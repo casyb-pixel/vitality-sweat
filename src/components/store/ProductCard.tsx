@@ -1,31 +1,41 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
-import type { ProductSize, StoreProduct } from "@/lib/store/products";
+import { useMemo, useState } from "react";
+import type { StoreProduct } from "@/lib/store/products";
 
 type ProductCardProps = {
   product: StoreProduct;
 };
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const [size, setSize] = useState<ProductSize>(product.sizes[0]);
+  const colors = product.colors?.length ? product.colors : [];
+  const [size, setSize] = useState(product.sizes[0] ?? "One Size");
+  const [color, setColor] = useState(colors[0] ?? "");
   const [added, setAdded] = useState(false);
+
+  const imageSrc = useMemo(() => {
+    if (product.mockups?.length) return product.mockups[0];
+    return product.image;
+  }, [product.image, product.mockups]);
 
   const onAdd = () => {
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };
 
+  const addedLabel = [size, color].filter(Boolean).join(" · ");
+
   return (
     <article className="flex h-full flex-col border border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
       <div className="relative mb-4 aspect-[4/3] overflow-hidden bg-brand-ink/5">
         <Image
-          src={product.image}
+          src={imageSrc}
           alt={product.imageAlt}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover"
+          unoptimized={imageSrc.startsWith("http")}
         />
       </div>
 
@@ -41,6 +51,34 @@ export default function ProductCard({ product }: ProductCardProps) {
           {product.currency}
         </span>
       </p>
+
+      {colors.length > 0 ? (
+        <fieldset className="mt-4">
+          <legend className="mb-2 font-sans text-xs font-semibold uppercase tracking-wider text-brand-muted">
+            Color
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {colors.map((option) => {
+              const selected = option === color;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setColor(option)}
+                  aria-pressed={selected}
+                  className={`border px-3 py-2 font-sans text-xs font-semibold uppercase tracking-wide transition-colors ${
+                    selected
+                      ? "border-brand-orange bg-brand-orange text-white"
+                      : "border-brand-ink/15 bg-surface text-brand-ink hover:border-brand-orange"
+                  }`}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
 
       <fieldset className="mt-4">
         <legend className="mb-2 font-sans text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -73,7 +111,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={onAdd}
         className="mt-5 inline-flex w-full items-center justify-center bg-brand-orange px-4 py-3.5 font-sans text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
       >
-        {added ? `Added · ${size}` : "Add to Cart"}
+        {added ? `Added · ${addedLabel}` : "Add to Cart"}
       </button>
     </article>
   );

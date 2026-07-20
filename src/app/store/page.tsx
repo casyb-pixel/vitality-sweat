@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import JsonLd from "@/components/seo/JsonLd";
-import ProductCard from "@/components/store/ProductCard";
+import StoreProductGrid from "@/components/store/StoreProductGrid";
 import {
   absoluteUrl,
   buildCanonical,
@@ -15,7 +14,7 @@ import {
 } from "@/lib/store/products";
 
 const STORE_DESCRIPTION =
-  "Shop Vitality Sweat branded merchandise — performance hoodies, everyday gym tees, insulated bottles, and training packs.";
+  "Shop Vitality Sweat branded merchandise — Printful-synced hoodies and training gear with live variants.";
 
 export const metadata: Metadata = {
   title: "Store",
@@ -67,20 +66,14 @@ export default function StorePage() {
               Vitality Sweat Store
             </h1>
             <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
-              Performance hoodies, everyday gym tees, and hydration that keeps
-              up — merch built for the Sweatlife.
+              Live Printful catalog — hoodie colors, sizes, and mockups synced
+              for the Sweatlife.
             </p>
           </div>
         </section>
 
         <section className="section-y site-shell">
-          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
-            {STORE_PRODUCTS.map((product) => (
-              <li key={product.id}>
-                <ProductCard product={product} />
-              </li>
-            ))}
-          </ul>
+          <StoreProductGrid initialProducts={STORE_PRODUCTS} />
         </section>
       </div>
     </>

@@ -1,6 +1,6 @@
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/seo/site";
 
-export type ProductSize = "XS" | "S" | "M" | "L" | "XL" | "XXL" | "One Size";
+export type ProductSize = string;
 
 export type StoreProduct = {
   id: string;
@@ -13,10 +13,14 @@ export type StoreProduct = {
   sku: string;
   category: string;
   sizes: ProductSize[];
+  colors?: string[];
+  mockups?: string[];
   featured?: boolean;
+  source?: "printful" | "fallback" | string;
   availability: "https://schema.org/InStock" | "https://schema.org/PreOrder";
 };
 
+/** Local fallback catalog used when Printful is unavailable. */
 export const STORE_PRODUCTS: StoreProduct[] = [
   {
     id: "vs-performance-hoodie",
@@ -30,7 +34,9 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     sku: "VS-HOOD-001",
     category: "Apparel",
     sizes: ["S", "M", "L", "XL", "XXL"],
+    colors: ["Black"],
     featured: true,
+    source: "fallback",
     availability: "https://schema.org/PreOrder",
   },
   {
@@ -46,6 +52,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     category: "Apparel",
     sizes: ["XS", "S", "M", "L", "XL", "XXL"],
     featured: true,
+    source: "fallback",
     availability: "https://schema.org/PreOrder",
   },
   {
@@ -61,6 +68,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     category: "Accessories",
     sizes: ["One Size"],
     featured: true,
+    source: "fallback",
     availability: "https://schema.org/InStock",
   },
   {
@@ -75,6 +83,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     sku: "VS-CAP-001",
     category: "Apparel",
     sizes: ["One Size"],
+    source: "fallback",
     availability: "https://schema.org/PreOrder",
   },
   {
@@ -89,6 +98,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     sku: "VS-BASE-PACK",
     category: "Digital Training",
     sizes: ["One Size"],
+    source: "fallback",
     availability: "https://schema.org/InStock",
   },
 ];
@@ -122,7 +132,9 @@ export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
           name: product.name,
           description: product.description,
           sku: product.sku,
-          image: absoluteUrl(product.image),
+          image: product.image.startsWith("http")
+            ? product.image
+            : absoluteUrl(product.image),
           category: product.category,
           brand: {
             "@type": "Brand",
