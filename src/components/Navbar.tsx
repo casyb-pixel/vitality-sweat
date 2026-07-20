@@ -45,11 +45,11 @@ export default function Navbar() {
           <Image
             src="/branding/logo-original-transparent.svg"
             alt="Vitality Sweat"
-            width={168}
-            height={48}
+            width={220}
+            height={54}
             priority
-            sizes="168px"
-            className="h-10 w-auto sm:h-11"
+            sizes="(max-width: 640px) 180px, 220px"
+            className="h-12 w-auto sm:h-14"
           />
         </Link>
 

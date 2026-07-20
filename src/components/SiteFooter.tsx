@@ -15,10 +15,10 @@ export default function SiteFooter() {
           <Image
             src="/branding/logo-black-transparent.svg"
             alt="Vitality Sweat"
-            width={140}
-            height={40}
-            sizes="140px"
-            className="h-9 w-auto"
+            width={220}
+            height={54}
+            sizes="220px"
+            className="h-12 w-auto sm:h-14"
           />
           <nav
             aria-label="Legal"

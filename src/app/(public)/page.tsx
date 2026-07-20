@@ -219,32 +219,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Field culture */}
-      <section className="section-y bg-surface-elevated">
-        <div className="site-shell grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-          <div className="order-2 lg:order-1">
-            <p className="eyebrow text-brand-orange">On the diamond</p>
-            <h2 className="mt-3 font-display text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-brand-ink text-balance">
-              Youth baseball with local pride.
-            </h2>
-            <p className="mt-5 font-sans text-lg leading-relaxed text-brand-muted">
-              Lessons in pitching, catching, hitting, and fielding — built for
-              young athletes who want fundamentals that stick and confidence
-              that shows up on game day.
-            </p>
-          </div>
-          <div className="relative order-1 aspect-[5/4] overflow-hidden lg:order-2">
-            <Image
-              src="/images/stock/sports/baseball-softball-gear.jpg"
-              alt="Baseball and softball gear ready for practice"
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Featured Chronicles */}
       <section className="section-y">
         <div className="site-shell">
