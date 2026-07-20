@@ -1,0 +1,254 @@
+{
+    "source":  {
+                   "url":  "https://vitalitysweat.com/",
+                   "pageTitle":  "Home - Sweatlife Chronicles",
+                   "scrapedAt":  "2026-07-20",
+                   "scope":  "home-page-only",
+                   "stackNotes":  "Astra + Elementor page ID 24462; Masteriyo LMS present"
+               },
+    "colorPalette":  {
+                         "notes":  "Refined from live site imagery + Drive brand assets. Logo pack and \u00275 times a week\u0027 graphic confirm orange accent + charcoal/navy wordmark. Exact HEX still approximate until brand-guide is digitized.",
+                         "primary":  "#E85A1B",
+                         "primaryDeep":  "#C4450F",
+                         "secondary":  "#0E1A24",
+                         "surface":  "#F7F4F0",
+                         "surfaceElevated":  "#FFFFFF",
+                         "muted":  "#5C6670",
+                         "ink":  "#121820",
+                         "cssTokensObserved":  [
+                                                   "--e-global-color-astglobalcolor0",
+                                                   "--e-global-color-astglobalcolor4",
+                                                   "--ast-global-color-5"
+                                               ],
+                         "brandGuideSignal":  "Orange accent mark + charcoal wordmark (see branding/brand-guide.png and graphics/cardio-5x-week.png)"
+                     },
+    "typography":  {
+                       "liveSite":  {
+                                        "heroHeadingSizePx":  59,
+                                        "bodyLeadSizePx":  20,
+                                        "eyebrow":  {
+                                                        "sizePx":  14,
+                                                        "weight":  600,
+                                                        "transform":  "uppercase",
+                                                        "letterSpacingPx":  2
+                                                    },
+                                        "family":  "Astra/Elementor default sans (not uniquely branded)"
+                                    },
+                       "recommendedNextJs":  {
+                                                 "display":  "Oswald",
+                                                 "body":  "Source Sans 3"
+                                             }
+                   },
+    "imageAssets":  [
+                        {
+                            "id":  "logo-primary",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/cropped-Vitality-Sweat-Logo-Original-with-Transparent-Background-5000x5000-1-scaled-1.webp",
+                            "recommendedFilename":  "vitality-sweat-logo.webp",
+                            "localPath":  "public/branding/vitality-sweat-logo.webp",
+                            "usage":  "Primary header logo (Sweatlife Chronicles / Vitality Sweat mark)",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "hero-collage",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/VitalitySweat.com-Hero-Image.png",
+                            "recommendedFilename":  "hero-strength-stamina-collage.png",
+                            "localPath":  "public/images/hero-strength-stamina-collage.png",
+                            "usage":  "Home hero visual — gym + baseball collage with orange panel dividers",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "pillar-fitness",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2024/07/VitalitySweat.com_.png",
+                            "recommendedFilename":  "pillar-general-fitness.png",
+                            "localPath":  "public/images/pillar-general-fitness.png",
+                            "usage":  "Change Your Life section — General Fitness Training Videos",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "pillar-nutrition",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/Heart-Healthy20Living.png",
+                            "recommendedFilename":  "pillar-nutrition-heart-healthy.png",
+                            "localPath":  "public/images/pillar-nutrition-heart-healthy.png",
+                            "usage":  "Change Your Life section — Nutrition Plans for Peak Performance",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "pillar-baseball",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/Lessons-in-Pitching-Catching-Hitting-Fielding.png",
+                            "recommendedFilename":  "pillar-youth-baseball-lessons.png",
+                            "localPath":  "public/images/pillar-youth-baseball-lessons.png",
+                            "usage":  "Change Your Life section — Youth Baseball Lessons in Southwest Louisiana",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "founder-hunter",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/image377121-e1769188656872.jpg",
+                            "recommendedFilename":  "hunter-broussard-portrait.jpg",
+                            "localPath":  "public/images/hunter-broussard-portrait.jpg",
+                            "usage":  "Meet Hunter Broussard founder portrait",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-youth-baseball",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/g9372a778a2333a02b4a9212bee822f34cd462bf1acf63eaccb065be2049c2a9535a17e11dbd1336a17bb825e97426a5a6db71712772ca319898b937e8e307aa1_1280-1488004.jpg",
+                            "recommendedFilename":  "gallery-youth-baseball-batter.jpg",
+                            "localPath":  "public/images/gallery-youth-baseball-batter.jpg",
+                            "usage":  "Success Stories mosaic — youth baseball action",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-gym-woman",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/pexels-photo-1717096-1717096-scaled.jpg",
+                            "recommendedFilename":  "gallery-gym-dumbbell-woman.jpg",
+                            "localPath":  "public/images/gallery-gym-dumbbell-woman.jpg",
+                            "usage":  "Success Stories mosaic — strength training",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-gear-flatlay",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/pexels-photo-6740821-6740821.jpg",
+                            "recommendedFilename":  "gallery-fitness-gear-flatlay.jpg",
+                            "localPath":  "public/images/gallery-fitness-gear-flatlay.jpg",
+                            "usage":  "Success Stories mosaic — home workout gear flat lay",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-nutrition-salad",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/pexels-photo-842571-842571-scaled.jpg",
+                            "recommendedFilename":  "gallery-nutrition-shrimp-salad.jpg",
+                            "localPath":  "public/images/gallery-nutrition-shrimp-salad.jpg",
+                            "usage":  "Success Stories mosaic — nutrition / healthy meal",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-battle-ropes",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/pexels-photo-8544788-8544788-scaled.jpg",
+                            "recommendedFilename":  "gallery-battle-ropes-beach.jpg",
+                            "localPath":  "public/images/gallery-battle-ropes-beach.jpg",
+                            "usage":  "Success Stories mosaic — endurance training",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "gallery-catcher",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2026/01/pexels-photo-7825370-7825370-scaled.jpg",
+                            "recommendedFilename":  "gallery-baseball-catcher.jpg",
+                            "localPath":  "public/images/gallery-baseball-catcher.jpg",
+                            "usage":  "Success Stories mosaic — catcher on field",
+                            "valuable":  true,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "template-pattern",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2020/10/pattern.png",
+                            "recommendedFilename":  "template-oval-pattern.png",
+                            "localPath":  "public/mockups/template-oval-pattern.png",
+                            "usage":  "Decorative LMS-template oval pattern (hero/newsletter) — not brand-critical",
+                            "valuable":  false,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "template-bg-shape",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2020/10/bg-shape.jpg",
+                            "recommendedFilename":  "template-bg-shape.jpg",
+                            "localPath":  "public/mockups/template-bg-shape.jpg",
+                            "usage":  "Template background shape behind founder section",
+                            "valuable":  false,
+                            "downloaded":  true
+                        },
+                        {
+                            "id":  "template-features-photo",
+                            "sourceUrl":  "https://vitalitysweat.com/wp-content/uploads/2020/10/features-and-benefits.jpg",
+                            "recommendedFilename":  "template-features-yoga.jpg",
+                            "localPath":  "public/mockups/template-features-yoga.jpg",
+                            "usage":  "Features \u0026 Benefits stock photo (template) — low brand value",
+                            "valuable":  false,
+                            "downloaded":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "Primary vector logo",
+                            "id":  "logo-original-svg",
+                            "localPath":  "public/branding/logo-original.svg",
+                            "valuable":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "Transparent SVG for light headers",
+                            "id":  "logo-original-transparent-svg",
+                            "localPath":  "public/branding/logo-original-transparent.svg",
+                            "valuable":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "Black logo for light backgrounds",
+                            "id":  "logo-black-transparent-svg",
+                            "localPath":  "public/branding/logo-black-transparent.svg",
+                            "valuable":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "White logo for dark headers/footers",
+                            "id":  "logo-white-transparent-svg",
+                            "localPath":  "public/branding/logo-white-transparent.svg",
+                            "valuable":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "Site favicon",
+                            "id":  "favicon-32",
+                            "localPath":  "public/branding/favicon-32.png",
+                            "valuable":  true
+                        },
+                        {
+                            "source":  "Google Drive Logos folder",
+                            "usage":  "VS Brand Guide reference",
+                            "id":  "brand-guide",
+                            "localPath":  "public/branding/brand-guide.png",
+                            "valuable":  true
+                        },
+                        {
+                            "id":  "drive-stock-curated-set",
+                            "localPath":  "public/images/stock/",
+                            "usage":  "28 curated photos across graphics/, nutrition/, fitness/, sports/",
+                            "source":  "Google Drive stock folder",
+                            "valuable":  true,
+                            "downloaded":  true,
+                            "categories":  {
+                                               "graphics":  5,
+                                               "nutrition":  5,
+                                               "fitness":  15,
+                                               "sports":  3
+                                           }
+                        }
+                    ],
+    "driveImport":  {
+                        "logosFolder":  "https://drive.google.com/drive/folders/1vISMWPat6EAdUNjNw7_fNe7tppgZOOTW",
+                        "stockFolder":  "https://drive.google.com/drive/folders/1pyvk0Syx5PGfKDvjTSH36r3lempomYKl",
+                        "importedAt":  "2026-07-20",
+                        "brandingFilesImported":  24,
+                        "stockFilesCurated":  28,
+                        "stockFilesSkipped":  [
+                                                  "American football game photo",
+                                                  "Night soccer with club branding (Frome Town FC)",
+                                                  "Toddler soccer practice",
+                                                  "Skateboard trick close-up",
+                                                  "Prenatal Pilates reformer",
+                                                  "Pickleball paddle flatlay",
+                                                  "Padel court prep",
+                                                  "Greenhouse yoga (active aging) — kept out to prioritize athletic performance look",
+                                                  "Broken Drive shortcut (06122016 1051.jpg)"
+                                              ],
+                        "curationNotes":  "Kept assets aligned with Vitality Sweat pillars: athletic training, nutrition, youth/team sports (esp. baseball/softball), and branded Canva graphics. Skipped off-brand or third-party-branded sports photos."
+                    }
+}
