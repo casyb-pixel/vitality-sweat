@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
+/* Brand tokens live in @theme below.
+   See also ./tailwind.config.ts for documented HEX reference (VS Brand Guide). */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* VS Brand Guide */
+  --brand-ink: #404040;
+  --brand-muted: #6f6b6b;
+  --brand-orange: #ff6600;
+  --brand-orange-deep: #e55c00;
+  --surface: #f4f2ef;
+  --surface-elevated: #ffffff;
+  --surface-dark: #1a1a1a;
+
+  /* Layout */
+  --site-max: 72rem;
+  --header-h: 4.25rem;
+  --section-y: clamp(3.5rem, 8vw, 6.5rem);
+  --gutter: clamp(1.25rem, 4vw, 2.5rem);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-orange-deep: var(--brand-orange-deep);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-dark: var(--surface-dark);
+  --font-display: var(--font-vesper);
+  --font-sans: var(--font-source-sans);
+  --max-width-site: var(--site-max);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--surface);
+    color: var(--brand-ink);
+    font-family: var(--font-source-sans), system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--brand-orange) 35%, white);
+    color: var(--brand-ink);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .site-gutter {
+    padding-inline: var(--gutter);
+  }
+
+  .site-shell {
+    width: 100%;
+    max-width: var(--site-max);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .section-y {
+    padding-block: var(--section-y);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .eyebrow {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-muted);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-ken {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes soft-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-orange) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--brand-orange) 0%, transparent);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-up-delay {
+  animation: fade-up 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.animate-fade-up-delay-2 {
+  animation: fade-up 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+.animate-hero-media {
+  animation: hero-ken 8s ease-out both;
+}
+
+.animate-cta-pulse {
+  animation: soft-glow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-fade-up,
+  .animate-fade-up-delay,
+  .animate-fade-up-delay-2,
+  .animate-hero-media,
+  .animate-cta-pulse {
+    animation: none !important;
+  }
 }
