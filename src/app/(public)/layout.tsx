@@ -1,4 +1,5 @@
 import Navbar from "@/components/Navbar";
+import AuthGate from "@/components/auth/AuthGate";
 
 export default function PublicLayout({
   children,
@@ -8,6 +9,7 @@ export default function PublicLayout({
   return (
     <>
       <Navbar />
+      <AuthGate />
       {children}
     </>
   );
