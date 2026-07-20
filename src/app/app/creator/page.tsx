@@ -9,7 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Creator Studio",
   description:
-    "Private Vitality Sweat creator backdoor for social video direction and captions.",
+    "Private Vitality Sweat creator backdoor for Video Studio and AI Blog Architect.",
   robots: { index: false, follow: false },
 };
 

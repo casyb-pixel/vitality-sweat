@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
-import { getFeaturedBlogPost } from "@/lib/blog/posts";
+import { getFeaturedBlogPostAsync } from "@/lib/blog/posts";
 import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -42,8 +42,8 @@ const PILLARS = [
   },
 ] as const;
 
-export default function HomePage() {
-  const featuredPost = getFeaturedBlogPost();
+export default async function HomePage() {
+  const featuredPost = await getFeaturedBlogPostAsync();
 
   return (
     <>

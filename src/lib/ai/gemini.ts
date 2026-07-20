@@ -1,7 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
-/** Default target — override with GEMINI_MODEL (e.g. gemini-2.0-flash, gemini-2.5-pro). */
+/** Default text model — override with GEMINI_MODEL. */
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
+/** Default image model — override with GEMINI_IMAGE_MODEL. */
+export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
 
 export function getGeminiApiKey(): string | undefined {
   const key = process.env.GEMINI_API_KEY?.trim();
@@ -10,6 +13,10 @@ export function getGeminiApiKey(): string | undefined {
 
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+}
+
+export function getGeminiImageModel(): string {
+  return process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_GEMINI_IMAGE_MODEL;
 }
 
 /**

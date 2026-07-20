@@ -127,6 +127,39 @@ export function getBlogSlugs(): string[] {
   return BLOG_POSTS.map((post) => post.slug);
 }
 
+/** Static archive + published Supabase posts (Creator Studio pipeline). */
+export async function getAllBlogPostsAsync(): Promise<MigratedPost[]> {
+  const {
+    fetchPublishedSupabasePosts,
+  } = await import("@/lib/blog/supabase-catalog");
+  const remote = await fetchPublishedSupabasePosts();
+  const bySlug = new Map<string, MigratedPost>();
+  for (const post of BLOG_POSTS) bySlug.set(post.slug, post);
+  for (const post of remote) {
+    if (!bySlug.has(post.slug)) bySlug.set(post.slug, post);
+  }
+  return Array.from(bySlug.values()).sort(
+    (a, b) =>
+      new Date(b.datePublished).getTime() - new Date(a.datePublished).getTime(),
+  );
+}
+
+export async function getBlogPostBySlugAsync(
+  slug: string,
+): Promise<MigratedPost | undefined> {
+  const local = getBlogPostBySlug(slug);
+  if (local) return local;
+  const {
+    fetchPublishedSupabasePostBySlug,
+  } = await import("@/lib/blog/supabase-catalog");
+  return fetchPublishedSupabasePostBySlug(slug);
+}
+
+export async function getFeaturedBlogPostAsync(): Promise<MigratedPost> {
+  const all = await getAllBlogPostsAsync();
+  return all.find((post) => post.featured) ?? all[0] ?? getFeaturedBlogPost();
+}
+
 export function buildArticleJsonLd(post: MigratedPost) {
   const url = absoluteUrl(`/blog/${post.slug}`);
   return {

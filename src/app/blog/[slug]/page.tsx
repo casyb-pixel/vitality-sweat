@@ -2,31 +2,34 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ArticleBlocks from "@/components/blog/ArticleBlocks";
 import Navbar from "@/components/Navbar";
 import JsonLd from "@/components/seo/JsonLd";
 import FeaturedGearSlider from "@/components/store/FeaturedGearSlider";
 import {
   buildArticleJsonLd,
-  getAllBlogPosts,
-  getBlogPostBySlug,
-  type BlogBlock,
+  getAllBlogPostsAsync,
+  getBlogPostBySlugAsync,
 } from "@/lib/blog/posts";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
 import { getFeaturedGear } from "@/lib/store/products";
+
+export const revalidate = 60;
 
 type BlogPageProps = {
   params: Promise<{ slug: string }>;
 };
 
 export async function generateStaticParams() {
-  return getAllBlogPosts().map((post) => ({ slug: post.slug }));
+  const posts = await getAllBlogPostsAsync();
+  return posts.map((post) => ({ slug: post.slug }));
 }
 
 export async function generateMetadata({
   params,
 }: BlogPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlugAsync(slug);
 
   if (!post) {
     return {
@@ -72,71 +75,9 @@ export async function generateMetadata({
   };
 }
 
-function ArticleBlocks({ blocks }: { blocks: BlogBlock[] }) {
-  return (
-    <div className="space-y-5">
-      {blocks.map((block, index) => {
-        const key = `${block.type}-${index}`;
-        switch (block.type) {
-          case "h2":
-            return (
-              <h2
-                key={key}
-                className="pt-4 font-display text-[clamp(1.65rem,3vw,2.15rem)] leading-[1.15] text-brand-ink"
-              >
-                {block.text}
-              </h2>
-            );
-          case "h3":
-            return (
-              <h3
-                key={key}
-                className="pt-2 font-display text-xl text-brand-ink sm:text-2xl"
-              >
-                {block.text}
-              </h3>
-            );
-          case "ul":
-            return (
-              <ul
-                key={key}
-                className="list-disc space-y-2 pl-5 font-sans text-lg leading-relaxed text-brand-muted"
-              >
-                {block.items.map((item) => (
-                  <li key={item.slice(0, 40)}>{item}</li>
-                ))}
-              </ul>
-            );
-          case "image":
-            return (
-              <figure key={key} className="relative my-6 aspect-[16/10] overflow-hidden bg-brand-ink/5">
-                <Image
-                  src={block.src}
-                  alt={block.alt}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                  className="object-contain bg-surface-elevated"
-                />
-              </figure>
-            );
-          default:
-            return (
-              <p
-                key={key}
-                className="font-sans text-lg leading-relaxed text-brand-muted"
-              >
-                {block.text}
-              </p>
-            );
-        }
-      })}
-    </div>
-  );
-}
-
 export default async function BlogArticlePage({ params }: BlogPageProps) {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlugAsync(slug);
 
   if (!post) notFound();
 

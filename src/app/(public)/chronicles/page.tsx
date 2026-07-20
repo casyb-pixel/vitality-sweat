@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
-import { getAllBlogPosts } from "@/lib/blog/posts";
+import { getAllBlogPostsAsync } from "@/lib/blog/posts";
 import { buildCanonical } from "@/lib/seo/site";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "The Sweatlife Chronicles",
@@ -28,8 +30,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ChroniclesPage() {
-  const posts = getAllBlogPosts();
+export default async function ChroniclesPage() {
+  const posts = await getAllBlogPostsAsync();
 
   return (
     <div className="bg-surface">
