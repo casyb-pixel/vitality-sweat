@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import SiteFooter from "@/components/SiteFooter";
 import { getFeaturedBlogPost } from "@/lib/blog/posts";
 import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 
@@ -322,21 +323,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-brand-ink/10 bg-surface-elevated py-10">
-        <div className="site-shell flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-          <Image
-            src="/branding/logo-black-transparent.svg"
-            alt="Vitality Sweat"
-            width={140}
-            height={40}
-            sizes="140px"
-            className="h-9 w-auto"
-          />
-          <p className="font-sans text-sm text-brand-muted">
-            © {new Date().getFullYear()} Vitality Sweat. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

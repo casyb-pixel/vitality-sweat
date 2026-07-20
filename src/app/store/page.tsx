@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
+import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
 import StoreProductGrid from "@/components/store/StoreProductGrid";
 import {
@@ -76,6 +77,7 @@ export default function StorePage() {
           <StoreProductGrid initialProducts={STORE_PRODUCTS} />
         </section>
       </div>
+      <SiteFooter />
     </>
   );
 }
