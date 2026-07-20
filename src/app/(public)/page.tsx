@@ -1,6 +1,24 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import { getFeaturedBlogPost } from "@/lib/blog/posts";
+import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: `${SITE_NAME} | Train. Fuel. Compete.`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  alternates: {
+    canonical: buildCanonical("/"),
+  },
+  openGraph: {
+    url: buildCanonical("/"),
+    title: `${SITE_NAME} | Train. Fuel. Compete.`,
+    description: DEFAULT_DESCRIPTION,
+  },
+};
 
 const PILLARS = [
   {
@@ -24,6 +42,8 @@ const PILLARS = [
 ] as const;
 
 export default function HomePage() {
+  const featuredPost = getFeaturedBlogPost();
+
   return (
     <>
       {/* HERO — one composition: brand, headline, support, CTAs, full-bleed media */}
@@ -198,6 +218,77 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Field culture */}
+      <section className="section-y bg-surface-elevated">
+        <div className="site-shell grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <div className="order-2 lg:order-1">
+            <p className="eyebrow text-brand-orange">On the diamond</p>
+            <h2 className="mt-3 font-display text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-brand-ink text-balance">
+              Youth baseball with local pride.
+            </h2>
+            <p className="mt-5 font-sans text-lg leading-relaxed text-brand-muted">
+              Lessons in pitching, catching, hitting, and fielding — built for
+              young athletes who want fundamentals that stick and confidence
+              that shows up on game day.
+            </p>
+          </div>
+          <div className="relative order-1 aspect-[5/4] overflow-hidden lg:order-2">
+            <Image
+              src="/images/stock/sports/baseball-softball-gear.jpg"
+              alt="Baseball and softball gear ready for practice"
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Chronicles */}
+      <section className="section-y">
+        <div className="site-shell">
+          <p className="eyebrow text-brand-orange">Sweatlife Chronicles</p>
+          <h2 className="mt-3 max-w-2xl font-display text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-brand-ink text-balance">
+            Featured from The Sweatlife Chronicles
+          </h2>
+          <p className="mt-3 max-w-xl font-sans text-lg text-brand-muted">
+            {featuredPost.excerpt}
+          </p>
+
+          <div className="mt-10 grid items-stretch gap-8 lg:grid-cols-12 lg:gap-12">
+            <div className="relative min-h-[18rem] overflow-hidden bg-brand-ink/5 lg:col-span-7 lg:min-h-[24rem]">
+              <Image
+                src={featuredPost.coverImage}
+                alt={featuredPost.coverAlt}
+                fill
+                sizes="(max-width: 1024px) 100vw, 58vw"
+                className="object-cover"
+              />
+            </div>
+            <div className="flex flex-col justify-center lg:col-span-5">
+              <p className="eyebrow">Weight loss · Nutrition</p>
+              <h3 className="mt-3 font-display text-[clamp(1.75rem,3vw,2.5rem)] leading-[1.1] text-brand-ink text-balance">
+                {featuredPost.title}
+              </h3>
+              {featuredPost.subtitle ? (
+                <p className="mt-3 font-display text-lg text-brand-orange">
+                  {featuredPost.subtitle}
+                </p>
+              ) : null}
+              <p className="mt-4 font-sans leading-relaxed text-brand-muted">
+                {featuredPost.description}
+              </p>
+              <Link
+                href={`/blog/${featuredPost.slug}`}
+                className="mt-8 inline-flex w-fit items-center justify-center bg-brand-orange px-7 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
+              >
+                Read Article
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Launch CTA */}
       <section
         id="launch"
@@ -238,6 +329,7 @@ export default function HomePage() {
             alt="Vitality Sweat"
             width={140}
             height={40}
+            sizes="140px"
             className="h-9 w-auto"
           />
           <p className="font-sans text-sm text-brand-muted">

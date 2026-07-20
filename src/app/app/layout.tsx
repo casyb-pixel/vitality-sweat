@@ -17,6 +17,7 @@ export default function CreatorAppLayout({
               width={132}
               height={38}
               className="h-8 w-auto"
+              sizes="132px"
               priority
             />
             <span className="hidden font-sans text-[0.65rem] font-bold uppercase tracking-[0.14em] text-brand-orange sm:inline">

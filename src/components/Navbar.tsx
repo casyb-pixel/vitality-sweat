@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/chronicles", label: "The Sweatlife Chronicles" },
+  { href: "/store", label: "Store" },
 ] as const;
 
 export default function Navbar() {
@@ -47,6 +48,7 @@ export default function Navbar() {
             width={168}
             height={48}
             priority
+            sizes="168px"
             className="h-10 w-auto sm:h-11"
           />
         </Link>

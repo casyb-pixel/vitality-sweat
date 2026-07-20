@@ -2,14 +2,35 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import { getAllBlogPosts } from "@/lib/blog/posts";
+import { buildCanonical } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
   title: "The Sweatlife Chronicles",
   description:
-    "Stories, training notes, and performance nutrition from the Vitality Sweat community.",
+    "Stories, training notes, and performance nutrition from Hunter Broussard and the Vitality Sweat community.",
+  alternates: {
+    canonical: buildCanonical("/chronicles"),
+  },
+  openGraph: {
+    title: "The Sweatlife Chronicles",
+    description:
+      "Training truths, nutrition that travels, and field notes from Hunter's coaching life.",
+    url: buildCanonical("/chronicles"),
+    images: [
+      {
+        url: "/images/stock/graphics/blog-workout-plan-energy.png",
+        width: 1200,
+        height: 630,
+        alt: "Sweatlife Chronicles workout energy graphic",
+      },
+    ],
+  },
 };
 
 export default function ChroniclesPage() {
+  const posts = getAllBlogPosts();
+
   return (
     <div className="bg-surface">
       <section className="relative isolate min-h-[42vh] overflow-hidden bg-surface-dark text-white">
@@ -36,19 +57,36 @@ export default function ChroniclesPage() {
 
       <div className="section-y site-shell space-y-10">
         <AdSlot slotId="chronicles-top" size="banner" />
-        <article className="max-w-2xl">
-          <p className="font-sans text-lg leading-relaxed text-brand-muted">
-            Chronicles posts are coming soon to this Next.js home. Until then,
-            explore the training pillars on the{" "}
-            <Link
-              href="/"
-              className="font-semibold text-brand-orange hover:text-brand-orange-deep"
-            >
-              Vitality Sweat home page
-            </Link>
-            .
-          </p>
-        </article>
+        <ul className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
+          {posts.map((post) => (
+            <li key={post.slug}>
+              <Link href={`/blog/${post.slug}`} className="group block">
+                <div className="relative mb-4 aspect-[16/10] overflow-hidden bg-brand-ink/5">
+                  <Image
+                    src={post.coverImage}
+                    alt={post.coverAlt}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </div>
+                <p className="eyebrow text-brand-orange">
+                  {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(post.datePublished))}
+                </p>
+                <h2 className="mt-2 font-display text-2xl text-brand-ink group-hover:text-brand-orange">
+                  {post.title}
+                </h2>
+                <p className="mt-2 font-sans text-sm leading-relaxed text-brand-muted">
+                  {post.excerpt}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

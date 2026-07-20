@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Vesper_Libre } from "next/font/google";
+import JsonLd from "@/components/seo/JsonLd";
+import { buildOrganizationJsonLd } from "@/lib/blog/posts";
+import {
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_URL,
+  TWITTER_HANDLE,
+} from "@/lib/seo/site";
 import "./globals.css";
 
 const vesperLibre = Vesper_Libre({
@@ -16,15 +26,67 @@ const sourceSans = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Vitality Sweat | Train. Fuel. Compete.",
-    template: "%s | Vitality Sweat",
+    default: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "On-demand fitness training, peak-performance nutrition, and youth baseball lessons from Hunter Broussard in Southwest Louisiana. Read The Sweatlife Chronicles.",
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: "Hunter Broussard" }],
+  creator: "Hunter Broussard",
+  publisher: SITE_NAME,
+  keywords: [
+    "Vitality Sweat",
+    "Sweatlife Chronicles",
+    "Hunter Broussard",
+    "fitness training",
+    "youth baseball Louisiana",
+    "performance nutrition",
+    "Southwest Louisiana",
+  ],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: DEFAULT_DESCRIPTION,
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "Vitality Sweat — strength, stamina, and youth baseball",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: DEFAULT_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
+    creator: TWITTER_HANDLE,
+  },
   icons: {
     icon: "/branding/favicon-32.png",
+    apple: "/branding/app/android-icon-192.png",
   },
+  category: "fitness",
 };
 
 export default function RootLayout({
@@ -38,6 +100,7 @@ export default function RootLayout({
       className={`${vesperLibre.variable} ${sourceSans.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
+        <JsonLd data={buildOrganizationJsonLd()} />
         <main className="flex-1">{children}</main>
       </body>
     </html>

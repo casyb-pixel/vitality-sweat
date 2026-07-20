@@ -1,0 +1,24 @@
+{
+  "updatedAt": "2026-07-20",
+  "sources": [
+    "https://vitalitysweat.com/calorie-deficit-weight-loss-golden-rule/",
+    "https://vitalitysweat.blogspot.com/"
+  ],
+  "notes": "Full Blogger archive catalog lives in blogger-migration.json. Runtime posts are served from src/data/posts.ts + src/lib/blog/posts.ts.",
+  "routes": [
+    "/blog/calorie-deficit-weight-loss-golden-rule",
+    "/blog/fuel-engine-of-change-mastering-your",
+    "/blog/fuel-vs-fire-science-of-weight-loss-and",
+    "/blog/meal-prep-made-easy-step-by-step-guide",
+    "/blog/splash-into-fun-creative-pool-games-for",
+    "/blog/unlock-health-benefits-of-fish-rich",
+    "/blog/infused-water-refreshing-and-nutritious",
+    "/blog/discover-joy-of-kayaking-ultimate-guide",
+    "/blog/enhancing-fitness-through-active",
+    "/blog/the-food-pyramid-critical-look-at-usda",
+    "/blog/cardio-crush-timing-your-top",
+    "/blog/glute-goals-transform-your-glutes-with",
+    "/blog/embrace-your-childs-energy-foster",
+    "/blog/get-in-game-empower-your-kids-through"
+  ]
+}
