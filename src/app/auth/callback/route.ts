@@ -18,6 +18,11 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // Password recovery / invite flows land here with next=/auth/update-password.
+      if (next.startsWith("/auth/update-password")) {
+        return NextResponse.redirect(`${origin}/auth/update-password`);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();

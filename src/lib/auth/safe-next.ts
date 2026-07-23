@@ -9,6 +9,10 @@ export function sanitizeNextPath(
   const trimmed = next.trim();
   if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return fallback;
   if (trimmed.includes("://")) return fallback;
+  // Allow auth recovery destination used by password-reset emails.
+  if (trimmed.startsWith("/auth/update-password")) {
+    return "/auth/update-password";
+  }
   return trimmed;
 }
 

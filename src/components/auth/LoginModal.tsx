@@ -8,7 +8,7 @@ import { sanitizeNextPath } from "@/lib/auth/safe-next";
 import { createClient } from "@/utils/supabase/client";
 
 type AuthMode = "password" | "magic";
-type PortalView = "form" | "denied" | "magic-sent";
+type PortalView = "form" | "denied" | "magic-sent" | "reset-sent";
 
 type LoginModalProps = {
   open: boolean;
@@ -131,6 +131,35 @@ export default function LoginModal({
     });
   }
 
+  function sendPasswordReset() {
+    setError(null);
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Enter your email first, then request a reset link.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const supabase = createClient();
+        const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`;
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          trimmed,
+          { redirectTo },
+        );
+        if (resetError) {
+          setError(resetError.message);
+          return;
+        }
+        setView("reset-sent");
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Could not send reset email.",
+        );
+      }
+    });
+  }
+
   function goToProfile() {
     onClose();
     router.push("/profile");
@@ -168,7 +197,7 @@ export default function LoginModal({
               >
                 {view === "denied"
                   ? "Studio access denied"
-                  : view === "magic-sent"
+                  : view === "magic-sent" || view === "reset-sent"
                     ? "Check your email"
                     : "Sign in to continue"}
               </h2>
@@ -209,13 +238,23 @@ export default function LoginModal({
                 </button>
               </div>
             </div>
-          ) : view === "magic-sent" ? (
+          ) : view === "magic-sent" || view === "reset-sent" ? (
             <div className="space-y-4">
               <p className="font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-                We sent a magic link to{" "}
-                <span className="font-semibold text-brand-ink">{email}</span>.
-                Open it on this device to finish signing in, then we’ll route
-                you to Creator Studio if you’re authorized.
+                {view === "reset-sent" ? (
+                  <>
+                    We sent a password reset link to{" "}
+                    <span className="font-semibold text-brand-ink">{email}</span>.
+                    Open it to choose your own password, then sign in.
+                  </>
+                ) : (
+                  <>
+                    We sent a magic link to{" "}
+                    <span className="font-semibold text-brand-ink">{email}</span>.
+                    Open it on this device to finish signing in, then we’ll route
+                    you to Creator Studio if you’re authorized.
+                  </>
+                )}
               </p>
               <button
                 type="button"
@@ -285,12 +324,22 @@ export default function LoginModal({
 
                 {mode === "password" ? (
                   <div>
-                    <label
-                      htmlFor="auth-password"
-                      className="mb-2 block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted"
-                    >
-                      Password
-                    </label>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <label
+                        htmlFor="auth-password"
+                        className="block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted"
+                      >
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={sendPasswordReset}
+                        disabled={isPending}
+                        className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange hover:text-brand-orange-deep disabled:opacity-60"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <input
                       id="auth-password"
                       type="password"
