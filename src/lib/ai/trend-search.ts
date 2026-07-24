@@ -6,59 +6,84 @@ export type TrendSource = {
 };
 
 export type TrendResearch = {
-  provider: "serper" | "tavily" | "gemini-search";
+  provider: "tavily" | "serper" | "gemini-search" | "baseline";
   queries: string[];
   /** Condensed plain-text digest of trending queries, questions, and articles. */
   findings: string;
   sources: TrendSource[];
 };
 
-const SEARCH_TIMEOUT_MS = 20_000;
-const MAX_QUERIES = 3;
+const SEARCH_TIMEOUT_MS = 18_000;
+const MAX_QUERIES = 2;
+const MAX_RESULTS_PER_QUERY = 6;
 
 /**
- * Researches current, high-engagement search trends around Hunter's daily notes.
- * Provider chain: SERPER_API_KEY → TAVILY_API_KEY → Gemini Google Search grounding
- * (the last one needs no extra key beyond GEMINI_API_KEY).
+ * Researches current, high-engagement fitness/nutrition trends around Hunter's notes.
+ * Preferred provider: TAVILY_API_KEY → SERPER_API_KEY → Gemini Google Search grounding.
  */
 export async function runTrendResearch(input: {
   geminiApiKey: string;
   notes: string;
 }): Promise<TrendResearch> {
-  const serperKey = process.env.SERPER_API_KEY?.trim();
   const tavilyKey = process.env.TAVILY_API_KEY?.trim();
+  const serperKey = process.env.SERPER_API_KEY?.trim();
+  const queries = await deriveFitnessTrendQueries(
+    input.geminiApiKey,
+    input.notes,
+  );
 
-  if (serperKey || tavilyKey) {
-    const queries = await deriveSearchQueries(input.geminiApiKey, input.notes);
-    return serperKey
-      ? searchSerper(serperKey, queries)
-      : searchTavily(tavilyKey as string, queries);
+  if (tavilyKey) {
+    return searchTavily(tavilyKey, queries);
   }
-
+  if (serperKey) {
+    return searchSerper(serperKey, queries);
+  }
   return searchWithGeminiGrounding(input.geminiApiKey, input.notes);
 }
 
 /**
- * Turns raw workout/meal/practice notes into 2–3 Google-style queries aimed
- * at what people are actively searching for around those topics.
+ * Tavily-only helper for the generate_ideas workflow.
+ * Returns null when the key is missing so callers can fall back cleanly.
  */
-async function deriveSearchQueries(
+export async function fetchTavilyTrends(input: {
+  geminiApiKey: string;
+  notes: string;
+}): Promise<TrendResearch | null> {
+  const apiKey = process.env.TAVILY_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const queries = await deriveFitnessTrendQueries(
+    input.geminiApiKey,
+    input.notes,
+  );
+  return searchTavily(apiKey, queries);
+}
+
+/**
+ * Turns raw gym/meal notes into 1–2 high-engagement fitness search queries.
+ * Example: "incline bench 185" → "trending chest workout advice incline bench tips"
+ */
+async function deriveFitnessTrendQueries(
   geminiApiKey: string,
   notes: string,
 ): Promise<string[]> {
-  const fallback = [notes.replace(/\s+/g, " ").slice(0, 90)];
+  const heuristic = heuristicFitnessQuery(notes);
+
   try {
     const ai = createGeminiClient(geminiApiKey);
     const response = await ai.models.generateContent({
       model: getGeminiModel(),
       contents: [
-        "You convert an athlete's raw daily fitness notes into Google search queries.",
-        `Return ONLY a JSON array of ${MAX_QUERIES} short search queries (strings).`,
-        "Target what fitness readers are actively searching for RIGHT NOW around these topics — trending exercises, questions, and content angles. No hashtags.",
+        "You convert an athlete's messy daily fitness notes into web search queries.",
+        `Return ONLY a JSON array of ${MAX_QUERIES} short queries (strings).`,
+        "Optimize for high-engagement fitness and nutrition content people are searching for RIGHT NOW.",
+        'Example: notes mention "incline bench" → "trending chest workout advice tips incline bench growth".',
+        "No hashtags. Keep each query under 12 words.",
         `Notes:\n${notes.slice(0, 2000)}`,
       ].join("\n\n"),
       config: { responseMimeType: "application/json" },
     });
+
     const parsed = JSON.parse((response.text ?? "").trim()) as unknown;
     const queries = Array.isArray(parsed)
       ? parsed
@@ -66,10 +91,123 @@ async function deriveSearchQueries(
           .map((q) => q.trim())
           .slice(0, MAX_QUERIES)
       : [];
-    return queries.length ? queries : fallback;
+
+    if (queries.length) return queries;
   } catch {
-    return fallback;
+    // Fall through to heuristic — idea generation must not stall on query NLP.
   }
+
+  return [heuristic];
+}
+
+function heuristicFitnessQuery(notes: string): string {
+  const compact = notes.replace(/\s+/g, " ").trim().slice(0, 80);
+  const lower = compact.toLowerCase();
+
+  if (/incline|bench|chest|pec/.test(lower)) {
+    return "trending chest workout advice tips incline bench growth";
+  }
+  if (/squat|deadlift|leg|glute|quad/.test(lower)) {
+    return "trending leg day workout tips squat strength";
+  }
+  if (/meal|protein|calorie|diet|chicken|rice|macro/.test(lower)) {
+    return "trending athlete nutrition meal tips high protein";
+  }
+  if (/sprint|cardio|conditioning|run/.test(lower)) {
+    return "trending athlete conditioning cardio tips";
+  }
+  if (/baseball|pitch|bat|throw/.test(lower)) {
+    return "trending youth baseball training tips strength";
+  }
+
+  return compact
+    ? `trending fitness workout advice tips ${compact}`
+    : "trending fitness workout advice tips 2026";
+}
+
+async function searchTavily(
+  apiKey: string,
+  queries: string[],
+): Promise<TrendResearch> {
+  const lines: string[] = [];
+  const sources: TrendSource[] = [];
+  const succeeded: string[] = [];
+  const errors: string[] = [];
+
+  for (const query of queries.slice(0, MAX_QUERIES)) {
+    try {
+      const res = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query,
+          topic: "general",
+          search_depth: "basic",
+          include_answer: true,
+          max_results: MAX_RESULTS_PER_QUERY,
+        }),
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+      });
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        errors.push(
+          `Tavily ${res.status} for "${query}"${detail ? `: ${detail.slice(0, 120)}` : ""}`,
+        );
+        continue;
+      }
+
+      const data = (await res.json()) as {
+        results?: {
+          title?: string;
+          url?: string;
+          content?: string;
+          score?: number;
+        }[];
+        answer?: string;
+      };
+
+      succeeded.push(query);
+      lines.push(`## Query: ${query}`);
+      if (data.answer?.trim()) {
+        lines.push(`- Trend summary: ${data.answer.trim()}`);
+      }
+
+      const ranked = [...(data.results ?? [])].sort(
+        (a, b) => (b.score ?? 0) - (a.score ?? 0),
+      );
+      for (const item of ranked) {
+        if (!item.title) continue;
+        const snippet = (item.content ?? "").replace(/\s+/g, " ").slice(0, 280);
+        lines.push(
+          snippet
+            ? `- Article: ${item.title} — ${snippet}`
+            : `- Article: ${item.title}`,
+        );
+        if (item.url) sources.push({ title: item.title, url: item.url });
+      }
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? `Tavily network error for "${query}": ${error.message}`
+          : `Tavily network error for "${query}"`,
+      );
+    }
+  }
+
+  if (!succeeded.length) {
+    throw new Error(
+      errors[0] || "Tavily returned no usable search results.",
+    );
+  }
+
+  return {
+    provider: "tavily",
+    queries: succeeded,
+    findings: lines.join("\n"),
+    sources: dedupeSources(sources),
+  };
 }
 
 async function searchSerper(
@@ -124,53 +262,6 @@ async function searchSerper(
   };
 }
 
-async function searchTavily(
-  apiKey: string,
-  queries: string[],
-): Promise<TrendResearch> {
-  const lines: string[] = [];
-  const sources: TrendSource[] = [];
-
-  for (const query of queries.slice(0, MAX_QUERIES)) {
-    const res = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query, max_results: 6, search_depth: "basic" }),
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      throw new Error(`Tavily search failed (${res.status}) for "${query}".`);
-    }
-
-    const data = (await res.json()) as {
-      results?: { title?: string; url?: string; content?: string }[];
-      answer?: string;
-    };
-
-    lines.push(`## Query: ${query}`);
-    if (data.answer) lines.push(`- Summary: ${data.answer}`);
-    for (const item of data.results ?? []) {
-      if (!item.title) continue;
-      lines.push(`- Article: ${item.title} — ${(item.content ?? "").slice(0, 240)}`);
-      if (item.url) sources.push({ title: item.title, url: item.url });
-    }
-  }
-
-  return {
-    provider: "tavily",
-    queries,
-    findings: lines.join("\n"),
-    sources: dedupeSources(sources),
-  };
-}
-
-/**
- * No dedicated search key configured — use Gemini's built-in Google Search
- * grounding tool as the web search mechanism.
- */
 async function searchWithGeminiGrounding(
   geminiApiKey: string,
   notes: string,

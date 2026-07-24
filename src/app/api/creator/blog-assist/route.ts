@@ -6,7 +6,11 @@ import {
   getGeminiModel,
   isLikelyConnectionError,
 } from "@/lib/ai/gemini";
-import { runTrendResearch, type TrendResearch } from "@/lib/ai/trend-search";
+import {
+  fetchTavilyTrends,
+  runTrendResearch,
+  type TrendResearch,
+} from "@/lib/ai/trend-search";
 import { getCreatorRole } from "@/lib/auth/creator";
 import type {
   BlogAssistAction,
@@ -164,50 +168,35 @@ function collectDetails(body: BlogAssistBody): string {
 
 async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
   const model = getGeminiModel();
+  const notes = input.notes.trim();
 
+  // 1) Tavily live trends (preferred). Any network/rate-limit failure falls
+  // through so Gemini can still pitch ideas from baseline fitness knowledge.
   let research: TrendResearch | null = null;
   let researchWarning: string | null = null;
   try {
-    research = await runTrendResearch({
+    research = await fetchTavilyTrends({
       geminiApiKey: input.apiKey,
-      notes: input.notes,
+      notes,
     });
+    if (!research) {
+      // Key missing or empty — try the shared provider chain as a soft backup.
+      research = await runTrendResearch({
+        geminiApiKey: input.apiKey,
+        notes,
+      });
+    }
   } catch (error) {
+    research = null;
     researchWarning =
       error instanceof Error
-        ? `Trend research unavailable (${error.message}); ideas use notes + evergreen fitness search behavior.`
-        : "Trend research unavailable; ideas use notes + evergreen fitness search behavior.";
+        ? `Live trend search unavailable (${error.message}). Generating from Gemini baseline fitness knowledge so you can keep posting.`
+        : "Live trend search unavailable. Generating from Gemini baseline fitness knowledge so you can keep posting.";
+    console.warn("[blog-assist:generate_ideas]", researchWarning);
   }
 
-  const prompt = [
-    "You are the Vitality Sweat AI Blog Architect for Sweatlife Chronicles.",
-    "Hunter is a 17-year-old high school athlete. He logged messy gym notes on his phone.",
-    "Evaluate current fitness search trends and content angles against his notes.",
-    "Pitch exactly 3 DISTINCT blog options he can tap on his phone.",
-    "",
-    "Each option needs:",
-    "- title: magnetic, click-earning headline",
-    "- talkingPoints: exactly 3 short questions/prompts he will answer later with quick fragments (e.g. \"How did the weight feel?\", \"What's the #1 tip you'd give someone trying this?\")",
-    "- targetAudience: who this post is for and why they care",
-    "",
-    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
-    JSON.stringify({
-      summary: "string — 1 sentence on the trend landscape",
-      options: [
-        {
-          title: "string",
-          talkingPoints: ["string", "string", "string"],
-          targetAudience: "string",
-        },
-      ],
-    }),
-    "",
-    `HUNTER'S RAW NOTES:\n${input.notes.slice(0, 4000)}`,
-    "",
-    research
-      ? `LIVE TREND RESEARCH (${research.provider}):\n${research.findings.slice(0, 6000)}`
-      : "NOTE: Live trend research was unavailable — lean on evergreen high-engagement fitness searches.",
-  ].join("\n");
+  // 2) Synthesize Hunter's notes with (optional) Tavily findings → 3 options.
+  const prompt = buildGenerateIdeasPrompt({ notes, research });
 
   try {
     const ai = createGeminiClient(input.apiKey);
@@ -228,12 +217,16 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
 
     const parsed = parseIdeaOptions(raw);
     if (parsed.options.length < 1) {
-      return jsonError("Gemini did not return usable blog options. Try again.", 502, {
-        provider: "gemini",
-        model,
-        action: "generate_ideas",
-        raw: raw.slice(0, 1500),
-      });
+      return jsonError(
+        "Gemini did not return usable blog options. Try again.",
+        502,
+        {
+          provider: "gemini",
+          model,
+          action: "generate_ideas",
+          raw: raw.slice(0, 1500),
+        },
+      );
     }
 
     return NextResponse.json({
@@ -242,7 +235,8 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
       provider: "gemini",
       model,
       summary: parsed.summary,
-      options: parsed.options,
+      // Strict array of 3 (or fewer if model under-delivered) wizard cards.
+      options: parsed.options.slice(0, 3),
       research: research
         ? {
             provider: research.provider,
@@ -255,6 +249,54 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
   } catch (error) {
     return geminiErrorResponse(error, model, "generate_ideas");
   }
+}
+
+function buildGenerateIdeasPrompt(input: {
+  notes: string;
+  research: TrendResearch | null;
+}): string {
+  const trendBlock = input.research
+    ? [
+        `LIVE WEB TRENDS FROM ${input.research.provider.toUpperCase()}:`,
+        "Use these current high-engagement articles, summaries, and angles as the market signal.",
+        "Synthesize Hunter's real gym experience WITH these trends — each option must connect something authentic from his notes to something people are searching for right now.",
+        input.research.findings.slice(0, 6000),
+      ].join("\n")
+    : [
+        "LIVE WEB TRENDS: unavailable.",
+        "Fall back to evergreen high-engagement fitness/nutrition search behavior (chest growth, progressive overload, athlete meals, recovery, youth baseball training).",
+        "Still ground every option in Hunter's actual notes — invent nothing he didn't write.",
+      ].join("\n");
+
+  return [
+    "You are the Vitality Sweat AI Blog Architect for Sweatlife Chronicles.",
+    "Hunter is a 17-year-old high school athlete logging messy gym notes on his phone.",
+    "Your job: synthesize his real-life training/nutrition experience with current search trends, then pitch content he can tap through on mobile.",
+    "",
+    "OUTPUT RULES:",
+    "- Return exactly 3 DISTINCT blog options.",
+    "- Each option must include title, talkingPoints (exactly 3 short gym-friendly questions), and targetAudience.",
+    "- Titles should be magnetic and click-earning — never corporate or fluffy.",
+    "- talkingPoints are prompts HE will answer later in quick fragments (e.g. \"How did the weight feel?\", \"What's the #1 tip you'd give someone trying this?\").",
+    "- Do not invent PRs, weights, or events that are not in his notes.",
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      summary:
+        "string — 1 sentence on how his notes line up with current fitness search demand",
+      options: [
+        {
+          title: "string",
+          talkingPoints: ["string", "string", "string"],
+          targetAudience: "string",
+        },
+      ],
+    }),
+    "",
+    `HUNTER'S RAW DAILY NOTES:\n${input.notes.slice(0, 4000)}`,
+    "",
+    trendBlock,
+  ].join("\n");
 }
 
 async function handleFinalizePost(input: {
