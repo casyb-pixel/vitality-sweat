@@ -6,7 +6,7 @@ import type {
   VideoRecommendation,
 } from "@/lib/chronicles/drafts";
 import AiDirector from "@/components/creator/AiDirector";
-import BlogBuilder from "@/components/creator/BlogBuilder";
+import BlogWizard from "@/components/creator/BlogWizard";
 import VideoCanvas from "@/components/creator/VideoCanvas";
 
 type StudioTab = "video" | "blog";
@@ -19,8 +19,8 @@ type CreatorStudioProps = {
 };
 
 const TABS: { id: StudioTab; label: string }[] = [
+  { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
-  { id: "blog", label: "Blog Builder" },
 ];
 
 export default function CreatorStudio({
@@ -29,7 +29,7 @@ export default function CreatorStudio({
   creatorLabel,
   role,
 }: CreatorStudioProps) {
-  const [tab, setTab] = useState<StudioTab>("video");
+  const [tab, setTab] = useState<StudioTab>("blog");
   const [caption, setCaption] = useState("");
   const [activeRecTitle, setActiveRecTitle] = useState<string | null>(null);
 
@@ -40,7 +40,7 @@ export default function CreatorStudio({
         <h1 className="font-display text-[clamp(1.85rem,6vw,2.75rem)] leading-[1.05] text-brand-ink">
           {tab === "video"
             ? "Direct the next Sweatlife clip"
-            : "Architect the next Chronicle"}
+            : "Log today, publish tonight"}
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
           Signed in as{" "}
@@ -48,7 +48,7 @@ export default function CreatorStudio({
           · {role} access.
           {tab === "video"
             ? " Draft-aware recommendations on the left energy, phone-first canvas below for capture and captions."
-            : " Outline on your phone after a workout — Gemini sharpens headlines, transitions, and reading flow."}
+            : " Four quick steps from gym notes to a live Chronicle — no paragraphs required."}
         </p>
 
         <div
@@ -106,7 +106,7 @@ export default function CreatorStudio({
           role="tabpanel"
           aria-labelledby="studio-tab-blog"
         >
-          <BlogBuilder />
+          <BlogWizard />
         </div>
       )}
     </div>

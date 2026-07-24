@@ -1,7 +1,3 @@
-import {
-  fingerprintSummary,
-  type ArchiveFingerprint,
-} from "@/lib/blog/archive-fingerprint";
 import { BRAND_VISUAL_TOKENS, BRAND_GUIDE_URL } from "@/lib/ai/brand-visual";
 
 export type StructuredArticleDraft = {
@@ -14,38 +10,32 @@ export type StructuredArticleDraft = {
 };
 
 /**
- * Structural editor brief: Gemini must match the historical Sweatlife fingerprint.
+ * Structural editor brief: rewrite Hunter's rough daily notes into a
+ * publish-ready Sweatlife Chronicle using the house voice and layout rules.
  */
-export function buildArchiveStructurePrompt(input: {
+export function buildBrandStructurePrompt(input: {
   notes: string;
   title: string;
   excerpt: string;
   bodyMarkdown: string;
-  fingerprint: ArchiveFingerprint;
 }): string {
-  const fp = input.fingerprint;
-
   return [
     "You are the Vitality Sweat primary structural editor for Sweatlife Chronicles.",
-    "Your job: take Hunter’s rough notes and rewrite them to match the EXACT historical formatting fingerprint of our migrated archive (calorie-deficit baseline + Blogger posts).",
-    "",
-    "FINGERPRINT SUMMARY:",
-    fingerprintSummary(fp),
+    "Your job: take Hunter's raw daily fitness notes (workouts, practices, meals) and rewrite them into a complete, publish-ready blog article.",
     "",
     "TONE RULES:",
-    ...fp.toneNotes.map((n) => `- ${n}`),
+    "- Direct, sweaty, encouraging — a coach talking to athletes, never corporate or fluffy.",
+    "- First-person perspective from Hunter where the notes are personal; practical instruction elsewhere.",
+    "- Audience: athletes, parents of youth baseball players, and everyday fitness readers in Southwest Louisiana and beyond.",
     "",
-    "STRUCTURE / CADENCE RULES:",
-    ...fp.cadenceNotes.map((n) => `- ${n}`),
-    `- Target word count: ${fp.targetWordCountMin}–${fp.targetWordCountMax}.`,
-    `- Typical paragraph length ≈ ${fp.avgParagraphChars} characters.`,
-    `- Use markdown only: paragraphs, ## H2, ### H3, and - bullet lists. Do NOT invent HTML.`,
+    "STRUCTURE RULES:",
+    "- Target word count: 900–1400.",
+    "- Open with a 2–3 paragraph hook grounded in the day's real training moment.",
+    "- Organize the body with ## H2 sections (3–5) and ### H3 subsections where useful.",
+    "- Use - bullet lists for exercises, meals, and step-by-step cues.",
+    "- Close with a short actionable takeaway and a one-line CTA.",
+    "- Use markdown only: paragraphs, ## H2, ### H3, and - bullet lists. Do NOT invent HTML.",
     "- Do NOT include images in bodyMarkdown (the pipeline injects a text-free background visual separately).",
-    "",
-    "Example H2 phrasing from archive:",
-    ...fp.exampleH2s.slice(0, 5).map((h) => `- ${h}`),
-    "Example H3 phrasing from archive:",
-    ...fp.exampleH3s.slice(0, 6).map((h) => `- ${h}`),
     "",
     "Return ONLY valid JSON (no markdown fences) with this shape:",
     JSON.stringify({

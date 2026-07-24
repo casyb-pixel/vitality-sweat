@@ -1,62 +1,59 @@
-import { FinishReason, Modality } from "@google/genai";
 import { NextResponse } from "next/server";
-import { buildBrandVisualAidPrompt } from "@/lib/ai/brand-visual";
+import { BRAND_GUIDE_URL, BRAND_VISUAL_TOKENS } from "@/lib/ai/brand-visual";
 import {
   createGeminiClient,
   getGeminiApiKey,
-  getGeminiImageModel,
   getGeminiModel,
   isLikelyConnectionError,
 } from "@/lib/ai/gemini";
+import { runTrendResearch, type TrendResearch } from "@/lib/ai/trend-search";
 import { getCreatorRole } from "@/lib/auth/creator";
+import type {
+  BlogAssistAction,
+  BlogIdeaOption,
+  BlogImagePrompt,
+  BlogSeoMetadata,
+  FinalizedPostResult,
+} from "@/lib/blog/blog-assist";
 import {
   fingerprintSummary,
   getArchiveFingerprint,
 } from "@/lib/blog/archive-fingerprint";
-import type {
-  BlogAssistMode,
-  BlogAssistSuggestion,
-  StructuredArticleResult,
-} from "@/lib/blog/blog-assist";
-import {
-  blocksToMarkdown,
-  injectLeadingImage,
-  markdownToBlocks,
-} from "@/lib/blog/markdown-blocks";
-import {
-  buildArchiveStructurePrompt,
-  buildTextFreeBackgroundPrompt,
-  type StructuredArticleDraft,
-} from "@/lib/blog/structure-editor";
-import { uploadBlogVisualAid } from "@/lib/storage/blog-images";
-import { createServiceRoleClient } from "@/utils/supabase/admin";
+import { slugifyTitle } from "@/lib/blog/supabase-posts";
 import { createClient } from "@/utils/supabase/server";
 
-export const runtime = "nodejs";
-export const maxDuration = 120;
+/**
+ * Edge Runtime keeps the search + Gemini chain off Node cold starts and
+ * avoids Vercel 502 HTML timeouts. Visual upload stays on a separate Node route.
+ */
+export const runtime = "edge";
+export const maxDuration = 60;
 
-export type { BlogAssistMode, BlogAssistSuggestion, StructuredArticleResult };
+export type {
+  BlogAssistAction,
+  BlogIdeaOption,
+  BlogImagePrompt,
+  BlogSeoMetadata,
+  FinalizedPostResult,
+};
 
 type BlogAssistBody = {
+  action?: BlogAssistAction;
+  /** @deprecated Use `action` — mapped for older clients. */
+  mode?: string;
   notes?: string;
   title?: string;
-  excerpt?: string;
-  bodyMarkdown?: string;
-  mode?: BlogAssistMode;
+  targetAudience?: string;
+  /** Phase 3 bulleted / fragment answers. */
+  details?: string | string[];
+  talkingPoints?: string[];
+  answers?: { prompt?: string; answer?: string }[];
 };
-
-type InlineImagePart = {
-  data: string;
-  mimeType: string;
-};
-
-type UserClient = Awaited<ReturnType<typeof createClient>>;
 
 /**
- * Creator Studio → Gemini blog architect.
- * - Text assists: headlines / transitions / reading flow
- * - structure: archive fingerprint rewrite + text-free cover background
- * - visual: ad-hoc brand visual aid
+ * Mobile creator workflow:
+ * - generate_ideas → 3 trend-aware options (title, talkingPoints, targetAudience)
+ * - finalize_post → polished archive-fingerprint markdown + imagePrompt
  */
 export async function POST(request: Request) {
   try {
@@ -66,218 +63,244 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user || !getCreatorRole(user)) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized — creator privileges required." },
-        { status: 401 },
-      );
+      return jsonError("Unauthorized — creator privileges required.", 401);
     }
 
     let body: BlogAssistBody;
     try {
       body = (await request.json()) as BlogAssistBody;
     } catch {
-      return NextResponse.json(
-        { ok: false, error: "Invalid JSON body." },
-        { status: 400 },
-      );
+      return jsonError("Invalid JSON body.", 400);
     }
 
-    const notes = (body.notes ?? "").trim();
-    const title = (body.title ?? "").trim();
-    const excerpt = (body.excerpt ?? "").trim();
-    const bodyMarkdown = (body.bodyMarkdown ?? "").trim();
-    const mode: BlogAssistMode = body.mode ?? "full";
-
-    if (!notes && !title && !excerpt && !bodyMarkdown) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Provide notes, title, excerpt, or bodyMarkdown for Gemini to work with.",
-        },
-        { status: 400 },
+    const action = resolveAction(body);
+    if (!action) {
+      return jsonError(
+        'Send action: "generate_ideas" or "finalize_post".',
+        400,
       );
     }
 
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "GEMINI_API_KEY is not configured on the server. Add it to .env.local and restart Next.js.",
-        },
-        { status: 503 },
+      return jsonError(
+        "GEMINI_API_KEY is not configured on the server. Add it to .env.local and restart Next.js.",
+        503,
       );
     }
 
-    if (mode === "structure") {
-      return handleStructurePipeline({
-        apiKey,
-        title,
-        excerpt,
-        notes,
-        bodyMarkdown,
-        userClient: supabase,
-      });
-    }
-
-    if (mode === "visual") {
-      return handleVisualAid({
-        apiKey,
-        title,
-        excerpt,
-        notes,
-        bodyMarkdown,
-        userClient: supabase,
-      });
-    }
-
-    const model = getGeminiModel();
-    const prompt = buildBlogAssistPrompt({
-      notes,
-      title,
-      excerpt,
-      bodyMarkdown,
-      mode,
-    });
-
-    try {
-      const ai = createGeminiClient(apiKey);
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-      });
-
-      const raw = (response.text ?? "").trim();
-      if (!raw) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Gemini returned an empty response.",
-            provider: "gemini",
-            model,
-          },
-          { status: 502 },
+    if (action === "generate_ideas") {
+      const notes = (body.notes ?? "").trim();
+      if (!notes) {
+        return jsonError(
+          "Send Hunter's raw daily notes in the `notes` field.",
+          400,
         );
       }
-
-      return NextResponse.json({
-        ok: true,
-        provider: "gemini",
-        model,
-        mode,
-        suggestion: parseSuggestion(raw),
-        raw,
-      });
-    } catch (error) {
-      return geminiErrorResponse(error, model);
+      return handleGenerateIdeas({ apiKey, notes });
     }
+
+    const title = (body.title ?? "").trim();
+    if (!title) {
+      return jsonError("Send the selected `title` to finalize the post.", 400);
+    }
+
+    return handleFinalizePost({
+      apiKey,
+      title,
+      notes: (body.notes ?? "").trim(),
+      targetAudience: (body.targetAudience ?? "").trim(),
+      details: collectDetails(body),
+      talkingPoints: asStringArray(body.talkingPoints).slice(0, 3),
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return jsonError(message, 500);
   }
 }
 
-async function handleStructurePipeline(input: {
-  apiKey: string;
-  title: string;
-  excerpt: string;
-  notes: string;
-  bodyMarkdown: string;
-  userClient: UserClient;
-}) {
-  const fingerprint = getArchiveFingerprint();
-  const textModel = getGeminiModel();
-  const structurePrompt = buildArchiveStructurePrompt({
-    ...input,
-    fingerprint,
-  });
+function resolveAction(body: BlogAssistBody): BlogAssistAction | null {
+  if (body.action === "generate_ideas" || body.action === "finalize_post") {
+    return body.action;
+  }
+  // Transitional aliases from the previous wizard modes.
+  if (
+    body.mode === "trends" ||
+    body.mode === "full" ||
+    body.mode === "headlines"
+  ) {
+    return "generate_ideas";
+  }
+  if (body.mode === "draft" || body.mode === "structure") {
+    return "finalize_post";
+  }
+  return null;
+}
 
-  console.info(
-    `[blog-assist:structure] Refining notes to archive fingerprint (${fingerprint.sampleSize} posts, ~${fingerprint.avgWordCount} words)`,
-  );
+function collectDetails(body: BlogAssistBody): string {
+  if (typeof body.details === "string" && body.details.trim()) {
+    return body.details.trim();
+  }
+  if (Array.isArray(body.details)) {
+    return body.details
+      .filter((d): d is string => typeof d === "string" && d.trim().length > 0)
+      .map((d) => `- ${d.trim()}`)
+      .join("\n");
+  }
+  if (Array.isArray(body.answers)) {
+    return body.answers
+      .map((a) => {
+        const prompt = typeof a?.prompt === "string" ? a.prompt.trim() : "";
+        const answer = typeof a?.answer === "string" ? a.answer.trim() : "";
+        if (!answer) return "";
+        return prompt ? `Q: ${prompt}\nA: ${answer}` : `- ${answer}`;
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  }
+  return "";
+}
 
-  let draft: StructuredArticleDraft;
+async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
+  const model = getGeminiModel();
+
+  let research: TrendResearch | null = null;
+  let researchWarning: string | null = null;
+  try {
+    research = await runTrendResearch({
+      geminiApiKey: input.apiKey,
+      notes: input.notes,
+    });
+  } catch (error) {
+    researchWarning =
+      error instanceof Error
+        ? `Trend research unavailable (${error.message}); ideas use notes + evergreen fitness search behavior.`
+        : "Trend research unavailable; ideas use notes + evergreen fitness search behavior.";
+  }
+
+  const prompt = [
+    "You are the Vitality Sweat AI Blog Architect for Sweatlife Chronicles.",
+    "Hunter is a 17-year-old high school athlete. He logged messy gym notes on his phone.",
+    "Evaluate current fitness search trends and content angles against his notes.",
+    "Pitch exactly 3 DISTINCT blog options he can tap on his phone.",
+    "",
+    "Each option needs:",
+    "- title: magnetic, click-earning headline",
+    "- talkingPoints: exactly 3 short questions/prompts he will answer later with quick fragments (e.g. \"How did the weight feel?\", \"What's the #1 tip you'd give someone trying this?\")",
+    "- targetAudience: who this post is for and why they care",
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      summary: "string — 1 sentence on the trend landscape",
+      options: [
+        {
+          title: "string",
+          talkingPoints: ["string", "string", "string"],
+          targetAudience: "string",
+        },
+      ],
+    }),
+    "",
+    `HUNTER'S RAW NOTES:\n${input.notes.slice(0, 4000)}`,
+    "",
+    research
+      ? `LIVE TREND RESEARCH (${research.provider}):\n${research.findings.slice(0, 6000)}`
+      : "NOTE: Live trend research was unavailable — lean on evergreen high-engagement fitness searches.",
+  ].join("\n");
+
   try {
     const ai = createGeminiClient(input.apiKey);
     const response = await ai.models.generateContent({
-      model: textModel,
-      contents: structurePrompt,
+      model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
     });
+
     const raw = (response.text ?? "").trim();
     if (!raw) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Structural editor returned an empty response.",
-          provider: "gemini",
-          model: textModel,
-          mode: "structure" as const,
-        },
-        { status: 502 },
-      );
-    }
-    draft = parseStructuredDraft(raw, input);
-  } catch (error) {
-    return geminiErrorResponse(error, textModel);
-  }
-
-  const imagePrompt = buildTextFreeBackgroundPrompt({
-    title: draft.title,
-    visualSubject: draft.visualSubject,
-    excerpt: draft.excerpt,
-  });
-
-  console.info(
-    "[blog-assist:structure] Programmatic text-free background prompt ready — calling image model.",
-  );
-
-  let article: StructuredArticleResult = {
-    title: draft.title,
-    excerpt: draft.excerpt,
-    description: draft.description,
-    keywords: draft.keywords,
-    bodyMarkdown: draft.bodyMarkdown,
-    visualSubject: draft.visualSubject,
-    fingerprintSummary: fingerprintSummary(fingerprint),
-  };
-
-  try {
-    const generated = await generateAndUploadImage({
-      apiKey: input.apiKey,
-      prompt: imagePrompt,
-      title: draft.title,
-      altHint: `${draft.title} — text-free Sweatlife Chronicles background`,
-      userClient: input.userClient,
-      logPrefix: "structure",
-    });
-
-    if (generated.ok) {
-      const blocks = injectLeadingImage(markdownToBlocks(draft.bodyMarkdown), {
-        src: generated.uploaded.publicUrl,
-        alt: generated.uploaded.alt,
+      return jsonError("Gemini returned an empty response.", 502, {
+        provider: "gemini",
+        model,
+        action: "generate_ideas",
       });
-      article = {
-        ...article,
-        bodyMarkdown: blocksToMarkdown(blocks),
-        coverMarkdown: generated.uploaded.markdown,
-        coverUrl: generated.uploaded.publicUrl,
-      };
-    } else {
-      console.warn(
-        "[blog-assist:structure] Cover image skipped:",
-        generated.error,
-      );
+    }
+
+    const parsed = parseIdeaOptions(raw);
+    if (parsed.options.length < 1) {
+      return jsonError("Gemini did not return usable blog options. Try again.", 502, {
+        provider: "gemini",
+        model,
+        action: "generate_ideas",
+        raw: raw.slice(0, 1500),
+      });
     }
 
     return NextResponse.json({
       ok: true,
+      action: "generate_ideas" as const,
       provider: "gemini",
-      model: textModel,
-      imageModel: getGeminiImageModel(),
-      mode: "structure" as const,
+      model,
+      summary: parsed.summary,
+      options: parsed.options,
+      research: research
+        ? {
+            provider: research.provider,
+            queries: research.queries,
+            sources: research.sources,
+          }
+        : null,
+      researchWarning,
+    });
+  } catch (error) {
+    return geminiErrorResponse(error, model, "generate_ideas");
+  }
+}
+
+async function handleFinalizePost(input: {
+  apiKey: string;
+  title: string;
+  notes: string;
+  targetAudience: string;
+  details: string;
+  talkingPoints: string[];
+}) {
+  const model = getGeminiModel();
+  const fingerprint = getArchiveFingerprint();
+  const prompt = buildFinalizePrompt(input, fingerprint);
+
+  try {
+    const ai = createGeminiClient(input.apiKey);
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    });
+
+    const raw = (response.text ?? "").trim();
+    if (!raw) {
+      return jsonError("Gemini returned an empty article draft.", 502, {
+        provider: "gemini",
+        model,
+        action: "finalize_post",
+      });
+    }
+
+    const article = parseFinalizedPost(raw, input.title);
+    if (!article.bodyMarkdown.trim()) {
+      return jsonError("Gemini returned an incomplete article. Try again.", 502, {
+        provider: "gemini",
+        model,
+        action: "finalize_post",
+        raw: raw.slice(0, 1500),
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action: "finalize_post" as const,
+      provider: "gemini",
+      model,
       fingerprint: {
         summary: fingerprintSummary(fingerprint),
         avgWordCount: fingerprint.avgWordCount,
@@ -287,381 +310,380 @@ async function handleStructurePipeline(input: {
         targetWordCountMax: fingerprint.targetWordCountMax,
       },
       article,
-      suggestion: {
-        headlines: [draft.title],
-        sectionTransitions: [],
-        readingFlowTips: fingerprint.cadenceNotes.slice(0, 4),
-        improvedExcerpt: draft.excerpt,
-        summary: `Refined to archive fingerprint (${fingerprint.sampleSize} posts).`,
-      } satisfies BlogAssistSuggestion,
     });
   } catch (error) {
-    return geminiErrorResponse(error, getGeminiImageModel());
+    return geminiErrorResponse(error, model, "finalize_post");
   }
 }
 
-async function handleVisualAid(input: {
-  apiKey: string;
-  title: string;
-  excerpt: string;
-  notes: string;
-  bodyMarkdown: string;
-  userClient: UserClient;
-}) {
-  const model = getGeminiImageModel();
-  const prompt = buildBrandVisualAidPrompt(input);
-
-  console.info(
-    `[blog-assist:visual] Starting image generation with model "${model}"`,
-  );
-
-  try {
-    const generated = await generateAndUploadImage({
-      apiKey: input.apiKey,
-      prompt,
-      title: input.title || "Vitality Sweat visual aid",
-      altHint: input.title
-        ? `${input.title} — Vitality Sweat visual aid`
-        : "Vitality Sweat Sweatlife Chronicles visual aid",
-      userClient: input.userClient,
-      logPrefix: "visual",
-    });
-
-    if (!generated.ok) {
-      return NextResponse.json(
-        {
-          ok: false,
-          provider: "gemini",
-          model,
-          mode: "visual" as const,
-          error: generated.error,
-          finishReason: generated.finishReason ?? null,
-          textNotes: generated.textNotes ?? null,
-        },
-        { status: 502 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      provider: "gemini",
-      model,
-      mode: "visual" as const,
-      finishReason: generated.finishReason ?? null,
-      textNotes: generated.textNotes ?? null,
-      visual: {
-        markdown: generated.uploaded.markdown,
-        publicUrl: generated.uploaded.publicUrl,
-        path: generated.uploaded.path,
-        alt: generated.uploaded.alt,
-        mimeType: generated.uploaded.mimeType,
-        model,
-      },
-      markdown: generated.uploaded.markdown,
-    });
-  } catch (error) {
-    if (isStructureLimitError(error)) {
-      console.error(
-        "[blog-assist:visual] External API structure limit / payload error:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-    return geminiErrorResponse(error, model);
-  }
-}
-
-async function generateAndUploadImage(input: {
-  apiKey: string;
-  prompt: string;
-  title: string;
-  altHint: string;
-  userClient: UserClient;
-  logPrefix: string;
-}): Promise<
-  | {
-      ok: true;
-      uploaded: Awaited<ReturnType<typeof uploadBlogVisualAid>>;
-      finishReason?: string;
-      textNotes?: string;
-    }
-  | {
-      ok: false;
-      error: string;
-      finishReason?: string;
-      textNotes?: string;
-    }
-> {
-  const model = getGeminiImageModel();
-  const ai = createGeminiClient(input.apiKey);
-  const stream = await ai.models.generateContentStream({
-    model,
-    contents: input.prompt,
-    config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE],
-      imageConfig: {
-        aspectRatio: "16:9",
-        imageSize: "1K",
-      },
-    },
-  });
-
-  const collected: InlineImagePart[] = [];
-  let textNotes = "";
-  let lastFinishReason: string | undefined;
-  let chunkCount = 0;
-
-  for await (const chunk of stream) {
-    chunkCount += 1;
-    const finishReason = chunk.candidates?.[0]?.finishReason;
-    if (finishReason) lastFinishReason = String(finishReason);
-
-    if (
-      finishReason === FinishReason.MAX_TOKENS ||
-      finishReason === FinishReason.RECITATION ||
-      String(finishReason ?? "").includes("LENGTH")
-    ) {
-      console.warn(
-        `[blog-assist:${input.logPrefix}] Structure / token limit signal on chunk ${chunkCount}: finishReason=${finishReason}`,
-      );
-    }
-
-    const parts = chunk.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      if (part.text) textNotes += part.text;
-      if (part.inlineData?.data) {
-        collected.push({
-          data: part.inlineData.data,
-          mimeType: part.inlineData.mimeType || "image/png",
-        });
-      }
-    }
-
-    if (!parts.some((p) => p.inlineData?.data) && chunk.data) {
-      collected.push({ data: chunk.data, mimeType: "image/png" });
-    }
-  }
-
-  console.info(
-    `[blog-assist:${input.logPrefix}] Stream complete — chunks=${chunkCount}, images=${collected.length}, finishReason=${lastFinishReason ?? "n/a"}`,
-  );
-
-  if (lastFinishReason === FinishReason.MAX_TOKENS) {
-    console.error(
-      `[blog-assist:${input.logPrefix}] External API hit a structure/token limit (MAX_TOKENS). Image payload may be incomplete.`,
-    );
-  }
-
-  if (!collected.length) {
-    return {
-      ok: false,
-      error:
-        lastFinishReason === FinishReason.MAX_TOKENS
-          ? "Gemini hit a structure/token limit before returning image bytes. Try a shorter draft context."
-          : "Gemini returned no image data. Retry or check GEMINI_IMAGE_MODEL access.",
-      finishReason: lastFinishReason,
-      textNotes: textNotes.trim() || undefined,
-    };
-  }
-
-  const image = collected[collected.length - 1];
-  const buffer = Buffer.from(image.data, "base64");
-  if (!buffer.byteLength) {
-    return { ok: false, error: "Decoded image buffer was empty." };
-  }
-
-  const serviceClient = createServiceRoleClient();
-  const storageClient = serviceClient ?? input.userClient;
-  if (!serviceClient) {
-    console.warn(
-      `[blog-assist:${input.logPrefix}] SUPABASE_SERVICE_ROLE_KEY missing — uploading with user session client.`,
-    );
-  }
-
-  const uploaded = await uploadBlogVisualAid({
-    supabase: storageClient,
-    buffer,
-    mimeType: image.mimeType,
-    title: input.title,
-    altHint: input.altHint,
-  });
-
-  return {
-    ok: true,
-    uploaded,
-    finishReason: lastFinishReason,
-    textNotes: textNotes.trim() || undefined,
-  };
-}
-
-function parseStructuredDraft(
-  raw: string,
-  fallback: {
+function buildFinalizePrompt(
+  input: {
     title: string;
-    excerpt: string;
     notes: string;
-    bodyMarkdown: string;
+    targetAudience: string;
+    details: string;
+    talkingPoints: string[];
   },
-): StructuredArticleDraft {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  fingerprint: ReturnType<typeof getArchiveFingerprint>,
+): string {
+  return [
+    "You are a world-class fitness editor for Vitality Sweat / Sweatlife Chronicles.",
+    "Hunter is a 17-year-old athlete logging from the gym. He gave a selected title, messy raw notes, and bulleted fragment details — NOT full paragraphs.",
+    "Weave his conversational, real-life gym experiences into a highly engaging, publish-ready markdown blog post.",
+    "Ensure absolute grammatical perfection. Expand fragments into full sentences. Do NOT invent PRs, weights, or numbers he did not provide.",
+    "",
+    "MATCH OUR HISTORICAL H2/H3 FINGERPRINT (calorie-deficit archive baseline):",
+    fingerprintSummary(fingerprint),
+    "",
+    "STRUCTURE / CADENCE RULES:",
+    ...fingerprint.cadenceNotes.map((n) => `- ${n}`),
+    `- Target word count: ${fingerprint.targetWordCountMin}–${fingerprint.targetWordCountMax}.`,
+    `- Typical paragraph length ≈ ${fingerprint.avgParagraphChars} characters.`,
+    `- Aim for ~${fingerprint.avgH2} ## H2 sections and ~${fingerprint.avgH3} ### H3 subsections.`,
+    "- Use markdown only: paragraphs, ## H2, ### H3, and - bullet lists. No HTML. No images in bodyMarkdown.",
+    "",
+    "TONE RULES:",
+    ...fingerprint.toneNotes.map((n) => `- ${n}`),
+    "",
+    "Example H2 phrasing from archive:",
+    ...fingerprint.exampleH2s.slice(0, 5).map((h) => `- ${h}`),
+    "Example H3 phrasing from archive:",
+    ...fingerprint.exampleH3s.slice(0, 6).map((h) => `- ${h}`),
+    "",
+    "Also return an explicit imagePrompt object for a later Gemini Image API call.",
+    "The image must be TEXT-FREE (no letters, logos, watermarks, captions). 16:9 editorial background.",
+    `Brand color cues: charcoal ${BRAND_VISUAL_TOKENS.ink}, orange accent ${BRAND_VISUAL_TOKENS.orange}, warm surface ${BRAND_VISUAL_TOKENS.surface}. Guide: ${BRAND_GUIDE_URL}`,
+    "",
+    "SEO METADATA (required — Hunter never fills tags on his phone):",
+    "Generate seoMetadata from the FINAL article so the post is fully search-optimized on publish.",
+    "- metaTitle: highly clickable, SEO-optimized title under 60 characters; weave in primary fitness/nutrition keywords; no clickbait spam.",
+    "- metaDescription: compelling Google SERP summary between 140 and 160 characters that maximizes CTR; include a benefit or hook.",
+    "- slug: clean URL-friendly kebab-case string from the topic (e.g. incline-bench-press-tips-chest-growth); lowercase letters, numbers, hyphens only; no stop-word stuffing.",
+    "- keywords: array of 5–8 highly relevant search terms and tags grounded in the post content.",
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      title: "string — editorial headline for the article page",
+      excerpt: "string — short card teaser",
+      bodyMarkdown:
+        "string — full article markdown with ## / ### / paragraphs / lists",
+      seoMetadata: {
+        metaTitle: "string — ≤60 chars, keyword-rich SERP title",
+        metaDescription:
+          "string — 140–160 chars, CTR-focused Google snippet",
+        slug: "string — kebab-case url slug",
+        keywords: ["string", "string", "string", "string", "string"],
+      },
+      imagePrompt: {
+        subject: "string — 8–16 words, scene subject only",
+        lighting: "string",
+        composition: "string — 16:9 framing notes",
+        style: "string — brand color / photography look",
+        negativeConstraints:
+          "string — no text, logos, watermarks, UI, stickers, purple neon",
+        prompt:
+          "string — complete ready-to-send image generation prompt combining the above",
+      },
+    }),
+    "",
+    `SELECTED TITLE:\n${input.title}`,
+    input.targetAudience
+      ? `TARGET AUDIENCE:\n${input.targetAudience}`
+      : null,
+    input.talkingPoints.length
+      ? `TALKING POINTS HE ANSWERED:\n${input.talkingPoints.map((t) => `- ${t}`).join("\n")}`
+      : null,
+    `HUNTER'S RAW NOTES:\n${input.notes.slice(0, 4000) || "(none)"}`,
+    `HUNTER'S BULLETED DETAILS:\n${input.details.slice(0, 4000) || "(none — lean on the raw notes)"}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function parseIdeaOptions(raw: string): {
+  summary: string;
+  options: BlogIdeaOption[];
+} {
+  const cleaned = stripFences(raw);
+  try {
+    const parsed = JSON.parse(cleaned) as {
+      summary?: unknown;
+      options?: unknown;
+      suggestions?: unknown;
+    };
+    const list = Array.isArray(parsed.options)
+      ? parsed.options
+      : Array.isArray(parsed.suggestions)
+        ? parsed.suggestions
+        : [];
+
+    const options: BlogIdeaOption[] = [];
+    for (const item of list) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const title =
+        (typeof row.title === "string" && row.title.trim()) ||
+        (typeof row.headline === "string" && row.headline.trim()) ||
+        "";
+      if (!title) continue;
+
+      const talkingPoints = asStringArray(
+        row.talkingPoints ?? row.detailPrompts ?? row.thingsToCover,
+      ).slice(0, 3);
+
+      while (talkingPoints.length < 3) {
+        talkingPoints.push(
+          [
+            "How did this feel in the moment?",
+            "What's the #1 tip you'd give someone trying this?",
+            "Any numbers or details worth sharing?",
+          ][talkingPoints.length]!,
+        );
+      }
+
+      options.push({
+        title,
+        talkingPoints,
+        targetAudience:
+          typeof row.targetAudience === "string"
+            ? row.targetAudience.trim()
+            : "",
+      });
+      if (options.length === 3) break;
+    }
+
+    return {
+      summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "",
+      options,
+    };
+  } catch {
+    return { summary: "", options: [] };
+  }
+}
+
+function parseFinalizedPost(
+  raw: string,
+  fallbackTitle: string,
+): FinalizedPostResult {
+  const cleaned = stripFences(raw);
+  const fallbackImage = defaultImagePrompt(fallbackTitle);
 
   try {
-    const parsed = JSON.parse(cleaned) as Partial<StructuredArticleDraft>;
+    const parsed = JSON.parse(cleaned) as Partial<FinalizedPostResult> & {
+      visualSubject?: string;
+      description?: string;
+      keywords?: unknown;
+    };
+
     const title =
       (typeof parsed.title === "string" && parsed.title.trim()) ||
-      fallback.title ||
-      "Untitled Sweatlife Chronicle";
+      fallbackTitle;
     const bodyMarkdown =
-      (typeof parsed.bodyMarkdown === "string" && parsed.bodyMarkdown.trim()) ||
-      fallback.bodyMarkdown ||
-      fallback.notes;
+      typeof parsed.bodyMarkdown === "string" ? parsed.bodyMarkdown.trim() : "";
     const excerpt =
       (typeof parsed.excerpt === "string" && parsed.excerpt.trim()) ||
-      fallback.excerpt ||
       bodyMarkdown.slice(0, 160);
+
+    const seoMetadata = normalizeSeoMetadata(parsed.seoMetadata, {
+      title,
+      excerpt,
+      description:
+        typeof parsed.description === "string"
+          ? parsed.description.trim()
+          : "",
+      keywords: asStringArray(parsed.keywords),
+    });
 
     return {
       title,
       excerpt,
-      description:
-        (typeof parsed.description === "string" && parsed.description.trim()) ||
-        excerpt,
-      keywords: asStringArray(parsed.keywords).length
-        ? asStringArray(parsed.keywords)
-        : ["Sweatlife Chronicles", "Vitality Sweat", "Hunter Broussard"],
+      // Keep top-level fields aligned with SEO for older clients / UI chips.
+      description: seoMetadata.metaDescription,
+      keywords: seoMetadata.keywords,
       bodyMarkdown,
-      visualSubject:
-        (typeof parsed.visualSubject === "string" &&
-          parsed.visualSubject.trim()) ||
-        `Athletic training scene for ${title}`,
+      seoMetadata,
+      imagePrompt: normalizeImagePrompt(
+        parsed.imagePrompt,
+        title,
+        typeof parsed.visualSubject === "string"
+          ? parsed.visualSubject
+          : undefined,
+      ),
     };
   } catch {
-    console.warn(
-      "[blog-assist:structure] Failed to parse structural JSON — falling back to notes markdown.",
-    );
+    const seoMetadata = normalizeSeoMetadata(null, {
+      title: fallbackTitle,
+      excerpt: "",
+      description: "",
+      keywords: [],
+    });
     return {
-      title: fallback.title || "Untitled Sweatlife Chronicle",
-      excerpt: fallback.excerpt || fallback.notes.slice(0, 160),
-      description: fallback.excerpt || fallback.notes.slice(0, 160),
-      keywords: ["Sweatlife Chronicles", "Vitality Sweat"],
-      bodyMarkdown: fallback.bodyMarkdown || fallback.notes,
-      visualSubject: `Athletic editorial background for ${fallback.title || "Sweatlife Chronicles"}`,
+      title: fallbackTitle,
+      excerpt: "",
+      description: seoMetadata.metaDescription,
+      keywords: seoMetadata.keywords,
+      bodyMarkdown: "",
+      seoMetadata,
+      imagePrompt: fallbackImage,
     };
   }
 }
 
-function isStructureLimitError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes("max token") ||
-    msg.includes("maximum") ||
-    msg.includes("too large") ||
-    msg.includes("payload") ||
-    msg.includes("quota") ||
-    msg.includes("resource exhausted") ||
-    msg.includes("structure")
-  );
-}
+/**
+ * Coerce / repair Gemini SEO output so publish always has usable fields.
+ * metaTitle ≤60, metaDescription clamped toward 140–160, slug kebab-cased.
+ */
+function normalizeSeoMetadata(
+  value: unknown,
+  fallback: {
+    title: string;
+    excerpt: string;
+    description: string;
+    keywords: string[];
+  },
+): BlogSeoMetadata {
+  const row =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
 
-function geminiErrorResponse(error: unknown, model: string) {
-  const message =
-    error instanceof Error ? error.message : "Gemini request failed.";
-  const connection = isLikelyConnectionError(error);
-  const structure = isStructureLimitError(error);
-
-  if (structure) {
-    console.error(
-      `[blog-assist] Structure/limit error from Gemini (${model}):`,
-      message,
-    );
+  let metaTitle =
+    (typeof row.metaTitle === "string" && row.metaTitle.trim()) ||
+    fallback.title ||
+    "Sweatlife Chronicles";
+  if (metaTitle.length > 60) {
+    metaTitle = metaTitle.slice(0, 57).replace(/\s+\S*$/, "").trimEnd() + "…";
   }
 
-  return NextResponse.json(
-    {
-      ok: false,
-      provider: "gemini",
-      model,
-      error: connection
-        ? "Gemini connection dropped or timed out. Retry in a moment."
-        : structure
-          ? `Gemini structure/limit error: ${message}`
-          : message,
-      connectionError: connection,
-      structureLimit: structure,
-    },
-    { status: connection ? 504 : 502 },
-  );
+  let metaDescription =
+    (typeof row.metaDescription === "string" && row.metaDescription.trim()) ||
+    fallback.description ||
+    fallback.excerpt ||
+    metaTitle;
+  if (metaDescription.length > 160) {
+    metaDescription =
+      metaDescription.slice(0, 157).replace(/\s+\S*$/, "").trimEnd() + "…";
+  }
+  if (metaDescription.length < 140 && fallback.excerpt) {
+    const padded = `${metaDescription} ${fallback.excerpt}`.trim();
+    metaDescription =
+      padded.length <= 160
+        ? padded
+        : padded.slice(0, 157).replace(/\s+\S*$/, "").trimEnd() + "…";
+  }
+
+  const rawSlug =
+    (typeof row.slug === "string" && row.slug.trim()) ||
+    slugifyTitle(fallback.title || metaTitle);
+  const slug = slugifyTitle(rawSlug.replace(/_/g, "-"));
+
+  let keywords = asStringArray(row.keywords);
+  if (keywords.length < 5) {
+    const extras = [
+      ...fallback.keywords,
+      "Sweatlife Chronicles",
+      "Vitality Sweat",
+      "Hunter Broussard",
+      "fitness",
+      "nutrition",
+      "training",
+    ];
+    for (const extra of extras) {
+      if (keywords.length >= 5) break;
+      if (!keywords.some((k) => k.toLowerCase() === extra.toLowerCase())) {
+        keywords.push(extra);
+      }
+    }
+  }
+  keywords = keywords.slice(0, 8);
+
+  return { metaTitle, metaDescription, slug, keywords };
 }
 
-function buildBlogAssistPrompt(input: {
-  notes: string;
-  title: string;
-  excerpt: string;
-  bodyMarkdown: string;
-  mode: BlogAssistMode;
-}): string {
-  const focus =
-    input.mode === "headlines"
-      ? "Prioritize SEO-ready headline options (5–7)."
-      : input.mode === "transitions"
-        ? "Prioritize clear section transition lines between ideas."
-        : input.mode === "reading_flow"
-          ? "Prioritize reading-flow improvements: order, pacing, and skim-friendly structure."
-          : "Deliver a balanced full assist: headlines, transitions, and reading-flow tips.";
+function normalizeImagePrompt(
+  value: unknown,
+  title: string,
+  visualSubject?: string,
+): BlogImagePrompt {
+  const fallback = defaultImagePrompt(title, visualSubject);
+  if (!value || typeof value !== "object") return fallback;
+  const row = value as Record<string, unknown>;
 
-  return [
-    "You are the Vitality Sweat AI Blog Architect for Sweatlife Chronicles.",
-    "Brand voice: direct, sweaty, encouraging — never corporate or fluffy.",
-    "Audience: athletes, parents of youth baseball players, and everyday fitness readers in Southwest Louisiana and beyond.",
-    "Identity cues: charcoal (#404040) + orange (#ff6600); product name Vitality Sweat.",
-    focus,
-    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
-    JSON.stringify({
-      headlines: ["string"],
-      sectionTransitions: ["string"],
-      readingFlowTips: ["string"],
-      improvedExcerpt: "string",
-      summary: "string",
-    }),
-    input.title ? `Working title:\n${input.title}` : null,
-    input.excerpt ? `Current excerpt:\n${input.excerpt}` : null,
-    input.notes ? `Creator rough notes:\n${input.notes}` : null,
-    input.bodyMarkdown ? `Draft body (markdown):\n${input.bodyMarkdown}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const subject =
+    (typeof row.subject === "string" && row.subject.trim()) ||
+    fallback.subject;
+  const lighting =
+    (typeof row.lighting === "string" && row.lighting.trim()) ||
+    fallback.lighting;
+  const composition =
+    (typeof row.composition === "string" && row.composition.trim()) ||
+    fallback.composition;
+  const style =
+    (typeof row.style === "string" && row.style.trim()) || fallback.style;
+  const negativeConstraints =
+    (typeof row.negativeConstraints === "string" &&
+      row.negativeConstraints.trim()) ||
+    fallback.negativeConstraints;
+  const prompt =
+    (typeof row.prompt === "string" && row.prompt.trim()) ||
+    [
+      "Generate ONE text-free editorial background photograph for Sweatlife Chronicles.",
+      `Subject: ${subject}`,
+      `Lighting: ${lighting}`,
+      `Composition: ${composition}`,
+      `Style: ${style}`,
+      `Avoid: ${negativeConstraints}`,
+    ].join("\n");
+
+  return {
+    subject,
+    lighting,
+    composition,
+    style,
+    negativeConstraints,
+    prompt,
+  };
 }
 
-function parseSuggestion(raw: string): BlogAssistSuggestion {
-  const cleaned = raw
+function defaultImagePrompt(
+  title: string,
+  visualSubject?: string,
+): BlogImagePrompt {
+  const subject =
+    visualSubject?.trim() ||
+    `Athletic training scene inspired by: ${title}`.slice(0, 120);
+  const lighting =
+    "Natural gym / outdoor training light with warm highlights and soft shadows";
+  const composition =
+    "Single clear subject, generous breathing room, edge-to-edge cinematic 16:9 crop";
+  const style = `Realistic editorial photography; charcoal ${BRAND_VISUAL_TOKENS.ink} and warm ${BRAND_VISUAL_TOKENS.surface} tones with restrained orange ${BRAND_VISUAL_TOKENS.orange} accent energy — never purple neon`;
+  const negativeConstraints =
+    "Absolutely no text, letters, numbers, logos, watermarks, captions, posters, UI chrome, stickers, badges, or floating labels";
+
+  return {
+    subject,
+    lighting,
+    composition,
+    style,
+    negativeConstraints,
+    prompt: [
+      "Generate ONE text-free editorial background photograph for a Sweatlife Chronicles blog hero.",
+      negativeConstraints + ".",
+      `Subject: ${subject}`,
+      `Lighting: ${lighting}`,
+      `Composition: ${composition}`,
+      `Style: ${style}`,
+      `Brand guide: ${BRAND_GUIDE_URL}`,
+      `Article context title (do not render as text): ${title}`,
+    ].join("\n"),
+  };
+}
+
+function stripFences(raw: string): string {
+  return raw
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
-
-  try {
-    const parsed = JSON.parse(cleaned) as Partial<BlogAssistSuggestion>;
-    return {
-      headlines: asStringArray(parsed.headlines),
-      sectionTransitions: asStringArray(parsed.sectionTransitions),
-      readingFlowTips: asStringArray(parsed.readingFlowTips),
-      improvedExcerpt:
-        typeof parsed.improvedExcerpt === "string"
-          ? parsed.improvedExcerpt.trim()
-          : undefined,
-      summary:
-        typeof parsed.summary === "string" ? parsed.summary.trim() : undefined,
-    };
-  } catch {
-    return {
-      headlines: [],
-      sectionTransitions: [],
-      readingFlowTips: [cleaned.slice(0, 2000)],
-      summary: "Gemini returned unstructured text — see readingFlowTips.",
-    };
-  }
 }
 
 function asStringArray(value: unknown): string[] {
@@ -671,4 +693,36 @@ function asStringArray(value: unknown): string[] {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 12);
+}
+
+function jsonError(
+  error: string,
+  status: number,
+  extra: Record<string, unknown> = {},
+) {
+  return NextResponse.json({ ok: false, error, ...extra }, { status });
+}
+
+function geminiErrorResponse(
+  error: unknown,
+  model: string,
+  action: BlogAssistAction,
+) {
+  const message =
+    error instanceof Error ? error.message : "Gemini request failed.";
+  const connection = isLikelyConnectionError(error);
+
+  return NextResponse.json(
+    {
+      ok: false,
+      provider: "gemini",
+      model,
+      action,
+      error: connection
+        ? "Gemini connection dropped or timed out. Retry in a moment."
+        : message,
+      connectionError: connection,
+    },
+    { status: connection ? 504 : 502 },
+  );
 }
