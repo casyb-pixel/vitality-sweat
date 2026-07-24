@@ -7,12 +7,12 @@ export const runtime = "nodejs";
 
 /**
  * Magic-link / OAuth PKCE callback — exchanges `code` for a session cookie,
- * then routes creators to `next` and members to the profile screen.
+ * then routes creators to Studio (when requested) and members to the app.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = sanitizeNextPath(searchParams.get("next"), "/app/creator");
+  const next = sanitizeNextPath(searchParams.get("next"), "/app");
 
   if (code) {
     const supabase = await createClient();
@@ -29,12 +29,19 @@ export async function GET(request: Request) {
       const access = await resolveAccessDecision(supabase, user);
 
       if (access.status === "creator") {
-        const destination = next.startsWith("/app/") ? next : "/app/creator";
+        const destination = next.startsWith("/app") ? next : "/app/creator";
         return NextResponse.redirect(`${origin}${destination}`);
       }
 
       if (user) {
-        return NextResponse.redirect(`${origin}/profile`);
+        const wantsCreator =
+          next === "/app/creator" || next.startsWith("/app/creator/");
+        const destination = wantsCreator
+          ? "/app"
+          : next.startsWith("/app") || next.startsWith("/profile")
+            ? next
+            : "/app";
+        return NextResponse.redirect(`${origin}${destination}`);
       }
     } else {
       console.error(

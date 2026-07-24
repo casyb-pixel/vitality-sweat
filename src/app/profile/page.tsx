@@ -45,32 +45,32 @@ export default async function ProfilePage() {
               <p className="font-sans text-sm font-semibold text-brand-ink">
                 Creator access is active ({access.role}).
               </p>
-              <Link
-                href="/app/creator"
-                className="mt-4 inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
-              >
-                Open Creator Studio
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href="/app"
+                  className="inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+                >
+                  Open Vitality Engine
+                </Link>
+                <Link
+                  href="/app/creator"
+                  className="inline-flex min-h-11 items-center justify-center border border-brand-ink/15 px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+                >
+                  Open Creator Studio
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="mt-8 border border-brand-ink/10 bg-surface-elevated p-5">
               <p className="font-sans text-sm leading-relaxed text-brand-muted">
-                This account is a standard member profile. Creator Studio is
-                reserved for authorized coaches. If you need access, contact
-                Hunter at{" "}
-                <a
-                  href="mailto:info@vitalitysweat.com"
-                  className="font-semibold text-brand-orange hover:text-brand-orange-deep"
-                >
-                  info@vitalitysweat.com
-                </a>
-                .
+                Your member profile is ready. Open the Vitality Engine app for
+                workouts, meal planning, and the video library.
               </p>
               <Link
-                href="/"
-                className="mt-4 inline-flex min-h-11 items-center justify-center border border-brand-ink/15 px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+                href="/app"
+                className="mt-4 inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
               >
-                Back home
+                Open Vitality Engine
               </Link>
             </div>
           )}

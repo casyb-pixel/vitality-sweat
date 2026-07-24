@@ -57,7 +57,9 @@ export default function LoginModal({
 
   if (!open) return null;
 
-  const safeNext = sanitizeNextPath(nextPath, "/app/creator");
+  const safeNext = sanitizeNextPath(nextPath, "/app");
+  const wantsCreatorStudio =
+    safeNext === "/app/creator" || safeNext.startsWith("/app/creator/");
 
   async function afterAuthenticated() {
     const supabase = createClient();
@@ -75,12 +77,26 @@ export default function LoginModal({
 
     if (access.status === "creator") {
       onClose();
-      router.replace(safeNext.startsWith("/app/") ? safeNext : "/app/creator");
+      router.replace(
+        safeNext.startsWith("/app/") ? safeNext : "/app/creator",
+      );
       router.refresh();
       return;
     }
 
-    setView("denied");
+    // Members may use the Vitality Engine app; only Creator Studio is gated.
+    if (wantsCreatorStudio) {
+      setView("denied");
+      return;
+    }
+
+    onClose();
+    const destination =
+      safeNext.startsWith("/app") || safeNext.startsWith("/profile")
+        ? safeNext
+        : "/app";
+    router.replace(destination);
+    router.refresh();
   }
 
   function submitPassword(event: React.FormEvent) {
@@ -190,7 +206,9 @@ export default function LoginModal({
                 height={40}
                 className="h-9 w-auto"
               />
-              <p className="eyebrow mt-4 text-brand-orange">Creator access</p>
+              <p className="eyebrow mt-4 text-brand-orange">
+                {view === "denied" ? "Creator access" : "Vitality Engine"}
+              </p>
               <h2
                 id={titleId}
                 className="mt-2 font-display text-2xl text-brand-ink sm:text-[1.75rem]"
@@ -218,23 +236,27 @@ export default function LoginModal({
             <div className="space-y-4">
               <p className="font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
                 You’re signed in, but this account doesn’t have Creator Studio
-                privileges yet. Standard member profiles stay on the public site
-                — ask Hunter if you need coach access.
+                privileges yet. You can still use the Vitality Engine member
+                app — ask Hunter if you need coach access.
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={goToProfile}
+                  onClick={() => {
+                    onClose();
+                    router.replace("/app");
+                    router.refresh();
+                  }}
                   className="inline-flex min-h-11 flex-1 items-center justify-center bg-brand-orange px-4 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
                 >
-                  Go to profile
+                  Open the app
                 </button>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={goToProfile}
                   className="inline-flex min-h-11 flex-1 items-center justify-center border border-brand-ink/15 px-4 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
                 >
-                  Stay on home
+                  Go to profile
                 </button>
               </div>
             </div>
@@ -251,8 +273,7 @@ export default function LoginModal({
                   <>
                     We sent a magic link to{" "}
                     <span className="font-semibold text-brand-ink">{email}</span>.
-                    Open it on this device to finish signing in, then we’ll route
-                    you to Creator Studio if you’re authorized.
+                    Open it on this device to finish signing in.
                   </>
                 )}
               </p>

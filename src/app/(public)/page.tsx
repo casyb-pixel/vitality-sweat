@@ -79,7 +79,7 @@ export default async function HomePage() {
           </p>
           <div className="animate-fade-up-delay-2 mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
-              href="#launch"
+              href="/app"
               className="inline-flex items-center justify-center bg-brand-orange px-7 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
             >
               Launch App
@@ -287,9 +287,7 @@ export default async function HomePage() {
             for the way you actually live and train.
           </p>
           <Link
-            href="https://vitalitysweat.com/"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/app"
             className="mt-9 inline-flex items-center justify-center bg-brand-orange px-8 py-4 font-sans text-sm font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-brand-orange-deep"
           >
             Launch App

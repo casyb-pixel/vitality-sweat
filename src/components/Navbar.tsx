@@ -67,7 +67,7 @@ export default function Navbar() {
             </Link>
           ))}
           <Link
-            href="/#launch"
+            href="/app"
             className="animate-cta-pulse inline-flex items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white transition-[background-color,transform] hover:bg-brand-orange-deep active:scale-[0.98]"
           >
             Launch App
@@ -126,7 +126,7 @@ export default function Navbar() {
             </Link>
           ))}
           <Link
-            href="/#launch"
+            href="/app"
             onClick={() => setOpen(false)}
             className="mt-6 inline-flex items-center justify-center bg-brand-orange px-6 py-4 font-sans text-base font-bold uppercase tracking-[0.1em] text-white"
           >

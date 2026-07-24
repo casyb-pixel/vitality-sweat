@@ -16,7 +16,7 @@ function AuthQueryListener() {
 
   const authFlag = searchParams.get("auth");
   const nextPath = useMemo(
-    () => sanitizeNextPath(searchParams.get("next"), "/app/creator"),
+    () => sanitizeNextPath(searchParams.get("next"), "/app"),
     [searchParams],
   );
 
