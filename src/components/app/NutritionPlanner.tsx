@@ -24,11 +24,34 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
     startTransition(async () => {
       try {
         const res = await fetch("/api/app/meal-plan", { method: "POST" });
-        const json = (await res.json()) as {
+        const contentType = res.headers.get("content-type") ?? "";
+        const raw = await res.text();
+
+        // Hosting timeouts / Next error pages return HTML — surface that clearly.
+        if (
+          !contentType.includes("application/json") ||
+          raw.trimStart().startsWith("<!")
+        ) {
+          setError(
+            res.status === 504 || res.status === 408
+              ? "Meal plan generation timed out. Please try again in a moment."
+              : `Meal plan request failed (${res.status || "unknown"}). The server returned an error page instead of JSON — try again, or check that GEMINI_API_KEY is set in production.`,
+          );
+          return;
+        }
+
+        let json: {
           ok?: boolean;
           mealPlan?: MealPlan;
           error?: string;
         };
+        try {
+          json = JSON.parse(raw) as typeof json;
+        } catch {
+          setError("Could not read the meal plan response. Please try again.");
+          return;
+        }
+
         if (!res.ok || !json.ok || !json.mealPlan) {
           setError(json.error ?? "Could not generate meal plan.");
           return;

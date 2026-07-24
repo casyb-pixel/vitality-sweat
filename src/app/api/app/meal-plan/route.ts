@@ -16,7 +16,12 @@ import {
 } from "@/lib/fitness/profile";
 import { createClient } from "@/utils/supabase/server";
 
-export const runtime = "nodejs";
+/**
+ * Edge keeps Gemini off Node cold starts and raises the practical timeout
+ * ceiling on Hobby (Edge ~25s vs Serverless ~10s), which avoids Vercel’s
+ * HTML timeout page that the client then fails to parse as JSON.
+ */
+export const runtime = "edge";
 export const maxDuration = 60;
 
 export async function GET() {
