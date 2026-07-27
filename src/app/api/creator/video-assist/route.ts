@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createGeminiClient,
+  formatGeminiError,
   getGeminiApiKey,
   getGeminiModel,
   isLikelyConnectionError,
@@ -448,8 +449,7 @@ function geminiError(
   model: string,
   action: VideoAssistAction,
 ) {
-  const message =
-    error instanceof Error ? error.message : "Gemini request failed.";
+  const message = formatGeminiError(error);
   const connection = isLikelyConnectionError(error);
   return NextResponse.json(
     {

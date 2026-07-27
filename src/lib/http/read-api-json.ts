@@ -23,6 +23,11 @@ export async function readApiJson<T = unknown>(
   } catch {
     const looksHtml = /^\s*</.test(trimmed) || /<!DOCTYPE/i.test(trimmed);
     if (looksHtml || res.status >= 502) {
+      // Prefer any JSON-ish error fragment inside gateway HTML when present.
+      const embedded = trimmed.match(/"error"\s*:\s*"([^"]+)"/);
+      if (embedded?.[1]) {
+        return { ok: false, error: embedded[1] };
+      }
       return {
         ok: false,
         error:

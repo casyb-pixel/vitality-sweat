@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { BRAND_GUIDE_URL, BRAND_VISUAL_TOKENS } from "@/lib/ai/brand-visual";
 import {
   createGeminiClient,
+  formatGeminiError,
   getGeminiApiKey,
   getGeminiModel,
   isLikelyConnectionError,
 } from "@/lib/ai/gemini";
 import {
   fetchTavilyTrends,
-  runTrendResearch,
   type TrendResearch,
 } from "@/lib/ai/trend-search";
 import { getCreatorRole } from "@/lib/auth/creator";
@@ -19,18 +19,15 @@ import type {
   BlogSeoMetadata,
   FinalizedPostResult,
 } from "@/lib/blog/blog-assist";
-import {
-  fingerprintSummary,
-  getArchiveFingerprint,
-} from "@/lib/blog/archive-fingerprint";
 import { slugifyTitle } from "@/lib/blog/supabase-posts";
 import { createClient } from "@/utils/supabase/server";
 
 /**
- * Node runtime: @google/genai is more reliable here than Edge, and failures
- * stay JSON instead of Safari seeing HTML gateway pages as "pattern" errors.
+ * Edge Runtime (same as meal-plan / video-assist): avoids Vercel Hobby Node
+ * cold-start / gateway HTML 502 pages that the wizard can't parse as JSON.
+ * Image upload stays on the separate Node `blog-visual` route.
  */
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const maxDuration = 60;
 
 export type {
@@ -170,8 +167,8 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
   const model = getGeminiModel();
   const notes = input.notes.trim();
 
-  // 1) Tavily live trends (preferred). Any network/rate-limit failure falls
-  // through so Gemini can still pitch ideas from baseline fitness knowledge.
+  // 1) Fast Tavily trends only. Never stack a second Gemini search-grounding
+  // round-trip here — that path regularly tripped Vercel HTML 502s on mobile.
   let research: TrendResearch | null = null;
   let researchWarning: string | null = null;
   try {
@@ -180,11 +177,8 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
       notes,
     });
     if (!research) {
-      // Key missing or empty — try the shared provider chain as a soft backup.
-      research = await runTrendResearch({
-        geminiApiKey: input.apiKey,
-        notes,
-      });
+      researchWarning =
+        "Live trend search unavailable. Generating from Gemini baseline fitness knowledge so you can keep posting.";
     }
   } catch (error) {
     research = null;
@@ -307,9 +301,12 @@ async function handleFinalizePost(input: {
   details: string;
   talkingPoints: string[];
 }) {
+  const { fingerprintSummary, getArchiveFingerprint } = await import(
+    "@/lib/blog/archive-fingerprint"
+  );
   const model = getGeminiModel();
   const fingerprint = getArchiveFingerprint();
-  const prompt = buildFinalizePrompt(input, fingerprint);
+  const prompt = buildFinalizePrompt(input, fingerprint, fingerprintSummary(fingerprint));
 
   try {
     const ai = createGeminiClient(input.apiKey);
@@ -366,7 +363,18 @@ function buildFinalizePrompt(
     details: string;
     talkingPoints: string[];
   },
-  fingerprint: ReturnType<typeof getArchiveFingerprint>,
+  fingerprint: {
+    cadenceNotes: string[];
+    toneNotes: string[];
+    exampleH2s: string[];
+    exampleH3s: string[];
+    targetWordCountMin: number;
+    targetWordCountMax: number;
+    avgParagraphChars: number;
+    avgH2: number;
+    avgH3: number;
+  },
+  fingerprintSummaryText: string,
 ): string {
   return [
     "You are a world-class fitness editor for Vitality Sweat / Sweatlife Chronicles.",
@@ -375,7 +383,7 @@ function buildFinalizePrompt(
     "Ensure absolute grammatical perfection. Expand fragments into full sentences. Do NOT invent PRs, weights, or numbers he did not provide.",
     "",
     "MATCH OUR HISTORICAL H2/H3 FINGERPRINT (calorie-deficit archive baseline):",
-    fingerprintSummary(fingerprint),
+    fingerprintSummaryText,
     "",
     "STRUCTURE / CADENCE RULES:",
     ...fingerprint.cadenceNotes.map((n) => `- ${n}`),
@@ -750,8 +758,7 @@ function geminiErrorResponse(
   model: string,
   action: BlogAssistAction,
 ) {
-  const message =
-    error instanceof Error ? error.message : "Gemini request failed.";
+  const message = formatGeminiError(error);
   const connection = isLikelyConnectionError(error);
 
   return NextResponse.json(

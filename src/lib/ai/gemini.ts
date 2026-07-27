@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 /** Default text model — override with GEMINI_MODEL. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
 /** Default image model — override with GEMINI_IMAGE_MODEL. */
 export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
@@ -44,4 +44,33 @@ export function isLikelyConnectionError(error: unknown): boolean {
     msg.includes("unavailable") ||
     msg.includes("timeout")
   );
+}
+
+/**
+ * Prefer the nested Gemini API `error.message` when the SDK throws a JSON body.
+ */
+export function formatGeminiError(error: unknown): string {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "Gemini request failed.";
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      error?: { message?: string; status?: string; code?: number };
+    };
+    const nested = parsed.error?.message?.trim();
+    if (nested) {
+      if (/no longer available/i.test(nested)) {
+        return `${nested} Set GEMINI_MODEL to a current Flash model (e.g. gemini-3.6-flash) in Vercel env.`;
+      }
+      return nested;
+    }
+  } catch {
+    // Not JSON — use the raw message.
+  }
+
+  return raw || "Gemini request failed.";
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createGeminiClient,
+  formatGeminiError,
   getGeminiApiKey,
   getGeminiModel,
   isLikelyConnectionError,
@@ -121,8 +122,7 @@ export async function POST(request: Request) {
         },
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Gemini request failed.";
+      const message = formatGeminiError(error);
       const connection = isLikelyConnectionError(error);
 
       return NextResponse.json(
