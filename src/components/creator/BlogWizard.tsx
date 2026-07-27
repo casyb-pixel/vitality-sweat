@@ -9,6 +9,7 @@ import type {
   FinalizedPostResult,
 } from "@/lib/blog/blog-assist";
 import { markdownToBlocks } from "@/lib/blog/markdown-blocks";
+import { readApiJson } from "@/lib/http/read-api-json";
 
 type WizardPhase =
   | "PHASE_1_INPUT"
@@ -109,14 +110,20 @@ export default function BlogWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "generate_ideas", notes }),
       });
-      const data = (await res.json()) as {
+      const parsed = await readApiJson<{
         ok: boolean;
         error?: string;
         summary?: string;
         options?: BlogIdeaOption[];
         researchWarning?: string | null;
-      };
+      }>(res);
 
+      if (!parsed.ok) {
+        setTrendsError(parsed.error);
+        return;
+      }
+
+      const data = parsed.data;
       if (!res.ok || !data.ok || !data.options?.length) {
         setTrendsError(
           data.error ?? "Couldn't find trending angles. Try again.",
@@ -130,8 +137,12 @@ export default function BlogWizard() {
       setChosenIndex(null);
       setPhase("PHASE_2_CHOICE");
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Network error. Try again.";
       setTrendsError(
-        error instanceof Error ? error.message : "Network error. Try again.",
+        /did not match the expected pattern/i.test(message)
+          ? "The AI service timed out or returned a bad response. Tap Find Trending Angles again."
+          : message,
       );
     } finally {
       setTrendsLoading(false);
@@ -176,12 +187,18 @@ export default function BlogWizard() {
           })),
         }),
       });
-      const data = (await res.json()) as {
+      const parsed = await readApiJson<{
         ok: boolean;
         error?: string;
         article?: FinalizedPostResult;
-      };
+      }>(res);
 
+      if (!parsed.ok) {
+        setDraftError(parsed.error);
+        return;
+      }
+
+      const data = parsed.data;
       if (!res.ok || !data.ok || !data.article) {
         setDraftError(data.error ?? "Article generation failed. Try again.");
         return;
@@ -196,8 +213,12 @@ export default function BlogWizard() {
       setPublishedStatus(null);
       setPhase("PHASE_4_REVIEW");
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Network error. Try again.";
       setDraftError(
-        error instanceof Error ? error.message : "Network error. Try again.",
+        /did not match the expected pattern/i.test(message)
+          ? "The AI service timed out or returned a bad response. Try again."
+          : message,
       );
     } finally {
       setDraftLoading(false);

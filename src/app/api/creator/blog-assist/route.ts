@@ -27,10 +27,10 @@ import { slugifyTitle } from "@/lib/blog/supabase-posts";
 import { createClient } from "@/utils/supabase/server";
 
 /**
- * Edge Runtime keeps the search + Gemini chain off Node cold starts and
- * avoids Vercel 502 HTML timeouts. Visual upload stays on a separate Node route.
+ * Node runtime: @google/genai is more reliable here than Edge, and failures
+ * stay JSON instead of Safari seeing HTML gateway pages as "pattern" errors.
  */
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export type {

@@ -13,9 +13,41 @@ export type TrendResearch = {
   sources: TrendSource[];
 };
 
-const SEARCH_TIMEOUT_MS = 18_000;
-const MAX_QUERIES = 2;
-const MAX_RESULTS_PER_QUERY = 6;
+const SEARCH_TIMEOUT_MS = 10_000;
+/** Soft cap so idea generation can proceed if search hangs. */
+const RESEARCH_BUDGET_MS = 12_000;
+const MAX_QUERIES = 1;
+const MAX_RESULTS_PER_QUERY = 5;
+
+function abortSignalTimeout(ms: number): AbortSignal {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+async function withBudget<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${ms}ms`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Researches current, high-engagement fitness/nutrition trends around Hunter's notes.
@@ -44,6 +76,8 @@ export async function runTrendResearch(input: {
 /**
  * Tavily-only helper for the generate_ideas workflow.
  * Returns null when the key is missing so callers can fall back cleanly.
+ * Uses heuristic queries (no extra Gemini round-trip) so mobile Safari
+ * doesn't sit through stacked LLM + search latency and hit HTML timeouts.
  */
 export async function fetchTavilyTrends(input: {
   geminiApiKey: string;
@@ -52,11 +86,12 @@ export async function fetchTavilyTrends(input: {
   const apiKey = process.env.TAVILY_API_KEY?.trim();
   if (!apiKey) return null;
 
-  const queries = await deriveFitnessTrendQueries(
-    input.geminiApiKey,
-    input.notes,
+  const queries = [heuristicFitnessQuery(input.notes)];
+  return withBudget(
+    searchTavily(apiKey, queries),
+    RESEARCH_BUDGET_MS,
+    "Tavily trend research",
   );
-  return searchTavily(apiKey, queries);
 }
 
 /**
@@ -84,7 +119,9 @@ async function deriveFitnessTrendQueries(
       config: { responseMimeType: "application/json" },
     });
 
-    const parsed = JSON.parse((response.text ?? "").trim()) as unknown;
+    const parsed = JSON.parse(
+      stripJsonFences((response.text ?? "").trim()),
+    ) as unknown;
     const queries = Array.isArray(parsed)
       ? parsed
           .filter((q): q is string => typeof q === "string" && q.trim().length > 0)
@@ -147,7 +184,7 @@ async function searchTavily(
           include_answer: true,
           max_results: MAX_RESULTS_PER_QUERY,
         }),
-        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+        signal: abortSignalTimeout(SEARCH_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -222,7 +259,7 @@ async function searchSerper(
       method: "POST",
       headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ q: query, num: 6 }),
-      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+      signal: abortSignalTimeout(SEARCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new Error(`Serper search failed (${res.status}) for "${query}".`);
@@ -309,4 +346,11 @@ function dedupeSources(sources: TrendSource[]): TrendSource[] {
     if (out.length >= 12) break;
   }
   return out;
+}
+
+function stripJsonFences(raw: string): string {
+  return raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
 }
