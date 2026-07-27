@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ArticleBlocks from "@/components/blog/ArticleBlocks";
+import DynamicVideoEmbedder from "@/components/blog/DynamicVideoEmbedder";
 import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
@@ -11,6 +11,7 @@ import {
   buildArticleJsonLd,
   getBlogPostBySlugAsync,
 } from "@/lib/blog/posts";
+import { fetchPublishedVideoEmbedsForPost } from "@/lib/blog/video-embeds";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
 import { getFeaturedGear } from "@/lib/store/products";
 
@@ -93,6 +94,9 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
   const coverSrc =
     post.coverImage?.trim() || "/images/hero-strength-stamina-collage.png";
   const ogSrc = post.ogImage?.trim() || coverSrc;
+  const videoEmbeds = await fetchPublishedVideoEmbedsForPost({
+    slug: post.slug,
+  });
 
   return (
     <>
@@ -129,7 +133,11 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
 
         <div className="section-y site-shell grid gap-10 lg:grid-cols-12">
           <div className="max-w-2xl lg:col-span-8">
-            <ArticleBlocks blocks={post.body} />
+            <DynamicVideoEmbedder
+              blocks={post.body}
+              embeds={videoEmbeds}
+              fallbackThumbnail={coverSrc}
+            />
             <Link
               href="/chronicles"
               className="mt-10 inline-flex font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange hover:text-brand-orange-deep"

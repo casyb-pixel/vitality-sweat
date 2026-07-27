@@ -164,6 +164,44 @@ export default function MarketingProjectsPanel({
     }
   }
 
+  async function setTargetSection(
+    project: MarketingProject,
+    key: MarketingChecklistKey,
+    targetSectionAnchor: string | null,
+  ) {
+    setBusyId(project.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/creator/marketing-projects/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: project.id,
+          checklistKey: key,
+          targetSectionAnchor,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        project?: MarketingProject;
+      };
+      if (!res.ok || !data.ok || !data.project) {
+        setError(data.error ?? "Could not save target section.");
+        return;
+      }
+      setProjects((prev) => upsertProject(prev, data.project!));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Network error saving target section.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function archiveProject(project: MarketingProject) {
     setBusyId(project.id);
     setError(null);
@@ -334,6 +372,7 @@ export default function MarketingProjectsPanel({
                       group="video"
                       disabled={rowBusy}
                       onToggle={toggleChecklist}
+                      onTargetSectionChange={setTargetSection}
                     />
                   </div>
 
@@ -442,6 +481,7 @@ function ChecklistGroup({
   group,
   disabled,
   onToggle,
+  onTargetSectionChange,
 }: {
   project: MarketingProject;
   group: "social" | "video";
@@ -451,15 +491,28 @@ function ChecklistGroup({
     key: MarketingChecklistKey,
     done: boolean,
   ) => void;
+  onTargetSectionChange?: (
+    project: MarketingProject,
+    key: MarketingChecklistKey,
+    anchor: string | null,
+  ) => void;
 }) {
   const items = MARKETING_CHECKLIST_ITEMS.filter((i) => i.group === group);
   return (
     <ul className="space-y-2">
       {items.map((item) => {
         const checked = flagFor(project, item.key);
+        const target =
+          group === "video"
+            ? project.videoTargets.find((t) => t.checklistKey === item.key)
+            : null;
+
         return (
-          <li key={item.key}>
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 border border-brand-ink/10 bg-surface px-3 py-2">
+          <li
+            key={item.key}
+            className="border border-brand-ink/10 bg-surface px-3 py-2"
+          >
+            <label className="flex min-h-11 cursor-pointer items-center gap-3">
               <input
                 type="checkbox"
                 className="size-5 accent-brand-orange"
@@ -473,6 +526,56 @@ function ChecklistGroup({
                 {item.label}
               </span>
             </label>
+
+            {group === "video" && onTargetSectionChange ? (
+              <div className="mt-2 space-y-1.5 border-t border-brand-ink/10 pt-2">
+                <label
+                  htmlFor={`${project.id}-${item.key}-section`}
+                  className="block font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-muted"
+                >
+                  Target Blog Section
+                </label>
+                <select
+                  id={`${project.id}-${item.key}-section`}
+                  className="min-h-11 w-full border border-brand-ink/15 bg-surface-elevated px-3 font-sans text-sm text-brand-ink disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={disabled || project.sectionOptions.length === 0}
+                  value={target?.targetSectionAnchor ?? ""}
+                  onChange={(e) =>
+                    onTargetSectionChange(
+                      project,
+                      item.key,
+                      e.target.value || null,
+                    )
+                  }
+                >
+                  <option value="">
+                    {project.sectionOptions.length === 0
+                      ? "No headings in this post yet"
+                      : "Select a section…"}
+                  </option>
+                  {project.sectionOptions.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.level === 3 ? "— " : ""}
+                      {section.label}
+                    </option>
+                  ))}
+                </select>
+                {!target?.hasVideo ? (
+                  <p className="font-sans text-xs text-brand-muted">
+                    Section saved. Upload the clip in Video Studio to embed it
+                    under this heading.
+                  </p>
+                ) : target.embedPublished ? (
+                  <p className="font-sans text-xs text-brand-orange">
+                    Live on the blog under this section.
+                  </p>
+                ) : (
+                  <p className="font-sans text-xs text-brand-muted">
+                    Clip ready — set a section to publish the in-article embed.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </li>
         );
       })}

@@ -20,7 +20,8 @@ type VideoAssetsAction =
   | "create_project"
   | "create_upload"
   | "confirm_upload"
-  | "save_social_package";
+  | "save_social_package"
+  | "update_embed";
 
 type RequestBody = {
   action?: VideoAssetsAction;
@@ -35,6 +36,11 @@ type RequestBody = {
   size?: number;
   path?: string;
   socialPackage?: VideoSocialPackage;
+  checklistKey?: string | null;
+  targetSectionAnchor?: string | null;
+  publicVideoUrl?: string | null;
+  thumbnailUrl?: string | null;
+  embedPublished?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -64,9 +70,11 @@ export async function POST(request: Request) {
         return confirmUpload(supabase, user.id, body);
       case "save_social_package":
         return saveSocialPackage(supabase, user.id, body);
+      case "update_embed":
+        return updateEmbed(supabase, user.id, body);
       default:
         return jsonError(
-          "Unknown action. Use create_project, create_upload, confirm_upload, or save_social_package.",
+          "Unknown action. Use create_project, create_upload, confirm_upload, save_social_package, or update_embed.",
           400,
         );
     }
@@ -88,15 +96,76 @@ async function createProject(
     return jsonError("blogTitle and concept.title are required.", 400);
   }
 
+  const postId = body.postId || null;
+  const postSlug = body.postSlug?.trim() || null;
+  const checklistKey =
+    typeof body.checklistKey === "string" ? body.checklistKey.trim() : null;
+
+  if (
+    checklistKey &&
+    checklistKey !== "video_1_done" &&
+    checklistKey !== "video_2_done" &&
+    checklistKey !== "video_3_done"
+  ) {
+    return jsonError("Invalid checklistKey.", 400);
+  }
+
+  // Reuse a marketing-panel stub (section chosen, clip not uploaded yet).
+  if (postId) {
+    let stubQuery = supabase
+      .from("video_projects")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("creator_id", userId)
+      .is("video_path", null)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (checklistKey) {
+      stubQuery = stubQuery.eq("checklist_key", checklistKey);
+    } else {
+      stubQuery = stubQuery.not("checklist_key", "is", null);
+    }
+
+    const { data: stub, error: stubError } = await stubQuery.maybeSingle();
+    if (stubError) return jsonError(stubError.message, 502);
+
+    if (stub) {
+      const { data, error } = await supabase
+        .from("video_projects")
+        .update({
+          blog_title: blogTitle,
+          post_slug: postSlug ?? stub.post_slug,
+          concept,
+          status: "collecting_assets",
+          ...(checklistKey ? { checklist_key: checklistKey } : {}),
+        })
+        .eq("id", stub.id)
+        .select("*")
+        .single();
+      if (error) return jsonError(error.message, 502);
+      return NextResponse.json({
+        ok: true,
+        project: mapProject(data as ProjectRow),
+      });
+    }
+  }
+
   const { data, error } = await supabase
     .from("video_projects")
     .insert({
       creator_id: userId,
-      post_id: body.postId || null,
-      post_slug: body.postSlug?.trim() || null,
+      post_id: postId,
+      post_slug: postSlug,
       blog_title: blogTitle,
       concept,
       status: "collecting_assets",
+      checklist_key: checklistKey,
+      target_section_anchor:
+        typeof body.targetSectionAnchor === "string"
+          ? body.targetSectionAnchor.trim() || null
+          : null,
+      embed_published: false,
     })
     .select("*")
     .single();
@@ -176,6 +245,10 @@ async function confirmUpload(
     kind === "video" ? { video_path: path } : { voiceover_path: path };
   const nextVideoPath = kind === "video" ? path : project.video_path;
   const nextVoicePath = kind === "voiceover" ? path : project.voiceover_path;
+  const hasPlayback =
+    Boolean(nextVideoPath) || Boolean(project.public_video_url?.trim());
+  const embedPublished =
+    Boolean(project.target_section_anchor?.trim()) && hasPlayback;
 
   const { data, error } = await supabase
     .from("video_projects")
@@ -183,6 +256,7 @@ async function confirmUpload(
       ...update,
       status:
         nextVideoPath || nextVoicePath ? "assets_ready" : "collecting_assets",
+      embed_published: embedPublished,
     })
     .eq("id", projectId)
     .eq("creator_id", userId)
@@ -233,6 +307,82 @@ async function saveSocialPackage(
     .update({
       social_package: body.socialPackage,
       status: "social_package_ready",
+    })
+    .eq("id", projectId)
+    .eq("creator_id", userId)
+    .select("*")
+    .single();
+
+  if (error) return jsonError(error.message, 502);
+  return NextResponse.json({
+    ok: true,
+    project: mapProject(data as ProjectRow),
+  });
+}
+
+async function updateEmbed(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  body: RequestBody,
+) {
+  const projectId = body.projectId?.trim() ?? "";
+  if (!projectId) return jsonError("projectId is required.", 400);
+
+  const project = await getOwnedProject(supabase, userId, projectId);
+  if (!project) return jsonError("Video project not found.", 404);
+
+  const targetSectionAnchor =
+    body.targetSectionAnchor === undefined
+      ? project.target_section_anchor?.trim() || null
+      : typeof body.targetSectionAnchor === "string"
+        ? body.targetSectionAnchor.trim() || null
+        : null;
+
+  const publicVideoUrl =
+    body.publicVideoUrl === undefined
+      ? project.public_video_url?.trim() || null
+      : typeof body.publicVideoUrl === "string"
+        ? body.publicVideoUrl.trim() || null
+        : null;
+
+  const thumbnailUrl =
+    body.thumbnailUrl === undefined
+      ? project.thumbnail_url?.trim() || null
+      : typeof body.thumbnailUrl === "string"
+        ? body.thumbnailUrl.trim() || null
+        : null;
+
+  const checklistKey =
+    body.checklistKey === undefined
+      ? project.checklist_key?.trim() || null
+      : typeof body.checklistKey === "string"
+        ? body.checklistKey.trim() || null
+        : null;
+
+  if (
+    checklistKey &&
+    checklistKey !== "video_1_done" &&
+    checklistKey !== "video_2_done" &&
+    checklistKey !== "video_3_done"
+  ) {
+    return jsonError("Invalid checklistKey.", 400);
+  }
+
+  const hasPlayback =
+    Boolean(project.video_path?.trim()) || Boolean(publicVideoUrl);
+  const embedPublished =
+    typeof body.embedPublished === "boolean"
+      ? body.embedPublished && Boolean(targetSectionAnchor) && hasPlayback
+      : Boolean(targetSectionAnchor) && hasPlayback;
+
+  const { data, error } = await supabase
+    .from("video_projects")
+    .update({
+      target_section_anchor: targetSectionAnchor,
+      public_video_url: publicVideoUrl,
+      thumbnail_url: thumbnailUrl,
+      checklist_key: checklistKey,
+      embed_published: embedPublished,
     })
     .eq("id", projectId)
     .eq("creator_id", userId)
@@ -316,6 +466,11 @@ type ProjectRow = {
   status: VideoProjectState["status"];
   video_path: string | null;
   voiceover_path: string | null;
+  target_section_anchor?: string | null;
+  checklist_key?: string | null;
+  thumbnail_url?: string | null;
+  public_video_url?: string | null;
+  embed_published?: boolean | null;
 };
 
 function mapProject(row: ProjectRow): VideoProjectState {
@@ -329,6 +484,11 @@ function mapProject(row: ProjectRow): VideoProjectState {
     status: row.status,
     videoPath: row.video_path,
     voiceoverPath: row.voiceover_path,
+    targetSectionAnchor: row.target_section_anchor?.trim() || null,
+    checklistKey: row.checklist_key?.trim() || null,
+    thumbnailUrl: row.thumbnail_url?.trim() || null,
+    publicVideoUrl: row.public_video_url?.trim() || null,
+    embedPublished: Boolean(row.embed_published),
   };
 }
 

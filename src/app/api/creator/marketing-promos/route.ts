@@ -7,7 +7,10 @@ import {
   isLikelyConnectionError,
 } from "@/lib/ai/gemini";
 import { generateMarketingPromos } from "@/lib/marketing/generate-promos";
-import { mapPostToMarketingProject } from "@/lib/marketing/map-project";
+import {
+  mapPostToMarketingProject,
+  type VideoProjectTargetRow,
+} from "@/lib/marketing/map-project";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -110,10 +113,20 @@ export async function POST(request: Request) {
         );
       }
 
+      const { data: videos } = await supabase
+        .from("video_projects")
+        .select(
+          "id, post_id, checklist_key, target_section_anchor, video_path, public_video_url, embed_published",
+        )
+        .eq("post_id", post.id);
+
       return NextResponse.json({
         ok: true,
         promos,
-        project: mapPostToMarketingProject(updated as BlogPostRecord),
+        project: mapPostToMarketingProject(
+          updated as BlogPostRecord,
+          (videos ?? []) as VideoProjectTargetRow[],
+        ),
       });
     } catch (error) {
       const connection = isLikelyConnectionError(error);

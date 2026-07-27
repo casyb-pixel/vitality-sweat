@@ -2,7 +2,10 @@
  * 7-Day Marketing Project types for Creator Studio.
  * Checklist columns live on `public.posts` after
  * `20260727195909_posts_marketing_projects.sql`.
+ * Video section targeting lives on `public.video_projects`.
  */
+
+import type { BlogSectionOption } from "@/lib/blog/heading-anchor";
 
 export type GeneratedPromos = {
   facebook: string;
@@ -17,6 +20,11 @@ export type MarketingChecklistKey =
   | "fb_post_done"
   | "ig_post_done"
   | "x_post_done"
+  | "video_1_done"
+  | "video_2_done"
+  | "video_3_done";
+
+export type MarketingVideoChecklistKey =
   | "video_1_done"
   | "video_2_done"
   | "video_3_done";
@@ -45,6 +53,14 @@ export const MARKETING_CHECKLIST_ITEMS: {
   },
 ];
 
+export type MarketingVideoTarget = {
+  checklistKey: MarketingVideoChecklistKey;
+  videoProjectId: string | null;
+  targetSectionAnchor: string | null;
+  hasVideo: boolean;
+  embedPublished: boolean;
+};
+
 export type MarketingProject = {
   id: string;
   slug: string;
@@ -61,7 +77,21 @@ export type MarketingProject = {
   video2Done: boolean;
   video3Done: boolean;
   generatedPromos: GeneratedPromos | null;
+  /** H2/H3 options extracted from the live post body. */
+  sectionOptions: BlogSectionOption[];
+  /** Per video-checklist section targeting (from video_projects). */
+  videoTargets: MarketingVideoTarget[];
 };
+
+export function isVideoChecklistKey(
+  value: string,
+): value is MarketingVideoChecklistKey {
+  return (
+    value === "video_1_done" ||
+    value === "video_2_done" ||
+    value === "video_3_done"
+  );
+}
 
 export function checklistProgress(project: MarketingProject): {
   done: number;
@@ -82,4 +112,21 @@ export function checklistProgress(project: MarketingProject): {
 
 export function isChecklistKey(value: string): value is MarketingChecklistKey {
   return MARKETING_CHECKLIST_ITEMS.some((item) => item.key === value);
+}
+
+export function emptyVideoTargets(): MarketingVideoTarget[] {
+  return (
+    MARKETING_CHECKLIST_ITEMS.filter((item) => item.group === "video") as {
+      key: MarketingVideoChecklistKey;
+      label: string;
+      group: "video";
+      platform: string;
+    }[]
+  ).map((item) => ({
+    checklistKey: item.key,
+    videoProjectId: null,
+    targetSectionAnchor: null,
+    hasVideo: false,
+    embedPublished: false,
+  }));
 }

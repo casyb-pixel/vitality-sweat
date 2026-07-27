@@ -4,10 +4,12 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
 } from "react";
+import { extractSectionOptionsFromPostBody } from "@/lib/blog/heading-anchor";
 import type {
   CreatorPublishedPost,
   ShortFormVideoIdea,
@@ -123,8 +125,18 @@ export default function VideoWizard() {
   const [packLoading, setPackLoading] = useState(false);
   const [packError, setPackError] = useState<string | null>(null);
   const [pack, setPack] = useState<VideoSocialPackage | null>(null);
+  const [targetSectionAnchor, setTargetSectionAnchor] = useState("");
+  const [embedSaving, setEmbedSaving] = useState(false);
+  const [embedMessage, setEmbedMessage] = useState<string | null>(null);
 
   const stepIndex = PHASE_ORDER.indexOf(phase);
+
+  const sectionOptions = useMemo(() => {
+    if (!selectedPost) return [];
+    return extractSectionOptionsFromPostBody({
+      bodyMarkdown: selectedPost.bodyMarkdown,
+    });
+  }, [selectedPost]);
 
   const loadPosts = useCallback(async () => {
     setPostsLoading(true);
@@ -476,6 +488,8 @@ export default function VideoWizard() {
         return;
       }
       setProject(saved.project);
+      setTargetSectionAnchor(saved.project.targetSectionAnchor ?? "");
+      setEmbedMessage(null);
       setPhase("PRODUCTION_REVIEW");
     } catch (error) {
       setPackError(
@@ -483,6 +497,47 @@ export default function VideoWizard() {
       );
     } finally {
       setPackLoading(false);
+    }
+  }
+
+  async function saveBlogEmbed() {
+    if (!project) return;
+    setEmbedSaving(true);
+    setEmbedMessage(null);
+    try {
+      const res = await fetch("/api/creator/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_embed",
+          projectId: project.id,
+          targetSectionAnchor: targetSectionAnchor || null,
+          embedPublished: Boolean(targetSectionAnchor),
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        project?: VideoProjectState;
+      };
+      if (!res.ok || !data.ok || !data.project) {
+        setEmbedMessage(data.error ?? "Could not save blog embed target.");
+        return;
+      }
+      setProject(data.project);
+      setEmbedMessage(
+        data.project.embedPublished
+          ? "Embed is live under that blog section."
+          : targetSectionAnchor
+            ? "Section saved. Upload a clip to publish the embed."
+            : "Blog embed cleared.",
+      );
+    } catch (error) {
+      setEmbedMessage(
+        error instanceof Error ? error.message : "Network error saving embed.",
+      );
+    } finally {
+      setEmbedSaving(false);
     }
   }
 
@@ -954,6 +1009,58 @@ export default function VideoWizard() {
                 </dd>
               </div>
             </dl>
+          </div>
+
+          <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
+            <p className="eyebrow text-brand-orange">Target blog section</p>
+            <p className="mt-2 font-sans text-sm text-brand-muted">
+              Inject this clip under a heading on the live Chronicle once media
+              is uploaded.
+            </p>
+            <label
+              htmlFor="video-target-section"
+              className="mt-4 block font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-muted"
+            >
+              Target Blog Section
+            </label>
+            <select
+              id="video-target-section"
+              className="mt-1.5 min-h-12 w-full border border-brand-ink/15 bg-surface px-3 font-sans text-sm text-brand-ink disabled:opacity-50"
+              value={targetSectionAnchor}
+              disabled={sectionOptions.length === 0 || embedSaving}
+              onChange={(e) => setTargetSectionAnchor(e.target.value)}
+            >
+              <option value="">
+                {sectionOptions.length === 0
+                  ? "No headings found in this post"
+                  : "Select a section…"}
+              </option>
+              {sectionOptions.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.level === 3 ? "— " : ""}
+                  {section.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`${secondaryButtonClass} mt-3`}
+              disabled={embedSaving || !project}
+              onClick={() => void saveBlogEmbed()}
+            >
+              {embedSaving ? (
+                <>
+                  <Spinner dark /> Saving…
+                </>
+              ) : (
+                "Save blog embed target"
+              )}
+            </button>
+            {embedMessage ? (
+              <p className="mt-2 font-sans text-sm text-brand-ink">
+                {embedMessage}
+              </p>
+            ) : null}
           </div>
 
           <button

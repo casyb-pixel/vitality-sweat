@@ -75,6 +75,11 @@ export type VideoProjectState = {
     | "archived";
   videoPath: string | null;
   voiceoverPath: string | null;
+  targetSectionAnchor?: string | null;
+  checklistKey?: string | null;
+  thumbnailUrl?: string | null;
+  publicVideoUrl?: string | null;
+  embedPublished?: boolean;
   video?: VideoAssetReference;
   voiceover?: VideoAssetReference;
 };

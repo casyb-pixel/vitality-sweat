@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCreatorRole } from "@/lib/auth/creator";
 import type { BlogPostRecord } from "@/lib/blog/supabase-posts";
-import { mapPostToMarketingProject } from "@/lib/marketing/map-project";
+import {
+  mapPostToMarketingProject,
+  type VideoProjectTargetRow,
+} from "@/lib/marketing/map-project";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -38,8 +41,37 @@ export async function GET() {
       );
     }
 
-    const projects = ((data ?? []) as BlogPostRecord[]).map((row) =>
-      mapPostToMarketingProject(row),
+    const posts = (data ?? []) as BlogPostRecord[];
+    const postIds = posts.map((p) => p.id);
+
+    let videoRows: VideoProjectTargetRow[] = [];
+    if (postIds.length > 0) {
+      const { data: videos, error: videoError } = await supabase
+        .from("video_projects")
+        .select(
+          "id, post_id, checklist_key, target_section_anchor, video_path, public_video_url, embed_published",
+        )
+        .in("post_id", postIds);
+
+      if (videoError) {
+        return NextResponse.json(
+          { ok: false, error: videoError.message },
+          { status: 502 },
+        );
+      }
+      videoRows = (videos ?? []) as VideoProjectTargetRow[];
+    }
+
+    const videosByPost = new Map<string, VideoProjectTargetRow[]>();
+    for (const row of videoRows) {
+      if (!row.post_id) continue;
+      const list = videosByPost.get(row.post_id) ?? [];
+      list.push(row);
+      videosByPost.set(row.post_id, list);
+    }
+
+    const projects = posts.map((row) =>
+      mapPostToMarketingProject(row, videosByPost.get(row.id) ?? []),
     );
 
     return NextResponse.json({ ok: true, projects });
