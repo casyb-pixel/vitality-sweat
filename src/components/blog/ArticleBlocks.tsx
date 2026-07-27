@@ -35,12 +35,13 @@ export default function ArticleBlocks({ blocks }: { blocks: BlogBlock[] }) {
                 key={key}
                 className="list-disc space-y-2 pl-5 font-sans text-lg leading-relaxed text-brand-muted"
               >
-                {block.items.map((item) => (
-                  <li key={item.slice(0, 40)}>{item}</li>
+                {(block.items ?? []).map((item, itemIndex) => (
+                  <li key={`${key}-${itemIndex}`}>{item}</li>
                 ))}
               </ul>
             );
           case "image":
+            if (!block.src?.trim()) return null;
             return (
               <figure
                 key={key}
@@ -48,7 +49,7 @@ export default function ArticleBlocks({ blocks }: { blocks: BlogBlock[] }) {
               >
                 <Image
                   src={block.src}
-                  alt={block.alt}
+                  alt={block.alt || ""}
                   fill
                   sizes="(max-width: 1024px) 100vw, 66vw"
                   className="object-contain bg-surface-elevated"
@@ -61,7 +62,7 @@ export default function ArticleBlocks({ blocks }: { blocks: BlogBlock[] }) {
                 key={key}
                 className="font-sans text-lg leading-relaxed text-brand-muted"
               >
-                {block.text}
+                {"text" in block ? block.text : null}
               </p>
             );
         }

@@ -39,7 +39,7 @@ export async function generateMetadata({
   }
 
   const canonical = buildCanonical(`/blog/${post.slug}`);
-  const ogImage = absoluteUrl(post.ogImage);
+  const ogImage = absoluteUrl(post.ogImage || post.coverImage || "/images/hero-strength-stamina-collage.png");
 
   return {
     title: post.title,
@@ -81,13 +81,19 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
 
   if (!post) notFound();
 
-  const publishedLabel = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(post.datePublished));
+  const publishedDate = new Date(post.datePublished);
+  const publishedLabel = Number.isNaN(publishedDate.getTime())
+    ? "Recently"
+    : new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(publishedDate);
 
   const featuredGear = getFeaturedGear(4);
+  const coverSrc =
+    post.coverImage?.trim() || "/images/hero-strength-stamina-collage.png";
+  const ogSrc = post.ogImage?.trim() || coverSrc;
 
   return (
     <>
@@ -96,7 +102,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
       <article className="bg-surface">
         <header className="relative isolate min-h-[44vh] overflow-hidden bg-surface-dark text-white">
           <Image
-            src={post.coverImage}
+            src={coverSrc}
             alt={post.coverAlt}
             fill
             priority
@@ -137,7 +143,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
           <aside className="lg:col-span-4">
             <div className="relative aspect-[4/3] overflow-hidden bg-brand-ink/5">
               <Image
-                src={post.ogImage}
+                src={ogSrc}
                 alt={post.coverAlt}
                 fill
                 sizes="(max-width: 1024px) 100vw, 33vw"
@@ -145,7 +151,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
               />
             </div>
             <ul className="mt-4 flex flex-wrap gap-2">
-              {post.keywords.map((keyword) => (
+              {(post.keywords ?? []).map((keyword) => (
                 <li
                   key={keyword}
                   className="border border-brand-ink/10 bg-surface-elevated px-2.5 py-1 font-sans text-xs text-brand-muted"

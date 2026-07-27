@@ -16,7 +16,14 @@ export const DEFAULT_OG_IMAGE = "/images/hero-strength-stamina-collage.png";
 export const TWITTER_HANDLE = "@vitalitysweat";
 
 export function absoluteUrl(path = "/"): string {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
+  const trimmed = (path || "/").trim();
+  if (!trimmed) return SITE_URL;
+  // Creator Studio covers are already absolute Supabase Storage URLs —
+  // never prefix those with the site origin (that produced a 500 in metadata).
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("//")) {
+    return trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
+  }
+  const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return `${SITE_URL}${normalized}`;
 }
 

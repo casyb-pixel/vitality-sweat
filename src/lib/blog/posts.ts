@@ -3,7 +3,7 @@ import {
   type BlogBlock,
   type MigratedPost,
 } from "@/data/posts";
-import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/seo/site";
+import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo/site";
 
 export type { BlogBlock, MigratedPost as BlogFrontmatter };
 
@@ -162,12 +162,15 @@ export async function getFeaturedBlogPostAsync(): Promise<MigratedPost> {
 
 export function buildArticleJsonLd(post: MigratedPost) {
   const url = absoluteUrl(`/blog/${post.slug}`);
+  const cover = absoluteUrl(
+    post.ogImage || post.coverImage || DEFAULT_OG_IMAGE,
+  );
   return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: post.title,
     description: post.description,
-    image: [absoluteUrl(post.ogImage), absoluteUrl(post.coverImage)],
+    image: [cover],
     datePublished: post.datePublished,
     dateModified: post.dateModified,
     author: {
@@ -187,7 +190,7 @@ export function buildArticleJsonLd(post: MigratedPost) {
       "@id": url,
     },
     url,
-    keywords: post.keywords.join(", "),
+    keywords: (post.keywords ?? []).join(", "),
     isPartOf: {
       "@type": "Blog",
       name: "The Sweatlife Chronicles",
