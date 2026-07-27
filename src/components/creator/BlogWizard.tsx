@@ -65,7 +65,12 @@ function promptsForOption(option: BlogIdeaOption | null): string[] {
   return points.length ? points : FALLBACK_TALKING_POINTS;
 }
 
-export default function BlogWizard() {
+type BlogWizardProps = {
+  /** Fired after a successful publish so Creator Studio can open Projects. */
+  onPublished?: (slug: string) => void;
+};
+
+export default function BlogWizard({ onPublished }: BlogWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("PHASE_1_INPUT");
 
   // Phase 1
@@ -307,6 +312,10 @@ export default function BlogWizard() {
       setPublishedSlug(data.post?.slug ?? publishSlug ?? null);
       setPublishedStatus(status);
       setPublishStage("done");
+      const liveSlug = data.post?.slug ?? publishSlug ?? null;
+      if (status === "published" && liveSlug) {
+        onPublished?.(liveSlug);
+      }
     } catch (error) {
       setPublishError(
         error instanceof Error ? error.message : "Network error saving post.",
@@ -569,9 +578,15 @@ export default function BlogWizard() {
                 </p>
               ) : null}
               {publishedStatus === "published" && publishedSlug ? (
-                <a href={`/blog/${publishedSlug}`} className={bigButtonClass}>
-                  View the post
-                </a>
+                <>
+                  <a href={`/blog/${publishedSlug}`} className={bigButtonClass}>
+                    View the post
+                  </a>
+                  <p className="font-sans text-sm text-brand-muted">
+                    Promo captions are generating on the Projects tab — swipe
+                    copy will be ready in a few seconds.
+                  </p>
+                </>
               ) : null}
               <button
                 type="button"

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       input.excerpt.trim() ||
       input.title.trim();
 
-    const row = {
+    const row: Record<string, unknown> = {
       slug,
       title: input.title.trim(),
       excerpt: input.excerpt.trim(),
@@ -89,6 +89,21 @@ export async function POST(request: Request) {
       published_at: input.status === "published" ? now : null,
       updated_at: now,
     };
+
+    // Fresh marketing project window when publishing (trigger also sets due date).
+    if (input.status === "published") {
+      row.fb_post_done = false;
+      row.ig_post_done = false;
+      row.x_post_done = false;
+      row.video_1_done = false;
+      row.video_2_done = false;
+      row.video_3_done = false;
+      row.is_archived = false;
+      row.generated_promos = null;
+      row.project_due_at = new Date(
+        Date.parse(now) + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+    }
 
     const { data, error } = await supabase
       .from("posts")

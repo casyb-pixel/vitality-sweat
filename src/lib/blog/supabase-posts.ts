@@ -23,6 +23,16 @@ export type BlogPostRecord = {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  /** 7-Day Marketing Project fields */
+  fb_post_done?: boolean;
+  ig_post_done?: boolean;
+  x_post_done?: boolean;
+  video_1_done?: boolean;
+  video_2_done?: boolean;
+  video_3_done?: boolean;
+  is_archived?: boolean;
+  project_due_at?: string | null;
+  generated_promos?: import("@/lib/marketing/project").GeneratedPromos | null;
 };
 
 export type SavePostInput = {
