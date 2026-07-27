@@ -14,6 +14,29 @@ export const SITE_URL = (
 
 export const DEFAULT_OG_IMAGE = "/images/hero-strength-stamina-collage.png";
 export const TWITTER_HANDLE = "@vitalitysweat";
+export const INSTAGRAM_HANDLE = "@vitalitysweat";
+
+/** Canonical social profiles — use across footer, nav, and Organization JSON-LD. */
+export const SOCIAL_LINKS = [
+  {
+    id: "youtube",
+    label: "YouTube",
+    href: "https://www.youtube.com/channel/UCKDlWVX1j1z-05rqZmIqEAA",
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    href: "https://www.instagram.com/vitalitysweat/",
+    handle: INSTAGRAM_HANDLE,
+  },
+  {
+    id: "facebook",
+    label: "Facebook",
+    href: "https://www.facebook.com/profile.php?id=61561385332818",
+  },
+] as const;
+
+export const SOCIAL_PROFILE_URLS = SOCIAL_LINKS.map((link) => link.href);
 
 export function absoluteUrl(path = "/"): string {
   const trimmed = (path || "/").trim();

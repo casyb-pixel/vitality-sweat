@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SOCIAL_LINKS } from "@/lib/seo/site";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -66,6 +67,19 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          <div className="flex items-center gap-3 border-l border-brand-ink/10 pl-4">
+            {SOCIAL_LINKS.map((link) => (
+              <a
+                key={link.id}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-muted transition-colors hover:text-brand-orange"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
           <Link
             href="/app"
             className="animate-cta-pulse inline-flex items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white transition-[background-color,transform] hover:bg-brand-orange-deep active:scale-[0.98]"
@@ -125,6 +139,28 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          <div className="mt-4 space-y-1 border-b border-brand-ink/10 pb-4">
+            <p className="font-sans text-xs font-bold uppercase tracking-[0.14em] text-brand-orange">
+              Follow
+            </p>
+            {SOCIAL_LINKS.map((link) => (
+              <a
+                key={link.id}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="block py-2.5 font-sans text-lg font-semibold text-brand-ink"
+              >
+                {link.label}
+                {"handle" in link && link.handle ? (
+                  <span className="ml-2 text-base font-medium text-brand-muted">
+                    {link.handle}
+                  </span>
+                ) : null}
+              </a>
+            ))}
+          </div>
           <Link
             href="/app"
             onClick={() => setOpen(false)}

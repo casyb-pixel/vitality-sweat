@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ArticleBlocks from "@/components/blog/ArticleBlocks";
 import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import Navbar from "@/components/Navbar";
+import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
 import FeaturedGearSlider from "@/components/store/FeaturedGearSlider";
 import {
@@ -161,6 +162,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
       </article>
 
       <FeaturedGearSlider products={featuredGear} />
+      <SiteFooter />
     </>
   );
 }

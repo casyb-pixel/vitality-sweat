@@ -3,7 +3,7 @@ import {
   type BlogBlock,
   type MigratedPost,
 } from "@/data/posts";
-import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo/site";
+import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, SOCIAL_PROFILE_URLS } from "@/lib/seo/site";
 
 export type { BlogBlock, MigratedPost as BlogFrontmatter };
 
@@ -208,5 +208,6 @@ export function buildOrganizationJsonLd() {
     logo: absoluteUrl("/branding/logo-original-transparent.svg"),
     description:
       "Fitness training, nutrition coaching, and youth baseball development with Hunter Broussard.",
+    sameAs: SOCIAL_PROFILE_URLS,
   };
 }

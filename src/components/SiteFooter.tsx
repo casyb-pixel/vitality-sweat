@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { SOCIAL_LINKS } from "@/lib/seo/site";
 
 const LEGAL_LINKS = [
   { href: "/privacy", label: "Privacy Policy" },
@@ -35,6 +36,26 @@ export default function SiteFooter() {
             ))}
           </nav>
         </div>
+
+        <nav aria-label="Social media" className="flex flex-wrap gap-x-5 gap-y-2">
+          {SOCIAL_LINKS.map((link) => (
+            <a
+              key={link.id}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink transition-colors hover:text-brand-orange"
+            >
+              {link.label}
+              {"handle" in link && link.handle ? (
+                <span className="ml-1 font-semibold normal-case tracking-normal text-brand-muted">
+                  {link.handle}
+                </span>
+              ) : null}
+            </a>
+          ))}
+        </nav>
+
         <p className="font-sans text-sm text-brand-muted">
           © {new Date().getFullYear()} Vitality Sweat. All rights reserved.
         </p>
