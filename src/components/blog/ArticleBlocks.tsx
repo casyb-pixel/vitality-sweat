@@ -40,22 +40,33 @@ export default function ArticleBlocks({ blocks }: { blocks: BlogBlock[] }) {
                 ))}
               </ul>
             );
-          case "image":
+          case "image": {
             if (!block.src?.trim()) return null;
+            const remote = /^https?:\/\//i.test(block.src);
             return (
               <figure
                 key={key}
                 className="relative my-6 aspect-[16/10] overflow-hidden bg-brand-ink/5"
               >
-                <Image
-                  src={block.src}
-                  alt={block.alt || ""}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                  className="object-contain bg-surface-elevated"
-                />
+                {remote ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage covers
+                  <img
+                    src={block.src}
+                    alt={block.alt || ""}
+                    className="h-full w-full bg-surface-elevated object-contain"
+                  />
+                ) : (
+                  <Image
+                    src={block.src}
+                    alt={block.alt || ""}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 66vw"
+                    className="object-contain bg-surface-elevated"
+                  />
+                )}
               </figure>
             );
+          }
           default:
             return (
               <p

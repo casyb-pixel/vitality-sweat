@@ -1,29 +1,27 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ArticleBlocks from "@/components/blog/ArticleBlocks";
+import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import Navbar from "@/components/Navbar";
 import JsonLd from "@/components/seo/JsonLd";
 import FeaturedGearSlider from "@/components/store/FeaturedGearSlider";
 import {
   buildArticleJsonLd,
-  getAllBlogPostsAsync,
   getBlogPostBySlugAsync,
 } from "@/lib/blog/posts";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
 import { getFeaturedGear } from "@/lib/store/products";
 
-export const revalidate = 60;
+/**
+ * Always render on request so newly published Creator Studio posts
+ * (Supabase + remote cover URLs) never stick on a cached 500 from ISR.
+ */
+export const dynamic = "force-dynamic";
 
 type BlogPageProps = {
   params: Promise<{ slug: string }>;
 };
-
-export async function generateStaticParams() {
-  const posts = await getAllBlogPostsAsync();
-  return posts.map((post) => ({ slug: post.slug }));
-}
 
 export async function generateMetadata({
   params,
@@ -101,10 +99,9 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
       <JsonLd data={buildArticleJsonLd(post)} />
       <article className="bg-surface">
         <header className="relative isolate min-h-[44vh] overflow-hidden bg-surface-dark text-white">
-          <Image
+          <SafeCoverImage
             src={coverSrc}
             alt={post.coverAlt}
-            fill
             priority
             sizes="100vw"
             className="object-cover opacity-55"
@@ -142,10 +139,9 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
 
           <aside className="lg:col-span-4">
             <div className="relative aspect-[4/3] overflow-hidden bg-brand-ink/5">
-              <Image
+              <SafeCoverImage
                 src={ogSrc}
                 alt={post.coverAlt}
-                fill
                 sizes="(max-width: 1024px) 100vw, 33vw"
                 className="object-cover"
               />

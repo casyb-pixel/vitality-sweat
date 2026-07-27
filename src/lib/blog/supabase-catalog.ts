@@ -38,8 +38,14 @@ export function mapSupabasePostToMigrated(
   };
 }
 
+/**
+ * Prefer the service-role client for public catalog reads so blog pages
+ * never depend on request cookies during render / static generation.
+ */
 async function getReadClient() {
-  return createServiceRoleClient() ?? (await createClient());
+  const admin = createServiceRoleClient();
+  if (admin) return admin;
+  return await createClient();
 }
 
 export async function fetchPublishedSupabasePosts(): Promise<MigratedPost[]> {
