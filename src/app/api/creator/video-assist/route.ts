@@ -12,6 +12,7 @@ import type {
   VideoSocialPackage,
 } from "@/lib/video/video-studio";
 import { createClient } from "@/utils/supabase/server";
+import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 
 export const runtime = "edge";
 export const maxDuration = 60;
@@ -256,13 +257,14 @@ async function handleGenerateSocialPackage(input: {
   const prompt = [
     "You are an expert social media growth manager for Vitality Sweat / Sweatlife Chronicles.",
     "Write a short-form video distribution package optimized for TikTok, Instagram Reels, and YouTube Shorts algorithms.",
-    "Brand voice: direct, sweaty, encouraging — never corporate or fluffy.",
+    "Brand voice: direct, sweaty, encouraging. Never corporate or fluffy.",
+    NO_EM_DASH_RULE,
     "",
     "Requirements:",
     "- caption: engaging, hook-first, line-broken, ready to paste; end with a soft CTA",
     "- hashtags: 5 to 8 hyper-targeted tags (include #VitalitySweat and #Sweatlife)",
-    "- thumbnailTitle: short text overlay suggestion (≤6 words) for the first frame / thumbnail",
-    "- seoMetadata: platform keyword tags plus a 1–2 sentence SEO description",
+    "- thumbnailTitle: short text overlay suggestion (max 6 words) for the first frame / thumbnail",
+    "- seoMetadata: platform keyword tags plus a 1-2 sentence SEO description",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
@@ -273,7 +275,7 @@ async function handleGenerateSocialPackage(input: {
         tiktok: ["string"],
         youtubeShorts: ["string"],
         instagramReels: ["string"],
-        description: "string — 1–2 sentence distribution SEO blurb",
+        description: "string - 1 to 2 sentence distribution SEO blurb",
       },
     }),
     "",
@@ -399,21 +401,25 @@ function parseSocialPackage(raw: string): VideoSocialPackage {
     const seo = parsed.seoMetadata ?? parsed.platformTags ?? {};
 
     return {
-      caption: typeof parsed.caption === "string" ? parsed.caption.trim() : "",
+      caption: stripEmDashes(
+        typeof parsed.caption === "string" ? parsed.caption.trim() : "",
+      ),
       hashtags: hashtags.length
         ? hashtags
         : ["#VitalitySweat", "#Sweatlife", "#Fitness"],
-      thumbnailTitle:
+      thumbnailTitle: stripEmDashes(
         (typeof parsed.thumbnailTitle === "string" &&
           parsed.thumbnailTitle.trim()) ||
-        asStringArray(parsed.onScreenText)[0] ||
-        "",
+          asStringArray(parsed.onScreenText)[0] ||
+          "",
+      ),
       seoMetadata: {
         tiktok: asStringArray(seo.tiktok).slice(0, 8),
         youtubeShorts: asStringArray(seo.youtubeShorts).slice(0, 8),
         instagramReels: asStringArray(seo.instagramReels).slice(0, 8),
-        description:
+        description: stripEmDashes(
           typeof seo.description === "string" ? seo.description.trim() : "",
+        ),
       },
     };
   } catch {

@@ -7,6 +7,7 @@ import {
   type MarketingChecklistKey,
   type MarketingProject,
 } from "@/lib/marketing/project";
+import { absoluteUrl } from "@/lib/seo/site";
 
 const primaryBtn =
   "inline-flex min-h-11 w-full items-center justify-center bg-brand-orange px-4 py-2.5 font-sans text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm";
@@ -262,7 +263,58 @@ export default function MarketingProjectsPanel({
       setCopiedKey(key);
       window.setTimeout(() => setCopiedKey(null), 1800);
     } catch {
-      setError("Clipboard permission blocked — long-press to copy manually.");
+      setError("Clipboard permission blocked. Long-press to copy manually.");
+    }
+  }
+
+  /**
+   * Instagram requires an image. Copy the caption and download the blog cover
+   * so Hunter can attach it when creating the feed post.
+   */
+  async function copyInstagramPromo(
+    project: MarketingProject,
+    key: string,
+    text: string,
+  ) {
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setError("Clipboard permission blocked. Long-press the caption to copy.");
+      return;
+    }
+
+    const cover = project.coverImage?.trim();
+    if (!cover) {
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey(null), 2200);
+      setError(
+        "Caption copied, but this post has no cover image yet. Add a cover before posting to Instagram.",
+      );
+      return;
+    }
+
+    try {
+      const url = absoluteUrl(cover);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Cover fetch failed (${res.status})`);
+      const blob = await res.blob();
+      const ext =
+        blob.type.includes("png")
+          ? "png"
+          : blob.type.includes("webp")
+            ? "webp"
+            : "jpg";
+      const filename = `${project.slug || "chronicle"}-instagram-cover.${ext}`;
+      downloadBlob(blob, filename);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey(null), 2200);
+    } catch {
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey(null), 2200);
+      setError(
+        "Caption copied. Could not download the cover automatically - open the live post and save the hero image for Instagram.",
+      );
     }
   }
 
@@ -415,6 +467,7 @@ export default function MarketingProjectsPanel({
                           ] as const
                         ).map(([id, label, text]) => {
                           const copyId = `${project.id}-${id}`;
+                          const isInstagram = id === "instagram";
                           return (
                             <div
                               key={id}
@@ -427,11 +480,41 @@ export default function MarketingProjectsPanel({
                                 <button
                                   type="button"
                                   className={secondaryBtn}
-                                  onClick={() => copyText(copyId, text)}
+                                  onClick={() =>
+                                    isInstagram
+                                      ? copyInstagramPromo(project, copyId, text)
+                                      : copyText(copyId, text)
+                                  }
                                 >
-                                  {copiedKey === copyId ? "Copied" : "Copy"}
+                                  {copiedKey === copyId
+                                    ? isInstagram
+                                      ? "Copied + image"
+                                      : "Copied"
+                                    : isInstagram
+                                      ? "Copy + image"
+                                      : "Copy"}
                                 </button>
                               </div>
+                              {isInstagram ? (
+                                <div className="mb-3 overflow-hidden border border-brand-ink/10 bg-brand-ink/5">
+                                  {project.coverImage ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- remote Supabase covers
+                                    <img
+                                      src={absoluteUrl(project.coverImage)}
+                                      alt={`${project.title} cover for Instagram`}
+                                      className="aspect-[4/5] w-full object-cover sm:aspect-square"
+                                    />
+                                  ) : (
+                                    <p className="px-3 py-8 text-center font-sans text-xs text-brand-muted">
+                                      No cover image on this post yet. Instagram
+                                      needs a photo with the caption.
+                                    </p>
+                                  )}
+                                  <p className="border-t border-brand-ink/10 px-3 py-2 font-sans text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-brand-muted">
+                                    Feed image = blog cover (downloads on copy)
+                                  </p>
+                                </div>
+                              ) : null}
                               <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-muted">
                                 {text}
                               </p>
@@ -615,11 +698,21 @@ function upsertProject(
 }
 
 function formatDue(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
   }).format(d);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  a.click();
+  URL.revokeObjectURL(url);
 }

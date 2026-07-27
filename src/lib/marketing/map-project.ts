@@ -10,6 +10,7 @@ import {
   emptyVideoTargets,
   isVideoChecklistKey,
 } from "@/lib/marketing/project";
+import { stripEmDashes } from "@/lib/text/humanize-copy";
 
 type MarketingRow = BlogPostRecord & {
   fb_post_done?: boolean;
@@ -100,9 +101,9 @@ function normalizePromos(value: unknown): GeneratedPromos | null {
     typeof row.blogUrl === "string" ? row.blogUrl.trim() : "";
   if (!facebook || !instagram || !x) return null;
   return {
-    facebook,
-    instagram,
-    x,
+    facebook: stripEmDashes(facebook),
+    instagram: stripEmDashes(instagram),
+    x: stripEmDashes(x),
     blogUrl,
     generatedAt:
       typeof row.generatedAt === "string"

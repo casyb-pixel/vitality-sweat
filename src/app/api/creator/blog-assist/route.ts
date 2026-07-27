@@ -21,6 +21,7 @@ import type {
 } from "@/lib/blog/blog-assist";
 import { slugifyTitle } from "@/lib/blog/supabase-posts";
 import { createClient } from "@/utils/supabase/server";
+import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 
 /**
  * Edge Runtime (same as meal-plan / video-assist): avoids Vercel Hobby Node
@@ -378,17 +379,19 @@ function buildFinalizePrompt(
 ): string {
   return [
     "You are a world-class fitness editor for Vitality Sweat / Sweatlife Chronicles.",
-    "Hunter is a 17-year-old athlete logging from the gym. He gave a selected title, messy raw notes, and bulleted fragment details — NOT full paragraphs.",
+    "Hunter is a 17-year-old athlete logging from the gym. He gave a selected title, messy raw notes, and bulleted fragment details. NOT full paragraphs.",
     "Weave his conversational, real-life gym experiences into a highly engaging, publish-ready markdown blog post.",
     "Ensure absolute grammatical perfection. Expand fragments into full sentences. Do NOT invent PRs, weights, or numbers he did not provide.",
+    NO_EM_DASH_RULE,
+    "Write like a real coach-athlete voice. Avoid AI tells: no em dashes, no stiff transitions like 'In conclusion' or 'It is important to note'.",
     "",
     "MATCH OUR HISTORICAL H2/H3 FINGERPRINT (calorie-deficit archive baseline):",
     fingerprintSummaryText,
     "",
     "STRUCTURE / CADENCE RULES:",
     ...fingerprint.cadenceNotes.map((n) => `- ${n}`),
-    `- Target word count: ${fingerprint.targetWordCountMin}–${fingerprint.targetWordCountMax}.`,
-    `- Typical paragraph length ≈ ${fingerprint.avgParagraphChars} characters.`,
+    `- Target word count: ${fingerprint.targetWordCountMin}-${fingerprint.targetWordCountMax}.`,
+    `- Typical paragraph length ~ ${fingerprint.avgParagraphChars} characters.`,
     `- Aim for ~${fingerprint.avgH2} ## H2 sections and ~${fingerprint.avgH3} ### H3 subsections.`,
     "- Use markdown only: paragraphs, ## H2, ### H3, and - bullet lists. No HTML. No images in bodyMarkdown.",
     "",
@@ -404,35 +407,35 @@ function buildFinalizePrompt(
     "The image must be TEXT-FREE (no letters, logos, watermarks, captions). 16:9 editorial background.",
     `Brand color cues: charcoal ${BRAND_VISUAL_TOKENS.ink}, orange accent ${BRAND_VISUAL_TOKENS.orange}, warm surface ${BRAND_VISUAL_TOKENS.surface}. Guide: ${BRAND_GUIDE_URL}`,
     "",
-    "SEO METADATA (required — Hunter never fills tags on his phone):",
+    "SEO METADATA (required. Hunter never fills tags on his phone):",
     "Generate seoMetadata from the FINAL article so the post is fully search-optimized on publish.",
     "- metaTitle: highly clickable, SEO-optimized title under 60 characters; weave in primary fitness/nutrition keywords; no clickbait spam.",
     "- metaDescription: compelling Google SERP summary between 140 and 160 characters that maximizes CTR; include a benefit or hook.",
     "- slug: clean URL-friendly kebab-case string from the topic (e.g. incline-bench-press-tips-chest-growth); lowercase letters, numbers, hyphens only; no stop-word stuffing.",
-    "- keywords: array of 5–8 highly relevant search terms and tags grounded in the post content.",
+    "- keywords: array of 5-8 highly relevant search terms and tags grounded in the post content.",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
-      title: "string — editorial headline for the article page",
-      excerpt: "string — short card teaser",
+      title: "string - editorial headline for the article page",
+      excerpt: "string - short card teaser",
       bodyMarkdown:
-        "string — full article markdown with ## / ### / paragraphs / lists",
+        "string - full article markdown with ## / ### / paragraphs / lists",
       seoMetadata: {
-        metaTitle: "string — ≤60 chars, keyword-rich SERP title",
+        metaTitle: "string - under 60 chars, keyword-rich SERP title",
         metaDescription:
-          "string — 140–160 chars, CTR-focused Google snippet",
-        slug: "string — kebab-case url slug",
+          "string - 140 to 160 chars, CTR-focused Google snippet",
+        slug: "string - kebab-case url slug",
         keywords: ["string", "string", "string", "string", "string"],
       },
       imagePrompt: {
-        subject: "string — 8–16 words, scene subject only",
+        subject: "string - 8 to 16 words, scene subject only",
         lighting: "string",
-        composition: "string — 16:9 framing notes",
-        style: "string — brand color / photography look",
+        composition: "string - 16:9 framing notes",
+        style: "string - brand color / photography look",
         negativeConstraints:
-          "string — no text, logos, watermarks, UI, stickers, purple neon",
+          "string - no text, logos, watermarks, UI, stickers, purple neon",
         prompt:
-          "string — complete ready-to-send image generation prompt combining the above",
+          "string - complete ready-to-send image generation prompt combining the above",
       },
     }),
     "",
@@ -444,7 +447,7 @@ function buildFinalizePrompt(
       ? `TALKING POINTS HE ANSWERED:\n${input.talkingPoints.map((t) => `- ${t}`).join("\n")}`
       : null,
     `HUNTER'S RAW NOTES:\n${input.notes.slice(0, 4000) || "(none)"}`,
-    `HUNTER'S BULLETED DETAILS:\n${input.details.slice(0, 4000) || "(none — lean on the raw notes)"}`,
+    `HUNTER'S BULLETED DETAILS:\n${input.details.slice(0, 4000) || "(none - lean on the raw notes)"}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -545,13 +548,17 @@ function parseFinalizedPost(
     });
 
     return {
-      title,
-      excerpt,
+      title: stripEmDashes(title),
+      excerpt: stripEmDashes(excerpt),
       // Keep top-level fields aligned with SEO for older clients / UI chips.
-      description: seoMetadata.metaDescription,
-      keywords: seoMetadata.keywords,
-      bodyMarkdown,
-      seoMetadata,
+      description: stripEmDashes(seoMetadata.metaDescription),
+      keywords: seoMetadata.keywords.map((k) => stripEmDashes(k)),
+      bodyMarkdown: stripEmDashes(bodyMarkdown),
+      seoMetadata: {
+        ...seoMetadata,
+        metaTitle: stripEmDashes(seoMetadata.metaTitle),
+        metaDescription: stripEmDashes(seoMetadata.metaDescription),
+      },
       imagePrompt: normalizeImagePrompt(
         parsed.imagePrompt,
         title,

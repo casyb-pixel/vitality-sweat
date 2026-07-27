@@ -30,6 +30,12 @@ export const SOCIAL_LINKS = [
     handle: INSTAGRAM_HANDLE,
   },
   {
+    id: "x",
+    label: "X",
+    href: "https://x.com/vitalitysweat",
+    handle: TWITTER_HANDLE,
+  },
+  {
     id: "facebook",
     label: "Facebook",
     href: "https://www.facebook.com/profile.php?id=61561385332818",

@@ -5,6 +5,7 @@ import {
   type PostStatus,
   type SavePostInput,
 } from "@/lib/blog/supabase-posts";
+import { stripEmDashes } from "@/lib/text/humanize-copy";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -168,17 +169,24 @@ function validateSaveBody(
   return {
     ok: true,
     data: {
-      title,
-      excerpt,
-      bodyMarkdown,
+      title: stripEmDashes(title),
+      excerpt: stripEmDashes(excerpt),
+      bodyMarkdown: stripEmDashes(bodyMarkdown),
       status,
       slug: body.slug,
-      description: body.description,
+      description: body.description
+        ? stripEmDashes(body.description)
+        : undefined,
       keywords: Array.isArray(body.keywords)
-        ? body.keywords.filter((k) => typeof k === "string" && k.trim())
+        ? body.keywords
+            .filter((k) => typeof k === "string" && k.trim())
+            .map((k) => stripEmDashes(k.trim()))
         : undefined,
       coverImage: body.coverImage ?? body.cover_image,
-      coverAlt: body.coverAlt ?? body.cover_alt,
+      coverAlt: (() => {
+        const alt = (body.coverAlt ?? body.cover_alt ?? "").trim();
+        return alt ? stripEmDashes(alt) : undefined;
+      })(),
       featured: body.featured,
     },
   };

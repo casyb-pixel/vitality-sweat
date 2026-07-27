@@ -5,6 +5,7 @@ import {
 } from "@/lib/ai/gemini";
 import type { GeneratedPromos } from "@/lib/marketing/project";
 import { absoluteUrl } from "@/lib/seo/site";
+import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 
 export type PromoGenerationInput = {
   title: string;
@@ -38,23 +39,24 @@ export async function generateMarketingPromos(
 
   const prompt = [
     "You are the Vitality Sweat social media copywriter for Sweatlife Chronicles.",
-    "Hunter Broussard is a 17-year-old athlete. Voice: real gym energy, clear, motivating — never corporate fluff.",
+    "Hunter Broussard is a 17-year-old athlete. Voice: real gym energy, clear, motivating. Never corporate fluff.",
     "Write THREE platform-specific promo captions that drive clicks back to the live blog post.",
     "",
     "PLATFORM RULES:",
-    "- facebook: authoritative, community-building, 2–4 short paragraphs OK, invite discussion.",
-    "- instagram: hook-driven first line for visual feed context, emoji sparingly, line breaks welcome.",
-    "- x: punchy short-form under 260 characters BEFORE the URL (URL is appended separately).",
+    "- facebook: authoritative, community-building, 2-4 short paragraphs OK, invite discussion.",
+    "- instagram: hook-driven first line for a feed post that will use the blog cover photo as the image. Emoji sparingly, line breaks welcome. Caption only (no image description).",
+    "- x: punchy short-form under 260 characters BEFORE the URL (URL is appended separately). Tag voice fits @vitalitysweat.",
     "",
     "CRITICAL:",
     "- Do NOT invent PRs, weights, or claims absent from the article.",
-    "- Do NOT include the blog URL in your JSON strings — the server appends it.",
+    "- Do NOT include the blog URL in your JSON strings. The server appends it.",
+    `- ${NO_EM_DASH_RULE}`,
     "- Return ONLY valid JSON (no markdown fences) with keys: facebook, instagram, x.",
     "",
     `TITLE: ${input.title}`,
     input.excerpt ? `EXCERPT: ${input.excerpt}` : null,
     `ARTICLE BODY (plain text):\n${bodySnippet || "(empty)"}`,
-    `LIVE POST URL (for context only — do not paste into captions): ${blogUrl}`,
+    `LIVE POST URL (for context only; do not paste into captions): ${blogUrl}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -72,9 +74,9 @@ export async function generateMarketingPromos(
 
   const parsed = parsePromoJson(raw);
   return {
-    facebook: appendBlogUrl(parsed.facebook, blogUrl),
-    instagram: appendBlogUrl(parsed.instagram, blogUrl),
-    x: appendBlogUrl(truncateForX(parsed.x), blogUrl),
+    facebook: stripEmDashes(appendBlogUrl(parsed.facebook, blogUrl)),
+    instagram: stripEmDashes(appendBlogUrl(parsed.instagram, blogUrl)),
+    x: stripEmDashes(appendBlogUrl(truncateForX(parsed.x), blogUrl)),
     blogUrl,
     generatedAt: new Date().toISOString(),
     model,
