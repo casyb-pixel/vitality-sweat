@@ -51,6 +51,7 @@ export default function WorkoutTracker({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [resolving, setResolving] = useState(false);
+  const [resolveChoices, setResolveChoices] = useState<Exercise[]>([]);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const selected = useMemo(
@@ -122,6 +123,7 @@ export default function WorkoutTracker({
     setSearch(ex.name);
     setSetNumber(1);
     setPickerOpen(false);
+    setResolveChoices([]);
     if (note) setMessage(note);
   }
 
@@ -240,6 +242,7 @@ export default function WorkoutTracker({
     }
     setError(null);
     setMessage(null);
+    setResolveChoices([]);
     setResolving(true);
     try {
       const res = await fetch("/api/app/exercises/resolve", {
@@ -266,11 +269,35 @@ export default function WorkoutTracker({
         ok?: boolean;
         created?: boolean;
         matched?: boolean;
+        ambiguous?: boolean;
         reason?: string;
         exercise?: Exercise;
+        candidates?: Exercise[];
         error?: string;
       };
-      if (!res.ok || !json.ok || !json.exercise) {
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Could not resolve that exercise.");
+        return;
+      }
+
+      if (json.ambiguous && json.candidates && json.candidates.length >= 2) {
+        setCatalog((prev) => {
+          const byId = new Map(prev.map((e) => [e.id, e]));
+          for (const c of json.candidates!) byId.set(c.id, c);
+          return [...byId.values()].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+        });
+        setResolveChoices(json.candidates);
+        setPickerOpen(false);
+        setMessage(
+          json.reason ??
+            "A few library exercises could fit — pick one, or refine your search.",
+        );
+        return;
+      }
+
+      if (!json.exercise) {
         setError(json.error ?? "Could not resolve that exercise.");
         return;
       }
@@ -409,7 +436,7 @@ export default function WorkoutTracker({
           </div>
         </fieldset>
 
-        <div ref={pickerRef} className="relative">
+        <div ref={pickerRef} className="relative space-y-2">
           <label htmlFor="exercise-search" className={labelClass}>
             Exercise
           </label>
@@ -422,6 +449,7 @@ export default function WorkoutTracker({
             onChange={(e) => {
               setSearch(e.target.value);
               setPickerOpen(true);
+              setResolveChoices([]);
               if (
                 selected &&
                 e.target.value.trim().toLowerCase() !==
@@ -434,12 +462,95 @@ export default function WorkoutTracker({
             className={fieldClass}
           />
 
-          {pickerOpen ? (
-            <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto border border-brand-ink/15 bg-surface-elevated shadow-lg">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void resolveWithGemini()}
+              disabled={resolving || search.trim().length < 2}
+              className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+            >
+              {resolving ? "Looking up…" : "Look up with AI"}
+            </button>
+            {selected ? (
+              <span className="font-sans text-xs text-brand-muted">
+                Selected:{" "}
+                <span className="font-semibold text-brand-ink">
+                  {selected.name}
+                </span>
+              </span>
+            ) : (
+              <span className="font-sans text-xs text-brand-muted">
+                Can’t find it? AI matches synonyms or asks you to choose when
+                several fit.
+              </span>
+            )}
+          </div>
+
+          {resolveChoices.length > 0 ? (
+            <div className="border border-brand-orange/35 bg-brand-orange/5 p-3">
+              <p className="font-sans text-xs font-bold uppercase tracking-[0.1em] text-brand-orange">
+                Did you mean…?
+              </p>
+              <p className="mt-1 font-sans text-sm text-brand-muted">
+                Pick the exercise that matches what you’re doing, or keep
+                typing if it’s something else.
+              </p>
+              <ul className="mt-3 space-y-1">
+                {resolveChoices.map((ex) => (
+                  <li key={ex.id}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col items-start gap-0.5 border border-brand-ink/10 bg-surface-elevated px-3 py-2.5 text-left hover:border-brand-orange hover:bg-brand-orange/10"
+                      onClick={() =>
+                        selectExercise(ex, `Using “${ex.name}”.`)
+                      }
+                    >
+                      <span className="font-sans text-sm font-semibold text-brand-ink">
+                        {ex.name}
+                      </span>
+                      <span className="font-sans text-xs text-brand-muted">
+                        {ex.category} ·{" "}
+                        {ex.equipment?.replace("_", " ") ?? "—"}
+                        {ex.primary_muscle ? ` · ${ex.primary_muscle}` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="mt-3 font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange"
+                onClick={() => {
+                  setResolveChoices([]);
+                  setPickerOpen(true);
+                  setMessage(null);
+                }}
+              >
+                None of these — I’ll keep searching
+              </button>
+            </div>
+          ) : null}
+
+          {pickerOpen && resolveChoices.length === 0 ? (
+            <div className="z-20 max-h-64 w-full overflow-y-auto border border-brand-ink/15 bg-surface-elevated shadow-lg">
               {filtered.length === 0 ? (
-                <p className="px-3 py-3 font-sans text-sm text-brand-muted">
-                  No matches in the library for these filters.
-                </p>
+                <div className="space-y-3 px-3 py-3">
+                  <p className="font-sans text-sm text-brand-muted">
+                    No matches in the library for these filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void resolveWithGemini()}
+                    disabled={resolving || search.trim().length < 2}
+                    className="inline-flex min-h-10 w-full items-center justify-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60"
+                  >
+                    {resolving ? "Looking up…" : "Look up with AI"}
+                  </button>
+                  <p className="font-sans text-xs text-brand-muted">
+                    AI will match synonyms, offer choices when a few exercises
+                    fit, or add a new library entry.
+                  </p>
+                </div>
               ) : (
                 <ul>
                   {filtered.map((ex) => (
@@ -464,30 +575,6 @@ export default function WorkoutTracker({
               )}
             </div>
           ) : null}
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void resolveWithGemini()}
-              disabled={resolving || search.trim().length < 2}
-              className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
-            >
-              {resolving ? "Looking up…" : "Look up with AI"}
-            </button>
-            {selected ? (
-              <span className="font-sans text-xs text-brand-muted">
-                Selected:{" "}
-                <span className="font-semibold text-brand-ink">
-                  {selected.name}
-                </span>
-              </span>
-            ) : (
-              <span className="font-sans text-xs text-brand-muted">
-                Can’t find it? AI matches synonyms or adds a new library entry
-                (no duplicates).
-              </span>
-            )}
-          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">

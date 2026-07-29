@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   BlogIdeaOption,
   BlogImagePrompt,
@@ -68,13 +68,26 @@ function promptsForOption(option: BlogIdeaOption | null): string[] {
 type BlogWizardProps = {
   /** Fired after a successful publish so Creator Studio can open Projects. */
   onPublished?: (slug: string) => void;
+  /** Prefill Phase 1 notes (e.g. from member Library search gaps). */
+  seedNotes?: string | null;
 };
 
-export default function BlogWizard({ onPublished }: BlogWizardProps) {
+export default function BlogWizard({
+  onPublished,
+  seedNotes = null,
+}: BlogWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("PHASE_1_INPUT");
 
   // Phase 1
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(() => seedNotes?.trim() || "");
+
+  useEffect(() => {
+    const next = seedNotes?.trim();
+    if (!next) return;
+    setNotes(next);
+    setPhase("PHASE_1_INPUT");
+  }, [seedNotes]);
+
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
 

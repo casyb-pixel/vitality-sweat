@@ -12,6 +12,11 @@ export type ResolveExerciseResult =
       reason: string;
     }
   | {
+      action: "choose";
+      exerciseIds: string[];
+      reason: string;
+    }
+  | {
       action: "create";
       name: string;
       aliases: string[];
@@ -40,9 +45,10 @@ export function buildResolveExercisePrompt(input: {
   return [
     "You are the Vitality Sweat exercise librarian.",
     "A member typed an exercise name while logging a workout.",
-    "Your job: MATCH an existing catalog exercise if it is the same movement under any common name/synonym, OR CREATE a clean new catalog entry.",
-    "NEVER invent a duplicate when an equivalent already exists (e.g. \"DB curls\" = Dumbbell Curl, \"RDL\" = Romanian Deadlift, \"bench\" often = Barbell Bench Press when free weight).",
-    "Prefer MATCH whenever the movement is clearly the same.",
+    "Your job: MATCH one existing catalog exercise, CHOOSE among several close catalog options when the query is ambiguous, OR CREATE a clean new catalog entry.",
+    "NEVER invent a duplicate when an equivalent already exists (e.g. \"DB curls\" = Dumbbell Curl, \"RDL\" = Romanian Deadlift).",
+    "CRITICAL: If the query could reasonably mean more than one catalog entry that differ by equipment or variation — e.g. \"bench\", \"benchpress\", \"bench press\" could be Barbell Bench Press OR Dumbbell Bench Press — you MUST use action \"choose\" and list all plausible catalog ids. Do NOT silently pick only Barbell.",
+    "Use action \"match\" only when ONE catalog exercise is clearly the intended movement.",
     "Only CREATE when nothing in the catalog is a reasonable equivalent.",
     "",
     "Return ONLY valid JSON (no markdown fences) with one of these shapes:",
@@ -50,6 +56,12 @@ export function buildResolveExercisePrompt(input: {
       action: "match",
       exerciseId: "uuid from catalog",
       reason: "short why it matches",
+    }),
+    "OR",
+    JSON.stringify({
+      action: "choose",
+      exerciseIds: ["uuid1", "uuid2"],
+      reason: "short why these are the options",
     }),
     "OR",
     JSON.stringify({
@@ -99,7 +111,47 @@ export function parseResolveExerciseResult(
         action: "match",
         exerciseId,
         reason:
-          typeof parsed.reason === "string" ? parsed.reason.trim() : "Matched catalog exercise.",
+          typeof parsed.reason === "string"
+            ? parsed.reason.trim()
+            : "Matched catalog exercise.",
+      };
+    }
+
+    if (action === "choose") {
+      const rawIds = Array.isArray(parsed.exerciseIds)
+        ? parsed.exerciseIds
+        : Array.isArray(parsed.exercise_ids)
+          ? parsed.exercise_ids
+          : [];
+      const exerciseIds = [
+        ...new Set(
+          rawIds
+            .filter((id): id is string => typeof id === "string")
+            .map((id) => id.trim())
+            .filter((id) => catalogIds.has(id)),
+        ),
+      ].slice(0, 8);
+      if (exerciseIds.length < 2) {
+        // Model listed one option — treat as a match when valid.
+        if (exerciseIds.length === 1) {
+          return {
+            action: "match",
+            exerciseId: exerciseIds[0]!,
+            reason:
+              typeof parsed.reason === "string"
+                ? parsed.reason.trim()
+                : "Matched catalog exercise.",
+          };
+        }
+        return null;
+      }
+      return {
+        action: "choose",
+        exerciseIds,
+        reason:
+          typeof parsed.reason === "string"
+            ? parsed.reason.trim()
+            : "Several library exercises could fit — pick one.",
       };
     }
 

@@ -10,6 +10,7 @@ import {
   isLikelyConnectionError,
 } from "@/lib/ai/gemini";
 import {
+  findAmbiguousLocalMatches,
   findLocalExerciseMatch,
   isExerciseCategory,
   isExerciseEquipment,
@@ -99,6 +100,20 @@ export async function POST(request: Request) {
       });
     }
 
+    const ambiguousLocal = findAmbiguousLocalMatches(exercises, query);
+    if (ambiguousLocal.length >= 2) {
+      return NextResponse.json({
+        ok: true,
+        created: false,
+        matched: false,
+        ambiguous: true,
+        source: "local",
+        reason:
+          "A few library exercises could fit — pick the one you mean, or look up something else.",
+        candidates: ambiguousLocal,
+      });
+    }
+
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
       return NextResponse.json(
@@ -180,6 +195,43 @@ export async function POST(request: Request) {
           reason: parsed.reason,
           exercise: matched,
         });
+      }
+
+      if (parsed.action === "choose") {
+        const candidates = parsed.exerciseIds
+          .map((id) => exercises.find((ex) => ex.id === id))
+          .filter((ex): ex is Exercise => Boolean(ex));
+        if (candidates.length >= 2) {
+          return NextResponse.json({
+            ok: true,
+            created: false,
+            matched: false,
+            ambiguous: true,
+            source: "gemini",
+            reason: parsed.reason,
+            candidates,
+          });
+        }
+        if (candidates.length === 1) {
+          return NextResponse.json({
+            ok: true,
+            created: false,
+            matched: true,
+            source: "gemini",
+            reason: parsed.reason,
+            exercise: candidates[0],
+          });
+        }
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Gemini suggested options that are no longer in the library. Try again.",
+            provider: "gemini",
+            model,
+          },
+          { status: 502 },
+        );
       }
 
       // Final server-side duplicate guard before insert.

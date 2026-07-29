@@ -133,19 +133,24 @@ function classifyExternalUrl(raw: string | null | undefined): {
 }
 
 /** Build a YouTube embed src from a watch / short / youtu.be URL. */
-export function toYouTubeEmbedSrc(url: string): string | null {
+export function toYouTubeEmbedSrc(
+  url: string,
+  options?: { autoplay?: boolean },
+): string | null {
+  const autoplay = options?.autoplay !== false;
+  const suffix = autoplay ? "autoplay=1&rel=0" : "rel=0";
   try {
     const u = new URL(url);
     if (u.hostname.includes("youtu.be")) {
       const id = u.pathname.replace(/^\//, "").split("/")[0];
-      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : null;
+      return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
     }
     if (u.pathname.startsWith("/shorts/")) {
       const id = u.pathname.split("/")[2];
-      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : null;
+      return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
     }
     const id = u.searchParams.get("v");
-    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : null;
+    return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
   } catch {
     return null;
   }

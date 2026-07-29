@@ -31,8 +31,8 @@ const QUICK_LINKS = [
   },
   {
     href: "/app/library",
-    title: "Video & Chronicles",
-    body: "Watch instructional videos and read Hunter’s Sweatlife Chronicles.",
+    title: "Library",
+    body: "Browse & search Chronicles, watch training clips, and open the YouTube channel mid-workout.",
   },
 ] as const;
 

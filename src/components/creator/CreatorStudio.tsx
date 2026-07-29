@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import BlogWizard from "@/components/creator/BlogWizard";
+import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
 
@@ -24,14 +25,26 @@ export default function CreatorStudio({
 }: CreatorStudioProps) {
   const [tab, setTab] = useState<StudioTab>("projects");
   const [highlightSlug, setHighlightSlug] = useState<string | null>(null);
+  const [seedNotes, setSeedNotes] = useState<string | null>(null);
 
   const handlePublished = useCallback((slug: string) => {
     setHighlightSlug(slug);
+    setSeedNotes(null);
     setTab("projects");
   }, []);
 
   const clearHighlight = useCallback(() => {
     setHighlightSlug(null);
+  }, []);
+
+  const handleWriteAbout = useCallback((topic: string) => {
+    const trimmed = topic.trim();
+    setSeedNotes(
+      trimmed
+        ? `Member Library search interest: ${trimmed}\n\nWrite a Chronicle that covers this topic for people training (treadmill-friendly tips welcome).`
+        : null,
+    );
+    setTab("blog");
   }, []);
 
   const headline =
@@ -96,7 +109,9 @@ export default function CreatorStudio({
           id="studio-panel-projects"
           role="tabpanel"
           aria-labelledby="studio-tab-projects"
+          className="space-y-6"
         >
+          <CreatorContentGaps onWriteAbout={handleWriteAbout} />
           <MarketingProjectsPanel
             highlightSlug={highlightSlug}
             onPromosReady={clearHighlight}
@@ -120,7 +135,7 @@ export default function CreatorStudio({
           role="tabpanel"
           aria-labelledby="studio-tab-blog"
         >
-          <BlogWizard onPublished={handlePublished} />
+          <BlogWizard onPublished={handlePublished} seedNotes={seedNotes} />
         </div>
       ) : null}
     </div>
