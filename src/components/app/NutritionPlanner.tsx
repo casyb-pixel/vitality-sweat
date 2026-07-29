@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import type {
   GroceryItem,
   MealDay,
@@ -15,19 +15,29 @@ type NutritionPlannerProps = {
 
 export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps) {
   const router = useRouter();
+  const whyTitleId = useId();
   const [plan, setPlan] = useState<MealPlan | null>(initialPlan);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [dayPending, setDayPending] = useState<string | null>(null);
+  const [whyDay, setWhyDay] = useState<MealDay | null>(null);
+  const [whyReason, setWhyReason] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+  }, [initialPlan]);
 
   function regenerate() {
     setError(null);
+    setMessage(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/app/meal-plan", { method: "POST" });
         const contentType = res.headers.get("content-type") ?? "";
         const raw = await res.text();
 
-        // Hosting timeouts / Next error pages return HTML — surface that clearly.
         if (
           !contentType.includes("application/json") ||
           raw.trimStart().startsWith("<!")
@@ -64,6 +74,107 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
     });
   }
 
+  async function submitDayRegen() {
+    if (!plan || !whyDay) return;
+    const reason = whyReason.trim();
+    if (reason.length < 3) {
+      setError("Tell us why you want a different day.");
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+    setDayPending(whyDay.day);
+
+    try {
+      const res = await fetch("/api/app/meal-plan/day", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          meal_plan_id: plan.id,
+          day: whyDay.day,
+          reason,
+        }),
+      });
+      const contentType = res.headers.get("content-type") ?? "";
+      const raw = await res.text();
+
+      if (
+        !contentType.includes("application/json") ||
+        raw.trimStart().startsWith("<!")
+      ) {
+        setError("Day regenerate timed out or returned an error page. Try again.");
+        return;
+      }
+
+      const json = JSON.parse(raw) as {
+        ok?: boolean;
+        mealPlan?: MealPlan;
+        addedDislikes?: string[];
+        error?: string;
+      };
+
+      if (!res.ok || !json.ok || !json.mealPlan) {
+        setError(json.error ?? "Could not regenerate that day.");
+        return;
+      }
+
+      setPlan(json.mealPlan);
+      setWhyDay(null);
+      setWhyReason("");
+      const dislikes = json.addedDislikes?.length
+        ? ` Saved dislikes: ${json.addedDislikes.join(", ")}.`
+        : "";
+      setMessage(`Updated ${whyDay.day}.${dislikes}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Day regenerate failed.");
+    } finally {
+      setDayPending(null);
+    }
+  }
+
+  function groceryShareUrl(): string | null {
+    if (!plan?.grocery_share_token || typeof window === "undefined") return null;
+    return `${window.location.origin}/grocery/${plan.grocery_share_token}`;
+  }
+
+  async function copyShareLink() {
+    const url = groceryShareUrl();
+    if (!url) {
+      setError("Share link is not ready yet. Regenerate the plan after deploy.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      setError("Could not copy the share link.");
+    }
+  }
+
+  async function shareList() {
+    const url = groceryShareUrl();
+    if (!url) {
+      setError("Share link is not ready yet. Regenerate the plan after deploy.");
+      return;
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Vitality Sweat grocery list",
+          text: `Grocery list for week of ${plan?.week_start ?? ""}`,
+          url,
+        });
+        return;
+      } catch {
+        // Fall through to copy.
+      }
+    }
+    await copyShareLink();
+  }
+
   const days = extractDays(plan);
   const grocery = extractGrocery(plan);
   const snacks = extractSnacks(plan);
@@ -81,13 +192,13 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
         <button
           type="button"
           onClick={regenerate}
-          disabled={pending}
+          disabled={pending || Boolean(dayPending)}
           className="inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60"
         >
           {pending
             ? "Generating…"
             : plan
-              ? "Regenerate plan"
+              ? "Regenerate full week"
               : "Generate weekly meal plan"}
         </button>
         {plan?.week_start ? (
@@ -105,6 +216,9 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
         >
           {error}
         </p>
+      ) : null}
+      {message ? (
+        <p className="font-sans text-sm text-brand-muted">{message}</p>
       ) : null}
 
       {!plan && !pending ? (
@@ -129,9 +243,23 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
                 key={day.day}
                 className="border border-brand-ink/10 bg-surface-elevated p-4"
               >
-                <h3 className="font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange">
-                  {day.day}
-                </h3>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange">
+                    {day.day}
+                  </h3>
+                  <button
+                    type="button"
+                    disabled={pending || Boolean(dayPending)}
+                    onClick={() => {
+                      setWhyDay(day);
+                      setWhyReason("");
+                      setError(null);
+                    }}
+                    className="shrink-0 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] text-brand-ink hover:text-brand-orange disabled:opacity-60"
+                  >
+                    {dayPending === day.day ? "Updating…" : "Change day"}
+                  </button>
+                </div>
                 <ul className="mt-3 space-y-2 font-sans text-sm text-brand-ink">
                   <li>
                     <span className="font-semibold">Breakfast:</span>{" "}
@@ -158,10 +286,38 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
       ) : null}
 
       {grocery.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-display text-xl text-brand-ink">
-            Weekly grocery list
-          </h2>
+        <section id="grocery-list" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="font-display text-xl text-brand-ink">
+              Weekly grocery list
+            </h2>
+            <div className="flex flex-wrap gap-2 print:hidden">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+              >
+                Print
+              </button>
+              <button
+                type="button"
+                onClick={() => void shareList()}
+                className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+              >
+                {shareCopied ? "Link copied" : "Share list"}
+              </button>
+              {plan?.grocery_share_token ? (
+                <a
+                  href={`/grocery/${plan.grocery_share_token}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+                >
+                  Open share page
+                </a>
+              ) : null}
+            </div>
+          </div>
           <ul className="divide-y divide-brand-ink/10 border border-brand-ink/10 bg-surface-elevated">
             {grocery.map((item, idx) => (
               <li
@@ -175,11 +331,15 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
               </li>
             ))}
           </ul>
+          <p className="font-sans text-xs text-brand-muted print:hidden">
+            Share sends a link your spouse can open without signing in — print
+            works from here or the share page.
+          </p>
         </section>
       ) : null}
 
       {snacks.length > 0 ? (
-        <section className="space-y-3">
+        <section className="space-y-3 print:hidden">
           <h2 className="font-display text-xl text-brand-ink">
             Healthy snack ideas
           </h2>
@@ -201,6 +361,56 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
             ))}
           </div>
         </section>
+      ) : null}
+
+      {whyDay ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-brand-ink/50 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={whyTitleId}
+        >
+          <div className="w-full max-w-md border border-brand-ink/10 bg-surface-elevated p-5 shadow-xl">
+            <h2
+              id={whyTitleId}
+              className="font-display text-2xl text-brand-ink"
+            >
+              Why change {whyDay.day}?
+            </h2>
+            <p className="mt-2 font-sans text-sm leading-relaxed text-brand-muted">
+              We’ll remember this so those meals (and foods you mention, like
+              hummus) don’t come back.
+            </p>
+            <textarea
+              rows={4}
+              value={whyReason}
+              onChange={(e) => setWhyReason(e.target.value)}
+              placeholder="e.g. I don’t like hummus, and that lunch felt too heavy…"
+              className="mt-4 w-full border border-brand-ink/15 bg-surface px-3 py-2.5 font-sans text-sm text-brand-ink outline-none focus:border-brand-orange"
+            />
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                disabled={Boolean(dayPending)}
+                onClick={() => void submitDayRegen()}
+                className="inline-flex min-h-11 flex-1 items-center justify-center bg-brand-orange px-4 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60"
+              >
+                {dayPending ? "Updating…" : "Save & regenerate day"}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(dayPending)}
+                onClick={() => {
+                  setWhyDay(null);
+                  setWhyReason("");
+                }}
+                className="inline-flex min-h-11 flex-1 items-center justify-center border border-brand-ink/15 px-4 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

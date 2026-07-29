@@ -28,6 +28,7 @@ export type FitnessProfile = {
   food_allergies: string[];
   health_conditions: string[];
   activity_restrictions: string | null;
+  meal_rejects?: string[];
   onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -56,12 +57,17 @@ export type ExerciseTrackingType =
   | "duration"
   | "distance";
 
+export type ExerciseEquipment = "machine" | "bodyweight" | "free_weight";
+
+export type ExerciseCategory = "cardio" | "strength" | "endurance";
+
 export type Exercise = {
   id: string;
   name: string;
-  category: string;
+  category: ExerciseCategory | string;
   primary_muscle: string | null;
-  equipment: string | null;
+  equipment: ExerciseEquipment | string | null;
+  aliases?: string[];
   tracking_type: ExerciseTrackingType;
   is_active: boolean;
   created_by: string | null;
@@ -146,8 +152,21 @@ export type MealPlan = {
   grocery_list: GroceryItem[] | unknown;
   snacks: SnackIdea[] | unknown;
   model: string | null;
+  grocery_share_token?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type MealFeedbackEntry = {
+  at: string;
+  day: string;
+  reason: string;
+  rejected: {
+    breakfast: string;
+    lunch: string;
+    dinner: string;
+  };
+  extracted_dislikes: string[];
 };
 
 export type VideoProvider = "youtube" | "vimeo";

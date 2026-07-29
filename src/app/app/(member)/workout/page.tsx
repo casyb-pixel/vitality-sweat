@@ -26,7 +26,9 @@ export default async function WorkoutPage() {
   const [{ data: exercises }, { data: activeSession }] = await Promise.all([
     supabase
       .from("exercises")
-      .select("*")
+      .select(
+        "id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active, created_by, created_at, updated_at",
+      )
       .eq("is_active", true)
       .order("name", { ascending: true }),
     supabase
@@ -47,8 +49,10 @@ export default async function WorkoutPage() {
           Log today’s workout
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-          Pick an exercise, log weight, reps, and how hard it felt. Easy sets
-          get a progressive overload suggestion next time.
+          Narrow by equipment and focus, type to search the library, or look up
+          a new movement with AI — it matches synonyms and avoids duplicates.
+          Log weight, reps, and how hard it felt for progressive overload next
+          time.
         </p>
       </header>
 

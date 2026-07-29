@@ -23,7 +23,7 @@ export default async function NutritionPage() {
     redirect("/app/onboarding");
   }
 
-  const { data: mealPlan } = await supabase
+  let { data: mealPlan } = await supabase
     .from("meal_plans")
     .select("*")
     .eq("user_id", user.id)
@@ -31,16 +31,28 @@ export default async function NutritionPage() {
     .limit(1)
     .maybeSingle();
 
+  if (mealPlan && !mealPlan.grocery_share_token) {
+    const token = crypto.randomUUID();
+    const { data: patched } = await supabase
+      .from("meal_plans")
+      .update({ grocery_share_token: token })
+      .eq("id", mealPlan.id)
+      .eq("user_id", user.id)
+      .select("*")
+      .single();
+    mealPlan = patched ?? { ...mealPlan, grocery_share_token: token };
+  }
+
   return (
     <div className="space-y-6">
-      <header className="space-y-3">
+      <header className="space-y-3 print:hidden">
         <p className="eyebrow text-brand-orange">Peak Nutrition</p>
         <h1 className="font-display text-[clamp(1.85rem,5vw,2.75rem)] leading-[1.05] text-brand-ink">
           Meal plan &amp; grocery list
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-          Gemini crafts a week of meals, a shopping list, and snack ideas from
-          your goals, allergies, and food preferences.
+          Generate a week of meals, tweak any day you don’t like (we’ll remember
+          why), and print or share the shopping list.
         </p>
       </header>
 

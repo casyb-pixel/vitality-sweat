@@ -1,9 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import {
+  EXERCISE_CATEGORY_OPTIONS,
+  EXERCISE_EQUIPMENT_OPTIONS,
+  filterExercises,
+} from "@/lib/fitness/exercises";
 import {
   DIFFICULTY_LABELS,
   type Exercise,
+  type ExerciseCategory,
+  type ExerciseEquipment,
   type ProgressionSuggestion,
   type WorkoutSession,
   type WorkoutSet,
@@ -15,11 +29,16 @@ type WorkoutTrackerProps = {
 };
 
 export default function WorkoutTracker({
-  exercises,
+  exercises: initialExercises,
   initialSession,
 }: WorkoutTrackerProps) {
+  const [catalog, setCatalog] = useState<Exercise[]>(initialExercises);
   const [session, setSession] = useState<WorkoutSession | null>(initialSession);
-  const [exerciseId, setExerciseId] = useState(exercises[0]?.id ?? "");
+  const [equipment, setEquipment] = useState<ExerciseEquipment | "">("");
+  const [category, setCategory] = useState<ExerciseCategory | "">("");
+  const [search, setSearch] = useState("");
+  const [exerciseId, setExerciseId] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [weightLb, setWeightLb] = useState("");
   const [reps, setReps] = useState("10");
   const [difficulty, setDifficulty] = useState(3);
@@ -31,10 +50,22 @@ export default function WorkoutTracker({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [resolving, setResolving] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   const selected = useMemo(
-    () => exercises.find((e) => e.id === exerciseId) ?? null,
-    [exercises, exerciseId],
+    () => catalog.find((e) => e.id === exerciseId) ?? null,
+    [catalog, exerciseId],
+  );
+
+  const filtered = useMemo(
+    () =>
+      filterExercises(catalog, {
+        query: search,
+        equipment,
+        category,
+      }).slice(0, 40),
+    [catalog, search, equipment, category],
   );
 
   const loadHistory = useCallback(async (id: string) => {
@@ -70,6 +101,29 @@ export default function WorkoutTracker({
   useEffect(() => {
     void loadHistory(exerciseId);
   }, [exerciseId, loadHistory]);
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  function selectExercise(ex: Exercise, note?: string) {
+    setCatalog((prev) =>
+      prev.some((p) => p.id === ex.id) ? prev : [...prev, ex].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    );
+    setExerciseId(ex.id);
+    setSearch(ex.name);
+    setSetNumber(1);
+    setPickerOpen(false);
+    if (note) setMessage(note);
+  }
 
   function startSession() {
     setError(null);
@@ -137,6 +191,10 @@ export default function WorkoutTracker({
       setError("Start today’s workout first.");
       return;
     }
+    if (!exerciseId) {
+      setError("Select or look up an exercise first.");
+      return;
+    }
     setError(null);
     setMessage(null);
 
@@ -174,9 +232,66 @@ export default function WorkoutTracker({
     });
   }
 
+  async function resolveWithGemini() {
+    const q = search.trim();
+    if (q.length < 2) {
+      setError("Type the exercise name, then tap Look up with AI.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    setResolving(true);
+    try {
+      const res = await fetch("/api/app/exercises/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: q,
+          equipment: equipment || undefined,
+          category: category || undefined,
+        }),
+      });
+      const contentType = res.headers.get("content-type") ?? "";
+      const raw = await res.text();
+      if (
+        !contentType.includes("application/json") ||
+        raw.trimStart().startsWith("<!")
+      ) {
+        setError(
+          "Exercise lookup timed out or returned an error page. Try again.",
+        );
+        return;
+      }
+      const json = JSON.parse(raw) as {
+        ok?: boolean;
+        created?: boolean;
+        matched?: boolean;
+        reason?: string;
+        exercise?: Exercise;
+        error?: string;
+      };
+      if (!res.ok || !json.ok || !json.exercise) {
+        setError(json.error ?? "Could not resolve that exercise.");
+        return;
+      }
+      const note = json.created
+        ? `Added “${json.exercise.name}” to the library.`
+        : json.reason
+          ? `Using “${json.exercise.name}”. ${json.reason}`
+          : `Using “${json.exercise.name}”.`;
+      selectExercise(json.exercise, note);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lookup failed.");
+    } finally {
+      setResolving(false);
+    }
+  }
+
   const fieldClass =
     "mt-1.5 w-full border border-brand-ink/15 bg-surface-elevated px-3 py-2.5 font-sans text-sm text-brand-ink outline-none focus:border-brand-orange";
   const labelClass = "block font-sans text-sm font-semibold text-brand-ink";
+  const chipBase =
+    "min-h-10 rounded-md border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.06em]";
 
   return (
     <div className="space-y-6">
@@ -232,27 +347,147 @@ export default function WorkoutTracker({
         onSubmit={logSet}
         className="space-y-4 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6"
       >
-        <div>
-          <label htmlFor="exercise" className={labelClass}>
+        <fieldset>
+          <legend className={labelClass}>What equipment?</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEquipment("")}
+              className={`${chipBase} ${
+                equipment === ""
+                  ? "border-brand-orange bg-brand-orange text-white"
+                  : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+              }`}
+            >
+              Any
+            </button>
+            {EXERCISE_EQUIPMENT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setEquipment(opt.value)}
+                className={`${chipBase} ${
+                  equipment === opt.value
+                    ? "border-brand-orange bg-brand-orange text-white"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className={labelClass}>Training focus?</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCategory("")}
+              className={`${chipBase} ${
+                category === ""
+                  ? "border-brand-orange bg-brand-orange text-white"
+                  : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+              }`}
+            >
+              Any
+            </button>
+            {EXERCISE_CATEGORY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setCategory(opt.value)}
+                className={`${chipBase} ${
+                  category === opt.value
+                    ? "border-brand-orange bg-brand-orange text-white"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <div ref={pickerRef} className="relative">
+          <label htmlFor="exercise-search" className={labelClass}>
             Exercise
           </label>
-          <select
-            id="exercise"
-            value={exerciseId}
+          <input
+            id="exercise-search"
+            type="search"
+            autoComplete="off"
+            placeholder="Type to search — e.g. RDL, DB curl, leg press…"
+            value={search}
             onChange={(e) => {
-              setExerciseId(e.target.value);
-              setSetNumber(1);
+              setSearch(e.target.value);
+              setPickerOpen(true);
+              if (
+                selected &&
+                e.target.value.trim().toLowerCase() !==
+                  selected.name.toLowerCase()
+              ) {
+                setExerciseId("");
+              }
             }}
+            onFocus={() => setPickerOpen(true)}
             className={fieldClass}
-            disabled={!exercises.length}
-          >
-            {exercises.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.name}
-                {ex.equipment ? ` (${ex.equipment})` : ""}
-              </option>
-            ))}
-          </select>
+          />
+
+          {pickerOpen ? (
+            <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto border border-brand-ink/15 bg-surface-elevated shadow-lg">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-3 font-sans text-sm text-brand-muted">
+                  No matches in the library for these filters.
+                </p>
+              ) : (
+                <ul>
+                  {filtered.map((ex) => (
+                    <li key={ex.id}>
+                      <button
+                        type="button"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-brand-orange/10"
+                        onClick={() => selectExercise(ex)}
+                      >
+                        <span className="font-sans text-sm font-semibold text-brand-ink">
+                          {ex.name}
+                        </span>
+                        <span className="font-sans text-xs text-brand-muted">
+                          {ex.category} ·{" "}
+                          {ex.equipment?.replace("_", " ") ?? "—"}
+                          {ex.primary_muscle ? ` · ${ex.primary_muscle}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void resolveWithGemini()}
+              disabled={resolving || search.trim().length < 2}
+              className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+            >
+              {resolving ? "Looking up…" : "Look up with AI"}
+            </button>
+            {selected ? (
+              <span className="font-sans text-xs text-brand-muted">
+                Selected:{" "}
+                <span className="font-semibold text-brand-ink">
+                  {selected.name}
+                </span>
+              </span>
+            ) : (
+              <span className="font-sans text-xs text-brand-muted">
+                Can’t find it? AI matches synonyms or adds a new library entry
+                (no duplicates).
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
@@ -269,7 +504,11 @@ export default function WorkoutTracker({
               onChange={(e) => setWeightLb(e.target.value)}
               className={fieldClass}
               placeholder={
-                selected?.tracking_type === "reps_only" ? "optional" : ""
+                selected?.tracking_type === "reps_only" ||
+                selected?.tracking_type === "duration" ||
+                selected?.tracking_type === "distance"
+                  ? "optional"
+                  : ""
               }
             />
           </div>
@@ -344,12 +583,10 @@ export default function WorkoutTracker({
 
       {loggedSets.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="font-display text-xl text-brand-ink">
-            This session
-          </h2>
+          <h2 className="font-display text-xl text-brand-ink">This session</h2>
           <ul className="divide-y divide-brand-ink/10 border border-brand-ink/10 bg-surface-elevated">
             {loggedSets.map((set) => {
-              const ex = exercises.find((e) => e.id === set.exercise_id);
+              const ex = catalog.find((e) => e.id === set.exercise_id);
               return (
                 <li
                   key={set.id}

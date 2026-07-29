@@ -36,7 +36,7 @@ export default function MemberNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-brand-ink/10 bg-surface-elevated/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-brand-ink/10 bg-surface-elevated/95 backdrop-blur-md print:hidden">
       <div className="mx-auto flex h-14 max-w-site items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link href="/app" className="flex shrink-0 items-center gap-2">
           <Image

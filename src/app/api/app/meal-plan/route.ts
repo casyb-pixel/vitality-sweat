@@ -47,6 +47,18 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
+  if (data && !data.grocery_share_token) {
+    const token = crypto.randomUUID();
+    const { data: patched } = await supabase
+      .from("meal_plans")
+      .update({ grocery_share_token: token })
+      .eq("id", data.id)
+      .eq("user_id", user.id)
+      .select("*")
+      .single();
+    return NextResponse.json({ ok: true, mealPlan: patched ?? { ...data, grocery_share_token: token } });
+  }
+
   return NextResponse.json({ ok: true, mealPlan: data });
 }
 
@@ -130,6 +142,7 @@ export async function POST() {
           grocery_list: payload.groceryList,
           snacks: payload.snacks,
           model,
+          grocery_share_token: crypto.randomUUID(),
         })
         .select("*")
         .single();
