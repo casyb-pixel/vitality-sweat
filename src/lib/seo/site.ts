@@ -16,6 +16,11 @@ export const DEFAULT_OG_IMAGE = "/images/hero-strength-stamina-collage.png";
 export const TWITTER_HANDLE = "@vitalitysweat";
 export const INSTAGRAM_HANDLE = "@vitalitysweat";
 
+/** GA4 web stream Measurement ID — override with NEXT_PUBLIC_GA_MEASUREMENT_ID. */
+export const GA_MEASUREMENT_ID = (
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || "G-V0H33373RB"
+) as string;
+
 /** Canonical social profiles — use across footer, nav, and Organization JSON-LD. */
 export const SOCIAL_LINKS = [
   {
