@@ -9,6 +9,7 @@ import {
   PRIMARY_GOAL_LABELS,
 } from "@/lib/fitness/types";
 import { ageFromBirthdate } from "@/lib/fitness/profile";
+import { formatDishRatingsForPrompt } from "@/lib/fitness/dishes";
 
 function profileContext(profile: FitnessProfile): string[] {
   const age = profile.birthdate ? ageFromBirthdate(profile.birthdate) : null;
@@ -33,6 +34,7 @@ function profileContext(profile: FitnessProfile): string[] {
     `- Health conditions: ${profile.health_conditions.join(", ") || "none listed"}`,
     `- Activity restrictions: ${profile.activity_restrictions?.trim() || "none"}`,
     `- Rejected meals (never repeat): ${rejects.join(" | ") || "none"}`,
+    `- Dish ratings (use to set frequency): ${formatDishRatingsForPrompt(profile.dish_ratings)}`,
   ];
 }
 
@@ -41,6 +43,7 @@ export function buildMealPlanPrompt(profile: FitnessProfile): string {
     "You are the Vitality Sweat Peak Nutrition coach for Southwest Louisiana athletes and families.",
     "Build a practical 7-day meal plan that fuels performance without ignoring real life (budget, leftovers, simple cooking).",
     "Respect food allergies strictly. Avoid disliked foods. Never repeat rejected meals. Account for health conditions and activity restrictions.",
+    "Use dish ratings to control frequency: feature 4–5★ favorites more often, use 3★ sparingly, and avoid or rarely repeat 1–2★ dishes.",
     "Prefer heart-healthy, whole-food meals. No medical claims — frame as coaching suggestions.",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
@@ -84,6 +87,7 @@ export function buildDayRegenPrompt(input: {
     `Replace ONLY the ${input.dayName} meals for this member.`,
     "They disliked the previous day and explained why — honor that feedback.",
     "Do NOT repeat the rejected meals. Avoid disliked foods and allergies.",
+    "Prefer highly rated (4–5★) dish styles when choosing replacements; avoid 1–2★ dishes.",
     "Keep the new day aligned with the rest of the week (variety, leftovers when sensible).",
     "",
     "Also extract any specific foods/ingredients they dislike from their reason",
@@ -328,6 +332,11 @@ export function asMealPlanPayload(
     days,
     groceryList,
     snacks,
+    recipes:
+      (plan as MealPlanPayload).recipes &&
+      typeof (plan as MealPlanPayload).recipes === "object"
+        ? (plan as MealPlanPayload).recipes
+        : undefined,
   };
 }
 

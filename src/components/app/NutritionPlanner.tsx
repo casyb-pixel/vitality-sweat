@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
+import { normalizeDishKey } from "@/lib/fitness/dishes";
 import type {
+  DishRatingsMap,
+  DishRecipe,
   GroceryItem,
   MealDay,
   MealPlan,
@@ -11,12 +14,24 @@ import type {
 
 type NutritionPlannerProps = {
   initialPlan: MealPlan | null;
+  initialRatings?: DishRatingsMap | null;
 };
 
-export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps) {
+type SelectedDish = {
+  day: string;
+  slot: "breakfast" | "lunch" | "dinner";
+  dish: string;
+};
+
+export default function NutritionPlanner({
+  initialPlan,
+  initialRatings = null,
+}: NutritionPlannerProps) {
   const router = useRouter();
   const whyTitleId = useId();
+  const recipeTitleId = useId();
   const [plan, setPlan] = useState<MealPlan | null>(initialPlan);
+  const [ratings, setRatings] = useState<DishRatingsMap>(initialRatings ?? {});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -24,10 +39,95 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
   const [whyDay, setWhyDay] = useState<MealDay | null>(null);
   const [whyReason, setWhyReason] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
+  const [selectedDish, setSelectedDish] = useState<SelectedDish | null>(null);
+  const [recipe, setRecipe] = useState<DishRecipe | null>(null);
+  const [recipeLoading, setRecipeLoading] = useState(false);
+  const [ratingSaving, setRatingSaving] = useState(false);
 
   useEffect(() => {
     setPlan(initialPlan);
   }, [initialPlan]);
+
+  useEffect(() => {
+    setRatings(initialRatings ?? {});
+  }, [initialRatings]);
+
+  useEffect(() => {
+    if (!selectedDish || !plan) {
+      setRecipe(null);
+      return;
+    }
+
+    let cancelled = false;
+    setRecipeLoading(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/app/meal-plan/recipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meal_plan_id: plan.id,
+            dish: selectedDish.dish,
+            slot: selectedDish.slot,
+            day: selectedDish.day,
+          }),
+        });
+        const contentType = res.headers.get("content-type") ?? "";
+        const raw = await res.text();
+        if (
+          !contentType.includes("application/json") ||
+          raw.trimStart().startsWith("<!")
+        ) {
+          if (!cancelled) {
+            setError("Recipe request timed out or returned an error page.");
+            setRecipe(null);
+          }
+          return;
+        }
+        const json = JSON.parse(raw) as {
+          ok?: boolean;
+          recipe?: DishRecipe;
+          rating?: number | null;
+          error?: string;
+        };
+        if (!res.ok || !json.ok || !json.recipe) {
+          if (!cancelled) {
+            setError(json.error ?? "Could not load recipe.");
+            setRecipe(null);
+          }
+          return;
+        }
+        if (!cancelled) {
+          setRecipe(json.recipe);
+          if (typeof json.rating === "number") {
+            const key = normalizeDishKey(selectedDish.dish);
+            setRatings((prev) => ({
+              ...prev,
+              [key]: {
+                title: selectedDish.dish,
+                rating: json.rating!,
+                count: prev[key]?.count ?? 1,
+                updated_at: prev[key]?.updated_at ?? new Date().toISOString(),
+              },
+            }));
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Recipe failed.");
+          setRecipe(null);
+        }
+      } finally {
+        if (!cancelled) setRecipeLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDish, plan]);
 
   function regenerate() {
     setError(null);
@@ -134,6 +234,41 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
     }
   }
 
+  async function saveRating(value: number) {
+    if (!selectedDish) return;
+    setRatingSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/app/meal-plan/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dish: selectedDish.dish, rating: value }),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        entry?: { title: string; rating: number; count: number; updated_at: string };
+        error?: string;
+      };
+      if (!res.ok || !json.ok || !json.entry) {
+        setError(json.error ?? "Could not save rating.");
+        return;
+      }
+      const key = normalizeDishKey(selectedDish.dish);
+      setRatings((prev) => ({ ...prev, [key]: json.entry! }));
+      setMessage(
+        value >= 4
+          ? `Loved it — we’ll suggest “${selectedDish.dish}” more often.`
+          : value <= 2
+            ? `Got it — we’ll suggest “${selectedDish.dish}” less often.`
+            : `Rated “${selectedDish.dish}” ${value}/5.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rating failed.");
+    } finally {
+      setRatingSaving(false);
+    }
+  }
+
   function groceryShareUrl(): string | null {
     if (!plan?.grocery_share_token || typeof window === "undefined") return null;
     return `${window.location.origin}/grocery/${plan.grocery_share_token}`;
@@ -186,6 +321,10 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
       ? (plan.plan as { summary: string }).summary
       : null;
 
+  const selectedRating = selectedDish
+    ? ratings[normalizeDishKey(selectedDish.dish)]?.rating ?? null
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -237,6 +376,10 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
       {days.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-display text-xl text-brand-ink">7-day plan</h2>
+          <p className="font-sans text-xs text-brand-muted">
+            Tap a dish for its recipe (built around your grocery list) and rate
+            it so we know how often to suggest it.
+          </p>
           <div className="grid gap-3 md:grid-cols-2">
             {days.map((day) => (
               <article
@@ -261,18 +404,37 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
                   </button>
                 </div>
                 <ul className="mt-3 space-y-2 font-sans text-sm text-brand-ink">
-                  <li>
-                    <span className="font-semibold">Breakfast:</span>{" "}
-                    {day.breakfast || "—"}
-                  </li>
-                  <li>
-                    <span className="font-semibold">Lunch:</span>{" "}
-                    {day.lunch || "—"}
-                  </li>
-                  <li>
-                    <span className="font-semibold">Dinner:</span>{" "}
-                    {day.dinner || "—"}
-                  </li>
+                  {(
+                    [
+                      ["breakfast", day.breakfast],
+                      ["lunch", day.lunch],
+                      ["dinner", day.dinner],
+                    ] as const
+                  ).map(([slot, dish]) => (
+                    <li key={slot}>
+                      <span className="font-semibold capitalize">{slot}:</span>{" "}
+                      {dish ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDish({ day: day.day, slot, dish });
+                            setError(null);
+                            setMessage(null);
+                          }}
+                          className="text-left text-brand-ink underline decoration-brand-orange/40 underline-offset-2 hover:text-brand-orange hover:decoration-brand-orange"
+                        >
+                          {dish}
+                          {ratings[normalizeDishKey(dish)] ? (
+                            <span className="ml-1 text-xs text-brand-muted no-underline">
+                              ({ratings[normalizeDishKey(dish)]!.rating}/5)
+                            </span>
+                          ) : null}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </li>
+                  ))}
                 </ul>
                 {day.notes ? (
                   <p className="mt-2 font-sans text-xs text-brand-muted">
@@ -408,6 +570,132 @@ export default function NutritionPlanner({ initialPlan }: NutritionPlannerProps)
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedDish ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-brand-ink/50 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={recipeTitleId}
+        >
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto border border-brand-ink/10 bg-surface-elevated p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  {selectedDish.day} · {selectedDish.slot}
+                </p>
+                <h2
+                  id={recipeTitleId}
+                  className="mt-1 font-display text-2xl text-brand-ink"
+                >
+                  {recipe?.title ?? selectedDish.dish}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDish(null);
+                  setRecipe(null);
+                }}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center border border-brand-ink/15 text-lg text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {recipeLoading ? (
+              <p className="mt-6 font-sans text-sm text-brand-muted">
+                Building a recipe from your grocery list…
+              </p>
+            ) : recipe ? (
+              <div className="mt-5 space-y-5">
+                <p className="font-sans text-xs text-brand-muted">
+                  {[
+                    recipe.servings ? `Serves ${recipe.servings}` : null,
+                    recipe.prepMinutes != null
+                      ? `${recipe.prepMinutes} min prep`
+                      : null,
+                    recipe.cookMinutes != null
+                      ? `${recipe.cookMinutes} min cook`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+
+                <div>
+                  <h3 className="font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-ink">
+                    Ingredients
+                  </h3>
+                  <ul className="mt-2 space-y-1.5 font-sans text-sm text-brand-ink">
+                    {recipe.ingredients.map((ing, idx) => (
+                      <li key={`${ing.name}-${idx}`}>
+                        {ing.amount ? `${ing.amount} ` : ""}
+                        {ing.name}
+                        {ing.fromGroceryList ? (
+                          <span className="ml-1 text-xs text-brand-orange">
+                            (on list)
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-ink">
+                    Steps
+                  </h3>
+                  <ol className="mt-2 list-decimal space-y-2 pl-5 font-sans text-sm leading-relaxed text-brand-ink">
+                    {recipe.steps.map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+
+                {recipe.tips ? (
+                  <p className="border border-brand-orange/20 bg-brand-orange/5 p-3 font-sans text-sm text-brand-ink">
+                    {recipe.tips}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-6 font-sans text-sm text-brand-muted">
+                No recipe loaded yet.
+              </p>
+            )}
+
+            <div className="mt-6 border-t border-brand-ink/10 pt-4">
+              <p className="font-sans text-sm font-semibold text-brand-ink">
+                Rate this dish
+              </p>
+              <p className="mt-1 font-sans text-xs text-brand-muted">
+                Higher ratings show up more often in future plans; low ratings
+                show up less.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    disabled={ratingSaving}
+                    onClick={() => void saveRating(n)}
+                    className={`min-h-10 min-w-10 rounded-md border px-3 py-2 font-sans text-sm font-bold ${
+                      selectedRating === n
+                        ? "border-brand-orange bg-brand-orange text-white"
+                        : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                    } disabled:opacity-60`}
+                    aria-label={`Rate ${n} out of 5`}
+                  >
+                    {n}★
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

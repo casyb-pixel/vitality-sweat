@@ -6,7 +6,7 @@ import {
   getFitnessProfile,
   isOnboardingComplete,
 } from "@/lib/fitness/profile";
-import type { MealPlan } from "@/lib/fitness/types";
+import type { DishRatingsMap, MealPlan } from "@/lib/fitness/types";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
@@ -51,12 +51,16 @@ export default async function NutritionPage() {
           Meal plan &amp; grocery list
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-          Generate a week of meals, tweak any day you don’t like (we’ll remember
-          why), and print or share the shopping list.
+          Generate a week of meals, open any dish for a grocery-aligned recipe,
+          rate favorites, tweak days you don’t like, and print or share the
+          shopping list.
         </p>
       </header>
 
-      <NutritionPlanner initialPlan={(mealPlan as MealPlan | null) ?? null} />
+      <NutritionPlanner
+        initialPlan={(mealPlan as MealPlan | null) ?? null}
+        initialRatings={(profile?.dish_ratings as DishRatingsMap | null) ?? null}
+      />
     </div>
   );
 }

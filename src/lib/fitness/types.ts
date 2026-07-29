@@ -12,6 +12,15 @@ export type PrimaryGoal =
 
 export type UnitSystem = "imperial" | "metric";
 
+export type DishRatingEntry = {
+  title: string;
+  rating: number;
+  count: number;
+  updated_at: string;
+};
+
+export type DishRatingsMap = Record<string, DishRatingEntry>;
+
 export type FitnessProfile = {
   id: string;
   sex: Sex | null;
@@ -29,6 +38,7 @@ export type FitnessProfile = {
   health_conditions: string[];
   activity_restrictions: string | null;
   meal_rejects?: string[];
+  dish_ratings?: DishRatingsMap;
   onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -142,6 +152,23 @@ export type MealPlanPayload = {
   groceryList: GroceryItem[];
   snacks: SnackIdea[];
   summary?: string;
+  recipes?: Record<string, DishRecipe>;
+};
+
+export type DishRecipeIngredient = {
+  name: string;
+  amount?: string;
+  fromGroceryList?: boolean;
+};
+
+export type DishRecipe = {
+  title: string;
+  servings?: number;
+  prepMinutes?: number;
+  cookMinutes?: number;
+  ingredients: DishRecipeIngredient[];
+  steps: string[];
+  tips?: string;
 };
 
 export type MealPlan = {
