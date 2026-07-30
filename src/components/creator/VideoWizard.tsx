@@ -19,6 +19,14 @@ import type {
   VideoSocialPackage,
   VideoStudioPhase,
 } from "@/lib/video/video-studio";
+import {
+  canLikelyCompressInBrowser,
+  COMPRESS_OFFER_BYTES,
+  compressVideoTo720p,
+  FREE_PLAN_MAX_UPLOAD_BYTES,
+  formatUploadBytes,
+  type CompressProgress,
+} from "@/lib/video/compress-720p";
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
@@ -119,6 +127,10 @@ export default function VideoWizard() {
   const [assetUploadKind, setAssetUploadKind] =
     useState<VideoAssetKind | null>(null);
   const [assetError, setAssetError] = useState<string | null>(null);
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
+  const [compressing, setCompressing] = useState(false);
+  const [compressProgress, setCompressProgress] =
+    useState<CompressProgress | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
@@ -489,17 +501,71 @@ export default function VideoWizard() {
 
   async function onVideoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    // Allow re-selecting the same file later.
+    event.target.value = "";
     if (!file) return;
+
+    // Large clips: offer 720p compress before upload (free plan caps ~50 MB).
+    if (file.size >= COMPRESS_OFFER_BYTES) {
+      setPendingVideoFile(file);
+      setAssetError(null);
+      return;
+    }
+
+    await applyVideoFile(file);
+  }
+
+  async function applyVideoFile(file: File) {
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideoFile(file);
     setVideoUrl(URL.createObjectURL(file));
     setVideoAsset(null);
+    setPendingVideoFile(null);
+    setCompressProgress(null);
+
+    if (file.size > FREE_PLAN_MAX_UPLOAD_BYTES) {
+      setAssetError(
+        `This clip is ${formatUploadBytes(file.size)}. Free-plan uploads max out around ${formatUploadBytes(FREE_PLAN_MAX_UPLOAD_BYTES)} — compress to 720p or trim under ~45s first.`,
+      );
+      return;
+    }
 
     const asset = await uploadAsset("video", file, file.name);
     if (asset) {
       setVideoAsset(asset);
       setVideoUrl(asset.signedUrl);
     }
+  }
+
+  async function compressPendingThenUpload() {
+    if (!pendingVideoFile || compressing) return;
+    setCompressing(true);
+    setAssetError(null);
+    setCompressProgress({ phase: "loading", ratio: 0 });
+    try {
+      const { blob, fileName } = await compressVideoTo720p(
+        pendingVideoFile,
+        setCompressProgress,
+      );
+      const compressed = new File([blob], fileName, {
+        type: blob.type || "video/mp4",
+      });
+      await applyVideoFile(compressed);
+    } catch (error) {
+      setAssetError(
+        error instanceof Error
+          ? error.message
+          : "Could not compress that clip in-browser.",
+      );
+    } finally {
+      setCompressing(false);
+      setCompressProgress(null);
+    }
+  }
+
+  async function uploadPendingOriginal() {
+    if (!pendingVideoFile) return;
+    await applyVideoFile(pendingVideoFile);
   }
 
   async function toggleRecording() {
@@ -948,8 +1014,8 @@ export default function VideoWizard() {
                 Gym video clip
               </span>
               <span className="font-sans text-sm text-brand-muted">
-                Pick a video you already recorded on your iPhone, or record a
-                new one. Vertical preferred.
+                Pick a video from Photos (under ~45s / 720p stays under the
+                upload limit). Large clips get a compress option first.
               </span>
               <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
                 <label
@@ -1006,6 +1072,93 @@ export default function VideoWizard() {
               />
             ) : null}
 
+            {assetError ? (
+              <p
+                className="font-sans text-sm font-semibold text-red-700"
+                role="alert"
+              >
+                {assetError}
+              </p>
+            ) : null}
+
+            {pendingVideoFile ? (
+              <div
+                className="space-y-3 border-2 border-brand-orange/40 bg-brand-orange/5 p-4"
+                role="dialog"
+                aria-label="Compress video before upload"
+              >
+                <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  Large clip
+                </p>
+                <p className="font-display text-lg text-brand-ink">
+                  {pendingVideoFile.name}
+                </p>
+                <p className="font-sans text-sm leading-relaxed text-brand-muted">
+                  This file is{" "}
+                  <span className="font-semibold text-brand-ink">
+                    {formatUploadBytes(pendingVideoFile.size)}
+                  </span>
+                  . Free-plan uploads max around{" "}
+                  {formatUploadBytes(FREE_PLAN_MAX_UPLOAD_BYTES)}. Want to
+                  convert to ~720p in the app before uploading?
+                </p>
+
+                {compressing ? (
+                  <p className="flex items-center gap-2 font-sans text-sm text-brand-muted">
+                    <Spinner dark />
+                    {compressProgress?.phase === "loading"
+                      ? "Reading clip…"
+                      : `Compressing to 720p… ${Math.round((compressProgress?.ratio ?? 0) * 100)}%`}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={compressing || !canLikelyCompressInBrowser()}
+                    onClick={() => void compressPendingThenUpload()}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center bg-brand-orange px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60"
+                  >
+                    Compress to 720p &amp; upload
+                  </button>
+                  <button
+                    type="button"
+                    disabled={compressing}
+                    onClick={() => void uploadPendingOriginal()}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center border-2 border-brand-ink/20 bg-surface px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+                  >
+                    Upload original
+                  </button>
+                  <button
+                    type="button"
+                    disabled={compressing}
+                    onClick={() => {
+                      setPendingVideoFile(null);
+                      setCompressProgress(null);
+                    }}
+                    className="inline-flex min-h-12 items-center justify-center px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-muted hover:text-brand-orange disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {!canLikelyCompressInBrowser() ? (
+                  <p className="font-sans text-xs leading-relaxed text-brand-muted">
+                    In-app compress isn&apos;t available in this browser. On
+                    iPhone: Settings → Camera → Record Video → 720p HD, or trim
+                    in Photos / export from CapCut at 720p, then choose the
+                    smaller file here.
+                  </p>
+                ) : (
+                  <p className="font-sans text-xs leading-relaxed text-brand-muted">
+                    Tip: keep the final cut under ~45 seconds. If compress fails
+                    on iPhone Safari, set Camera to 720p HD or export 720p from
+                    CapCut / Photos, then re-upload.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => void toggleRecording()}
@@ -1043,12 +1196,12 @@ export default function VideoWizard() {
               ) : null}
             </button>
 
-            {micError || assetError ? (
+            {micError ? (
               <p
                 className="font-sans text-sm font-semibold text-red-700"
                 role="alert"
               >
-                {micError ?? assetError}
+                {micError}
               </p>
             ) : null}
 
