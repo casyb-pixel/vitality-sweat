@@ -64,7 +64,7 @@ export default function CreatorStudio({
   return (
     <div className="space-y-6 pb-10 pt-4 sm:space-y-8 sm:pt-6">
       <header className="space-y-3">
-        <p className="eyebrow text-brand-orange">Creator studio backdoor</p>
+        <p className="eyebrow text-brand-orange">Creator studio</p>
         <h1 className="font-display text-[clamp(1.85rem,6vw,2.75rem)] leading-[1.05] text-brand-ink">
           {headline}
         </h1>

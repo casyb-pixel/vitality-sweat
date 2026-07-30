@@ -5,7 +5,7 @@ import { requireCreatorAccess } from "@/lib/auth/creator";
 export const metadata: Metadata = {
   title: "Creator Studio",
   description:
-    "Private Vitality Sweat creator backdoor for Video Studio and AI Blog Architect.",
+    "Private Vitality Sweat studio for Video Studio and AI Blog Architect.",
   robots: { index: false, follow: false },
 };
 

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
+import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
 import { createClient } from "@/utils/supabase/client";
@@ -128,7 +129,7 @@ export default function LoginModal({
     startTransition(async () => {
       try {
         const supabase = createClient();
-        const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
+        const redirectTo = buildAuthCallbackUrl(safeNext);
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: email.trim(),
           options: {
@@ -158,7 +159,7 @@ export default function LoginModal({
     startTransition(async () => {
       try {
         const supabase = createClient();
-        const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`;
+        const redirectTo = buildAuthCallbackUrl("/auth/update-password");
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(
           trimmed,
           { redirectTo },
@@ -288,8 +289,8 @@ export default function LoginModal({
           ) : (
             <>
               <p className="font-sans text-sm leading-relaxed text-brand-muted">
-                Hunter’s Creator Studio backdoor — email/password or a one-tap
-                magic link.
+                Sign in to your Vitality Engine account with email and password,
+                or request a one-tap magic link.
               </p>
 
               <div
