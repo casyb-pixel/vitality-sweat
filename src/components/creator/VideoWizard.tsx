@@ -84,6 +84,7 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export default function VideoWizard() {
   const videoInputId = useId();
+  const videoCameraInputId = useId();
   const [phase, setPhase] = useState<VideoStudioPhase>("SELECT_BLOG_CONTEXT");
 
   // Step 1
@@ -97,6 +98,11 @@ export default function VideoWizard() {
   const [ideasLoading, setIdeasLoading] = useState(false);
   const [ideasError, setIdeasError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<ShortFormVideoIdea[]>([]);
+  const [ideasLocked, setIdeasLocked] = useState(false);
+  const [ideasLockedAt, setIdeasLockedAt] = useState<string | null>(null);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(
+    null,
+  );
   const [selectedIdea, setSelectedIdea] = useState<ShortFormVideoIdea | null>(
     null,
   );
@@ -180,11 +186,37 @@ export default function VideoWizard() {
     setSelectedPost(post);
     setSelectedIdea(null);
     setIdeas([]);
+    setIdeasLocked(false);
+    setIdeasLockedAt(null);
     setIdeasError(null);
     setIdeasLoading(true);
     setPhase("VIDEO_IDEAS_DISPLAY");
 
     try {
+      // Prefer locked ideas so gym trips / re-entry don't reshuffle the set.
+      const lockedRes = await fetch(
+        `/api/creator/video-ideas?postId=${encodeURIComponent(post.id)}`,
+      );
+      const lockedJson = (await lockedRes.json()) as {
+        ok?: boolean;
+        locked?: boolean;
+        ideas?: ShortFormVideoIdea[];
+        lockedAt?: string;
+        error?: string;
+      };
+      if (
+        lockedRes.ok &&
+        lockedJson.ok &&
+        lockedJson.locked &&
+        lockedJson.ideas &&
+        lockedJson.ideas.length > 0
+      ) {
+        setIdeas(lockedJson.ideas);
+        setIdeasLocked(true);
+        setIdeasLockedAt(lockedJson.lockedAt ?? null);
+        return;
+      }
+
       const res = await fetch("/api/creator/video-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -210,13 +242,119 @@ export default function VideoWizard() {
         setIdeasError(data.error ?? "Couldn't generate video ideas.");
         return;
       }
-      setIdeas(data.ideas);
+
+      const saveRes = await fetch("/api/creator/video-ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save",
+          postId: post.id,
+          postSlug: post.slug,
+          blogTitle: post.title,
+          ideas: data.ideas,
+        }),
+      });
+      const saveJson = (await saveRes.json()) as {
+        ok?: boolean;
+        ideas?: ShortFormVideoIdea[];
+        lockedAt?: string;
+        error?: string;
+      };
+      if (!saveRes.ok || !saveJson.ok) {
+        // Still show generated ideas even if lock failed — warn creator.
+        setIdeas(data.ideas);
+        setIdeasError(
+          saveJson.error ??
+            "Ideas generated but couldn't lock them. They may reshuffle if you leave.",
+        );
+        return;
+      }
+
+      setIdeas(saveJson.ideas ?? data.ideas);
+      setIdeasLocked(true);
+      setIdeasLockedAt(saveJson.lockedAt ?? null);
     } catch (error) {
       setIdeasError(
         error instanceof Error ? error.message : "Network error. Try again.",
       );
     } finally {
       setIdeasLoading(false);
+    }
+  }
+
+  async function regenerateIdea(index: number) {
+    if (!selectedPost || regeneratingIndex != null) return;
+    setRegeneratingIndex(index);
+    setIdeasError(null);
+    try {
+      const res = await fetch("/api/creator/video-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "regenerate_video_idea",
+          blogTitle: selectedPost.title,
+          bodyMarkdown: selectedPost.bodyMarkdown || selectedPost.bodyPreview,
+          replaceIndex: index,
+          existingIdeas: ideas,
+          post: {
+            title: selectedPost.title,
+            bodyMarkdown:
+              selectedPost.bodyMarkdown || selectedPost.bodyPreview,
+            slug: selectedPost.slug,
+          },
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        idea?: ShortFormVideoIdea;
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.idea) {
+        setIdeasError(data.error ?? "Couldn't regenerate that idea.");
+        return;
+      }
+
+      const saveRes = await fetch("/api/creator/video-ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "replace_one",
+          postId: selectedPost.id,
+          index,
+          idea: data.idea,
+        }),
+      });
+      const saveJson = (await saveRes.json()) as {
+        ok?: boolean;
+        ideas?: ShortFormVideoIdea[];
+        lockedAt?: string;
+        error?: string;
+      };
+      if (!saveRes.ok || !saveJson.ok || !saveJson.ideas) {
+        // Apply locally even if persistence failed.
+        setIdeas((prev) => {
+          const next = [...prev];
+          next[index] = data.idea!;
+          return next;
+        });
+        setIdeasError(
+          saveJson.error ??
+            "Replaced locally, but couldn't save the locked set.",
+        );
+        return;
+      }
+
+      setIdeas(saveJson.ideas);
+      setIdeasLocked(true);
+      setIdeasLockedAt(saveJson.lockedAt ?? null);
+    } catch (error) {
+      setIdeasError(
+        error instanceof Error
+          ? error.message
+          : "Network error regenerating idea.",
+      );
+    } finally {
+      setRegeneratingIndex(null);
     }
   }
 
@@ -677,7 +815,7 @@ export default function VideoWizard() {
                     {post.excerpt}
                   </p>
                   <span className="mt-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
-                    Generate video ideas →
+                    Open video ideas →
                   </span>
                 </button>
               </li>
@@ -697,9 +835,19 @@ export default function VideoWizard() {
             </p>
           ) : null}
 
+          {ideasLocked && !ideasLoading ? (
+            <p className="border border-brand-ink/10 bg-surface-elevated px-3 py-2 font-sans text-sm text-brand-muted">
+              Locked in
+              {ideasLockedAt
+                ? ` · ${formatDate(ideasLockedAt)}`
+                : ""}. These five stay put when you leave — reject one to swap
+              just that slot.
+            </p>
+          ) : null}
+
           {ideasLoading ? (
             <p className="flex items-center gap-2 font-sans text-sm text-brand-muted">
-              <Spinner dark /> Writing 5 high-impact clip ideas…
+              <Spinner dark /> Loading video ideas…
             </p>
           ) : null}
 
@@ -711,7 +859,7 @@ export default function VideoWizard() {
               >
                 {ideasError}
               </p>
-              {selectedPost ? (
+              {selectedPost && !ideas.length ? (
                 <button
                   type="button"
                   onClick={() => void selectBlog(selectedPost)}
@@ -724,12 +872,10 @@ export default function VideoWizard() {
           ) : null}
 
           <div className="space-y-3">
-            {ideas.map((idea) => (
-              <button
-                key={idea.title}
-                type="button"
-                onClick={() => chooseIdea(idea)}
-                className="block w-full border-2 border-brand-ink/15 bg-surface-elevated p-4 text-left transition-colors hover:border-brand-orange focus:border-brand-orange focus:outline-none"
+            {ideas.map((idea, index) => (
+              <article
+                key={`${index}-${idea.title}`}
+                className="border-2 border-brand-ink/15 bg-surface-elevated p-4"
               >
                 <p className="font-display text-lg leading-snug text-brand-ink">
                   {idea.title}
@@ -745,10 +891,31 @@ export default function VideoWizard() {
                     {idea.shootingConcept}
                   </p>
                 ) : null}
-                <span className="mt-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
-                  Film this one →
-                </span>
-              </button>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => void chooseIdea(idea)}
+                    disabled={regeneratingIndex != null}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center bg-brand-orange px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60"
+                  >
+                    Film this one →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void regenerateIdea(index)}
+                    disabled={regeneratingIndex != null}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center border-2 border-brand-ink/20 bg-surface px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+                  >
+                    {regeneratingIndex === index ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner dark /> Regenerating…
+                      </span>
+                    ) : (
+                      "Reject & regenerate"
+                    )}
+                  </button>
+                </div>
+              </article>
             ))}
           </div>
 
@@ -776,16 +943,28 @@ export default function VideoWizard() {
           </p>
 
           <div className="space-y-3">
-            <label
-              htmlFor={videoInputId}
-              className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-brand-ink/25 bg-surface px-4 py-6 text-center transition-colors hover:border-brand-orange"
-            >
+            <div className="flex min-h-36 flex-col items-center justify-center gap-3 border-2 border-dashed border-brand-ink/25 bg-surface px-4 py-6 text-center">
               <span className="font-sans text-xs font-bold uppercase tracking-[0.14em] text-brand-orange">
-                Upload Gym Video Clip
+                Gym video clip
               </span>
               <span className="font-sans text-sm text-brand-muted">
-                Camera roll or record now · vertical preferred
+                Pick a video you already recorded on your iPhone, or record a
+                new one. Vertical preferred.
               </span>
+              <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
+                <label
+                  htmlFor={videoInputId}
+                  className="inline-flex min-h-12 flex-1 cursor-pointer items-center justify-center bg-brand-orange px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+                >
+                  Choose from Photos
+                </label>
+                <label
+                  htmlFor={videoCameraInputId}
+                  className="inline-flex min-h-12 flex-1 cursor-pointer items-center justify-center border-2 border-brand-ink/20 bg-surface-elevated px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+                >
+                  Record with camera
+                </label>
+              </div>
               {videoFile ? (
                 <span className="font-sans text-xs font-semibold text-brand-ink">
                   {videoFile.name} · {formatBytes(videoFile.size)}
@@ -800,9 +979,17 @@ export default function VideoWizard() {
                   Secure upload complete
                 </span>
               ) : null}
-            </label>
+            </div>
+            {/* No capture attr — iOS opens Photos / Files instead of forcing Camera. */}
             <input
               id={videoInputId}
+              type="file"
+              accept="video/*,.mov,.mp4,.m4v"
+              className="sr-only"
+              onChange={onVideoChange}
+            />
+            <input
+              id={videoCameraInputId}
               type="file"
               accept="video/*"
               capture="environment"

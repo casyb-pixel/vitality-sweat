@@ -180,8 +180,7 @@ export default function VideoCanvas({
           <input
             id={inputId}
             type="file"
-            accept="video/*"
-            capture="environment"
+            accept="video/*,.mov,.mp4,.m4v"
             className="sr-only"
             onChange={onFileChange}
           />

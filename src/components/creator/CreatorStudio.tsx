@@ -119,15 +119,17 @@ export default function CreatorStudio({
         </div>
       ) : null}
 
-      {tab === "video" ? (
-        <div
-          id="studio-panel-video"
-          role="tabpanel"
-          aria-labelledby="studio-tab-video"
-        >
-          <VideoWizard />
-        </div>
-      ) : null}
+      {/* Keep Video Studio mounted so mid-session state survives tab switches;
+          locked ideas also persist in the database for gym trips. */}
+      <div
+        id="studio-panel-video"
+        role="tabpanel"
+        aria-labelledby="studio-tab-video"
+        hidden={tab !== "video"}
+        className={tab === "video" ? undefined : "hidden"}
+      >
+        <VideoWizard />
+      </div>
 
       {tab === "blog" ? (
         <div

@@ -17,7 +17,10 @@ import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 export const runtime = "edge";
 export const maxDuration = 60;
 
-type VideoAssistAction = "generate_video_ideas" | "generate_social_package";
+type VideoAssistAction =
+  | "generate_video_ideas"
+  | "regenerate_video_idea"
+  | "generate_social_package";
 
 type VideoAssistBody = {
   action?: VideoAssistAction;
@@ -45,6 +48,10 @@ type VideoAssistBody = {
     hook?: string;
     shootingConcept?: string;
   };
+  /** Existing locked ideas — used when regenerating one slot. */
+  existingIdeas?: ShortFormVideoIdea[];
+  /** Index (0–4) of the idea to replace. */
+  replaceIndex?: number;
   /** Confirmation that gym clip and/or voice-over were attached. */
   assetsReady?: boolean;
   hasVideo?: boolean;
@@ -77,7 +84,7 @@ export async function POST(request: Request) {
     const action = resolveAction(body.action);
     if (!action) {
       return jsonError(
-        'Send action: "generate_video_ideas" or "generate_social_package".',
+        'Send action: "generate_video_ideas", "regenerate_video_idea", or "generate_social_package".',
         400,
       );
     }
@@ -101,6 +108,32 @@ export async function POST(request: Request) {
         );
       }
       return handleGenerateVideoIdeas({ apiKey, blogTitle, markdown });
+    }
+
+    if (action === "regenerate_video_idea") {
+      const markdown = resolveBlogMarkdown(body);
+      const blogTitle =
+        (body.blogTitle ?? body.post?.title ?? "").trim() || "Sweatlife Chronicle";
+      const replaceIndex = Number(body.replaceIndex);
+      if (!markdown) {
+        return jsonError(
+          "Provide the published blog markdown in `bodyMarkdown` (or post.bodyMarkdown).",
+          400,
+        );
+      }
+      if (!Number.isInteger(replaceIndex) || replaceIndex < 0 || replaceIndex > 4) {
+        return jsonError("Provide replaceIndex between 0 and 4.", 400);
+      }
+      const existing = Array.isArray(body.existingIdeas)
+        ? body.existingIdeas
+        : [];
+      return handleRegenerateVideoIdea({
+        apiKey,
+        blogTitle,
+        markdown,
+        replaceIndex,
+        existingIdeas: existing,
+      });
     }
 
     const conceptTitle = (
@@ -150,6 +183,7 @@ function resolveAction(
   action: string | undefined,
 ): VideoAssistAction | null {
   if (action === "generate_video_ideas") return action;
+  if (action === "regenerate_video_idea") return action;
   if (action === "generate_social_package") return action;
   // Transitional alias from earlier wizard scaffold.
   if (action === "generate_production_pack") return "generate_social_package";
@@ -234,6 +268,93 @@ async function handleGenerateVideoIdeas(input: {
     });
   } catch (error) {
     return geminiError(error, model, "generate_video_ideas");
+  }
+}
+
+async function handleRegenerateVideoIdea(input: {
+  apiKey: string;
+  blogTitle: string;
+  markdown: string;
+  replaceIndex: number;
+  existingIdeas: ShortFormVideoIdea[];
+}) {
+  const model = getGeminiModel();
+  const avoid = input.existingIdeas
+    .map((idea, i) =>
+      i === input.replaceIndex
+        ? null
+        : `- ${idea.title}: ${idea.videoHook || idea.shootingConcept || ""}`,
+    )
+    .filter(Boolean)
+    .join("\n");
+
+  const rejected = input.existingIdeas[input.replaceIndex];
+  const prompt = [
+    "You are the Vitality Sweat AI Director for short-form social video.",
+    "Hunter rejected ONE idea from a locked set of five. Generate exactly ONE replacement concept.",
+    "It must be distinct from the other kept ideas and different from the rejected one.",
+    "Optimize for TikTok / Reels / YouTube Shorts. Gym-native, under 45 seconds.",
+    "Voice: direct, sweaty, encouraging — never corporate.",
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      idea: {
+        title: "string — punchy short-form video title",
+        videoHook: "string — exactly 1 sentence hook for the first 1–2 seconds",
+        shootingConcept:
+          "string — brief note of what Hunter should visually capture in the gym",
+      },
+    }),
+    "",
+    `BLOG TITLE:\n${input.blogTitle}`,
+    "",
+    rejected
+      ? `REJECTED IDEA (do not repeat):\n${rejected.title} — ${rejected.videoHook} — ${rejected.shootingConcept}`
+      : null,
+    avoid ? `KEEP THESE (do not duplicate):\n${avoid}` : null,
+    "",
+    `FULL BLOG MARKDOWN:\n${input.markdown.slice(0, 12000)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const ai = createGeminiClient(input.apiKey);
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    });
+
+    const raw = (response.text ?? "").trim();
+    if (!raw) {
+      return jsonError("Gemini returned an empty response.", 502, {
+        provider: "gemini",
+        model,
+        action: "regenerate_video_idea",
+      });
+    }
+
+    const idea = parseSingleVideoIdea(raw);
+    if (!idea) {
+      return jsonError("Gemini did not return a usable replacement idea.", 502, {
+        provider: "gemini",
+        model,
+        action: "regenerate_video_idea",
+        raw: raw.slice(0, 1500),
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action: "regenerate_video_idea" as const,
+      provider: "gemini",
+      model,
+      idea,
+      replaceIndex: input.replaceIndex,
+    });
+  } catch (error) {
+    return geminiError(error, model, "regenerate_video_idea");
   }
 }
 
@@ -345,31 +466,53 @@ function parseVideoIdeas(raw: string): ShortFormVideoIdea[] {
 
     const ideas: ShortFormVideoIdea[] = [];
     for (const item of list) {
-      if (!item || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const title = typeof row.title === "string" ? row.title.trim() : "";
-      if (!title) continue;
-
-      const videoHook =
-        (typeof row.videoHook === "string" && row.videoHook.trim()) ||
-        (typeof row.hook === "string" && row.hook.trim()) ||
-        "";
-
-      const shootingConcept =
-        (typeof row.shootingConcept === "string" &&
-          row.shootingConcept.trim()) ||
-        (Array.isArray(row.shotList)
-          ? asStringArray(row.shotList).join(" · ")
-          : "") ||
-        (typeof row.whyItWorks === "string" ? row.whyItWorks.trim() : "");
-
-      ideas.push({ title, videoHook, shootingConcept });
+      const idea = coerceIdea(item);
+      if (!idea) continue;
+      ideas.push(idea);
       if (ideas.length === 5) break;
     }
     return ideas;
   } catch {
     return [];
   }
+}
+
+function parseSingleVideoIdea(raw: string): ShortFormVideoIdea | null {
+  const cleaned = stripFences(raw);
+  try {
+    const parsed = JSON.parse(cleaned) as {
+      idea?: unknown;
+      ideas?: unknown[];
+    };
+    if (parsed.idea) return coerceIdea(parsed.idea);
+    if (Array.isArray(parsed.ideas) && parsed.ideas[0]) {
+      return coerceIdea(parsed.ideas[0]);
+    }
+    return coerceIdea(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function coerceIdea(item: unknown): ShortFormVideoIdea | null {
+  if (!item || typeof item !== "object") return null;
+  const row = item as Record<string, unknown>;
+  const title = typeof row.title === "string" ? row.title.trim() : "";
+  if (!title) return null;
+
+  const videoHook =
+    (typeof row.videoHook === "string" && row.videoHook.trim()) ||
+    (typeof row.hook === "string" && row.hook.trim()) ||
+    "";
+
+  const shootingConcept =
+    (typeof row.shootingConcept === "string" && row.shootingConcept.trim()) ||
+    (Array.isArray(row.shotList)
+      ? asStringArray(row.shotList).join(" · ")
+      : "") ||
+    (typeof row.whyItWorks === "string" ? row.whyItWorks.trim() : "");
+
+  return { title, videoHook, shootingConcept };
 }
 
 function parseSocialPackage(raw: string): VideoSocialPackage {
