@@ -3,6 +3,7 @@ export type VideoStudioPhase =
   | "SELECT_BLOG_CONTEXT"
   | "VIDEO_IDEAS_DISPLAY"
   | "ASSET_COLLECTION"
+  | "SYNC_MERGE"
   | "PRODUCTION_REVIEW";
 
 export type CreatorPublishedPost = {
@@ -47,7 +48,7 @@ export type VideoSocialPackage = {
   };
 };
 
-export type VideoAssetKind = "video" | "voiceover";
+export type VideoAssetKind = "video" | "voiceover" | "merged";
 
 export type VideoAssetReference = {
   kind: VideoAssetKind;
@@ -60,6 +61,14 @@ export type VideoAssetReference = {
   size: number;
 };
 
+export type VideoProjectStatus =
+  | "collecting_assets"
+  | "assets_ready"
+  | "merged_ready"
+  | "social_package_ready"
+  | "exported"
+  | "archived";
+
 export type VideoProjectState = {
   id: string;
   creatorId: string;
@@ -67,21 +76,34 @@ export type VideoProjectState = {
   postSlug: string | null;
   blogTitle: string;
   concept: ShortFormVideoIdea;
-  status:
-    | "collecting_assets"
-    | "assets_ready"
-    | "social_package_ready"
-    | "exported"
-    | "archived";
+  status: VideoProjectStatus;
   videoPath: string | null;
   voiceoverPath: string | null;
+  mergedPath: string | null;
   targetSectionAnchor?: string | null;
   checklistKey?: string | null;
   thumbnailUrl?: string | null;
   publicVideoUrl?: string | null;
   embedPublished?: boolean;
+  socialPackage?: VideoSocialPackage | null;
+  updatedAt?: string | null;
   video?: VideoAssetReference;
   voiceover?: VideoAssetReference;
+  merged?: VideoAssetReference;
+};
+
+/** Lightweight row for the resume list. */
+export type VideoProjectSummary = {
+  id: string;
+  blogTitle: string;
+  postSlug: string | null;
+  conceptTitle: string;
+  status: VideoProjectStatus;
+  hasVideo: boolean;
+  hasVoiceover: boolean;
+  hasMerged: boolean;
+  hasSocialPackage: boolean;
+  updatedAt: string;
 };
 
 /** @deprecated Prefer VideoSocialPackage */

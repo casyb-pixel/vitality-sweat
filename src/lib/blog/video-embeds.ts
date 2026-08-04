@@ -18,6 +18,7 @@ type VideoProjectEmbedRow = {
   thumbnail_url: string | null;
   public_video_url: string | null;
   video_path: string | null;
+  merged_path: string | null;
   embed_published: boolean;
   concept: unknown;
   post_slug: string | null;
@@ -41,7 +42,7 @@ export async function fetchPublishedVideoEmbedsForPost(input: {
   let query = admin
     .from("video_projects")
     .select(
-      "id, target_section_anchor, thumbnail_url, public_video_url, video_path, embed_published, concept, post_slug, post_id",
+      "id, target_section_anchor, thumbnail_url, public_video_url, video_path, merged_path, embed_published, concept, post_slug, post_id",
     )
     .eq("embed_published", true)
     .not("target_section_anchor", "is", null);
@@ -68,12 +69,16 @@ export async function fetchPublishedVideoEmbedsForPost(input: {
 
     if (external.provider === "file" && external.url) {
       playbackUrl = external.url;
-    } else if (row.video_path?.trim()) {
-      const { data: signed, error: signError } = await admin.storage
-        .from(BUCKET)
-        .createSignedUrl(row.video_path.trim(), SIGNED_URL_SECONDS);
-      if (!signError && signed?.signedUrl) {
-        playbackUrl = signed.signedUrl;
+    } else {
+      const storagePath =
+        row.merged_path?.trim() || row.video_path?.trim() || "";
+      if (storagePath) {
+        const { data: signed, error: signError } = await admin.storage
+          .from(BUCKET)
+          .createSignedUrl(storagePath, SIGNED_URL_SECONDS);
+        if (!signError && signed?.signedUrl) {
+          playbackUrl = signed.signedUrl;
+        }
       }
     }
 

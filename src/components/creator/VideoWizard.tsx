@@ -16,6 +16,7 @@ import type {
   VideoAssetKind,
   VideoAssetReference,
   VideoProjectState,
+  VideoProjectSummary,
   VideoSocialPackage,
   VideoStudioPhase,
 } from "@/lib/video/video-studio";
@@ -27,12 +28,18 @@ import {
   formatUploadBytes,
   type CompressProgress,
 } from "@/lib/video/compress-720p";
+import {
+  canLikelyMergeInBrowser,
+  mergeVideoWithVoiceover,
+  type MergeProgress,
+} from "@/lib/video/merge-av";
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
   "SELECT_BLOG_CONTEXT",
   "VIDEO_IDEAS_DISPLAY",
   "ASSET_COLLECTION",
+  "SYNC_MERGE",
   "PRODUCTION_REVIEW",
 ];
 
@@ -40,6 +47,7 @@ const PHASE_LABELS: Record<VideoStudioPhase, string> = {
   SELECT_BLOG_CONTEXT: "Pick blog",
   VIDEO_IDEAS_DISPLAY: "Pick idea",
   ASSET_COLLECTION: "Assets",
+  SYNC_MERGE: "Sync",
   PRODUCTION_REVIEW: "Export",
 };
 
@@ -123,7 +131,23 @@ export default function VideoWizard() {
   const [videoAsset, setVideoAsset] = useState<VideoAssetReference | null>(null);
   const [voiceoverAsset, setVoiceoverAsset] =
     useState<VideoAssetReference | null>(null);
+  const [mergedAsset, setMergedAsset] = useState<VideoAssetReference | null>(
+    null,
+  );
+  const [mergedBlob, setMergedBlob] = useState<Blob | null>(null);
+  const [mergedUrl, setMergedUrl] = useState<string | null>(null);
   const [project, setProject] = useState<VideoProjectState | null>(null);
+  const [resumeProjects, setResumeProjects] = useState<VideoProjectSummary[]>(
+    [],
+  );
+  const [resumeLoading, setResumeLoading] = useState(true);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [mergeProgress, setMergeProgress] = useState<MergeProgress | null>(
+    null,
+  );
   const [assetUploadKind, setAssetUploadKind] =
     useState<VideoAssetKind | null>(null);
   const [assetError, setAssetError] = useState<string | null>(null);
@@ -181,23 +205,204 @@ export default function VideoWizard() {
     }
   }, []);
 
+  const loadResumeProjects = useCallback(async () => {
+    setResumeLoading(true);
+    setResumeError(null);
+    try {
+      const res = await fetch("/api/creator/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list_projects", limit: 12 }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        projects?: VideoProjectSummary[];
+      };
+      if (!res.ok || !data.ok) {
+        setResumeError(data.error ?? "Couldn't load saved shoots.");
+        setResumeProjects([]);
+        return;
+      }
+      setResumeProjects(
+        (data.projects ?? []).filter(
+          (p) => p.hasVideo || p.hasVoiceover || p.hasMerged,
+        ),
+      );
+    } catch (error) {
+      setResumeError(
+        error instanceof Error
+          ? error.message
+          : "Network error loading saved shoots.",
+      );
+    } finally {
+      setResumeLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadPosts();
-  }, [loadPosts]);
+    void loadResumeProjects();
+  }, [loadPosts, loadResumeProjects]);
 
   useEffect(() => {
     return () => {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (mergedUrl) URL.revokeObjectURL(mergedUrl);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     };
-  }, [videoUrl, audioUrl]);
+  }, [videoUrl, audioUrl, mergedUrl]);
 
   async function selectBlog(post: CreatorPublishedPost) {
     setSelectedPost(post);
     setSelectedIdea(null);
     setIdeas([]);
+    setIdeasError(null);
+    setPack(null);
+    setPackError(null);
+    setMergeError(null);
+    setPhase("VIDEO_IDEAS_DISPLAY");
+    // Keep loading ideas for this blog (existing effect / call below).
+    await loadIdeasForPost(post);
+  }
+
+  function statusLabel(status: VideoProjectSummary["status"]): string {
+    switch (status) {
+      case "collecting_assets":
+        return "Collecting";
+      case "assets_ready":
+        return "Assets ready";
+      case "merged_ready":
+        return "Synced";
+      case "social_package_ready":
+        return "Export ready";
+      case "exported":
+        return "Exported";
+      default:
+        return status;
+    }
+  }
+
+  function phaseForProject(project: VideoProjectState): VideoStudioPhase {
+    if (project.socialPackage || project.status === "social_package_ready") {
+      return "PRODUCTION_REVIEW";
+    }
+    if (project.mergedPath || project.status === "merged_ready") {
+      return "SYNC_MERGE";
+    }
+    if (project.videoPath && project.voiceoverPath) {
+      return "SYNC_MERGE";
+    }
+    return "ASSET_COLLECTION";
+  }
+
+  async function resumeProject(summary: VideoProjectSummary) {
+    setResumingId(summary.id);
+    setResumeError(null);
+    setIdeasError(null);
+    try {
+      const res = await fetch("/api/creator/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_project",
+          projectId: summary.id,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        project?: VideoProjectState;
+      };
+      if (!res.ok || !data.ok || !data.project) {
+        throw new Error(data.error ?? "Couldn't open that shoot.");
+      }
+
+      const next = data.project;
+      const matchedPost =
+        posts.find((p) => p.id === next.postId) ||
+        posts.find((p) => p.slug === next.postSlug) ||
+        null;
+
+      if (!matchedPost) {
+        // Minimal stub so later steps still have a title/slug.
+        setSelectedPost({
+          id: next.postId ?? next.id,
+          slug: next.postSlug ?? "shoot",
+          title: next.blogTitle,
+          excerpt: "",
+          description: null,
+          keywords: [],
+          coverImage: null,
+          publishedAt: null,
+          bodyPreview: "",
+          bodyMarkdown: "",
+        });
+      } else {
+        setSelectedPost(matchedPost);
+      }
+
+      setSelectedIdea(next.concept);
+      setIdeas([next.concept]);
+      setIdeasLocked(true);
+      setProject(next);
+      setPack(next.socialPackage ?? null);
+      setTargetSectionAnchor(next.targetSectionAnchor ?? "");
+      setEmbedMessage(null);
+      setAssetError(null);
+      setMergeError(null);
+      setPackError(null);
+
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (mergedUrl) URL.revokeObjectURL(mergedUrl);
+      setVideoFile(null);
+      setAudioBlob(null);
+      setMergedBlob(null);
+
+      if (next.video) {
+        setVideoAsset(next.video);
+        setVideoUrl(next.video.signedUrl);
+      } else {
+        setVideoAsset(null);
+        setVideoUrl(null);
+      }
+      if (next.voiceover) {
+        setVoiceoverAsset(next.voiceover);
+        setAudioUrl(next.voiceover.signedUrl);
+      } else {
+        setVoiceoverAsset(null);
+        setAudioUrl(null);
+      }
+      if (next.merged) {
+        setMergedAsset(next.merged);
+        setMergedUrl(next.merged.signedUrl);
+      } else {
+        setMergedAsset(null);
+        setMergedUrl(null);
+      }
+
+      const nextPhase = phaseForProject(next);
+      if (
+        nextPhase === "PRODUCTION_REVIEW" &&
+        !next.socialPackage
+      ) {
+        setPhase("SYNC_MERGE");
+      } else {
+        setPhase(nextPhase);
+      }
+    } catch (error) {
+      setResumeError(
+        error instanceof Error ? error.message : "Could not resume that shoot.",
+      );
+    } finally {
+      setResumingId(null);
+    }
+  }
+
+  async function loadIdeasForPost(post: CreatorPublishedPost) {
     setIdeasLocked(false);
     setIdeasLockedAt(null);
     setIdeasError(null);
@@ -424,7 +629,8 @@ export default function VideoWizard() {
     setAssetError(null);
     try {
       const contentType = (
-        blob.type || (kind === "video" ? "video/mp4" : "audio/webm")
+        blob.type ||
+        (kind === "voiceover" ? "audio/webm" : "video/mp4")
       )
         .split(";")[0]
         .trim()
@@ -516,10 +722,14 @@ export default function VideoWizard() {
   }
 
   async function applyVideoFile(file: File) {
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
+    if (mergedUrl?.startsWith("blob:")) URL.revokeObjectURL(mergedUrl);
     setVideoFile(file);
     setVideoUrl(URL.createObjectURL(file));
     setVideoAsset(null);
+    setMergedAsset(null);
+    setMergedBlob(null);
+    setMergedUrl(null);
     setPendingVideoFile(null);
     setCompressProgress(null);
 
@@ -603,10 +813,14 @@ export default function VideoWizard() {
         const blob = new Blob(audioChunksRef.current, {
           type: recorder.mimeType || "audio/webm",
         });
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        if (audioUrl?.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+        if (mergedUrl?.startsWith("blob:")) URL.revokeObjectURL(mergedUrl);
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
         setVoiceoverAsset(null);
+        setMergedAsset(null);
+        setMergedBlob(null);
+        setMergedUrl(null);
 
         const extension = blob.type.includes("mp4") ? "m4a" : "webm";
         const asset = await uploadAsset(
@@ -652,9 +866,10 @@ export default function VideoWizard() {
             videoHook: selectedIdea.videoHook,
             shootingConcept: selectedIdea.shootingConcept,
           },
-          assetsReady: Boolean(videoAsset || voiceoverAsset),
-          hasVideo: Boolean(videoAsset),
+          assetsReady: Boolean(videoAsset || voiceoverAsset || mergedAsset),
+          hasVideo: Boolean(videoAsset || mergedAsset),
           hasVoiceOver: Boolean(voiceoverAsset),
+          hasMerged: Boolean(mergedAsset),
         }),
       });
       const data = (await res.json()) as {
@@ -695,6 +910,7 @@ export default function VideoWizard() {
       setTargetSectionAnchor(saved.project.targetSectionAnchor ?? "");
       setEmbedMessage(null);
       setPhase("PRODUCTION_REVIEW");
+      void loadResumeProjects();
     } catch (error) {
       setPackError(
         error instanceof Error ? error.message : "Network error. Try again.",
@@ -702,6 +918,64 @@ export default function VideoWizard() {
     } finally {
       setPackLoading(false);
     }
+  }
+
+  async function runSyncMerge() {
+    if (!project || !videoAsset || !voiceoverAsset) {
+      setMergeError("Need both a gym clip and a voiceover before syncing.");
+      return;
+    }
+    if (!canLikelyMergeInBrowser()) {
+      setMergeError(
+        "This browser can't sync in-app. Download both assets from Export and mix in CapCut.",
+      );
+      return;
+    }
+
+    setMergeLoading(true);
+    setMergeError(null);
+    setMergeProgress({ phase: "loading", ratio: 0 });
+
+    try {
+      const videoSource = videoFile ?? videoAsset.signedUrl;
+      const voiceSource = audioBlob ?? voiceoverAsset.signedUrl;
+      const { blob, fileName } = await mergeVideoWithVoiceover({
+        videoSource,
+        voiceoverSource: voiceSource,
+        onProgress: setMergeProgress,
+      });
+
+      if (mergedUrl?.startsWith("blob:")) URL.revokeObjectURL(mergedUrl);
+      const previewUrl = URL.createObjectURL(blob);
+      setMergedBlob(blob);
+      setMergedUrl(previewUrl);
+
+      const asset = await uploadAsset("merged", blob, fileName);
+      if (!asset) {
+        setMergeError("Synced locally but upload failed. Try Sync again.");
+        return;
+      }
+      setMergedAsset(asset);
+      void loadResumeProjects();
+    } catch (error) {
+      setMergeError(
+        error instanceof Error
+          ? error.message
+          : "Sync failed. Try again or mix in CapCut.",
+      );
+    } finally {
+      setMergeLoading(false);
+      setMergeProgress(null);
+    }
+  }
+
+  function goToSyncOrPack() {
+    if (videoAsset && voiceoverAsset) {
+      setMergeError(null);
+      setPhase("SYNC_MERGE");
+      return;
+    }
+    void buildProductionPack();
   }
 
   async function saveBlogEmbed() {
@@ -776,6 +1050,7 @@ export default function VideoWizard() {
       `Project ID: ${project?.id ?? "not synced"}`,
       `Gym clip: ${videoAsset?.path ?? "not attached"}`,
       `Voice over: ${voiceoverAsset?.path ?? "not attached"}`,
+      `Synced clip: ${mergedAsset?.path ?? "not synced yet"}`,
       ``,
       `— Generated in Creator Studio Video Wizard`,
     ].join("\n");
@@ -785,12 +1060,27 @@ export default function VideoWizard() {
       `vitality-sweat-${selectedPost.slug}-production-pack.md`,
     );
 
-    if (videoFile) {
-      downloadBlob(videoFile, videoFile.name);
-    }
-    if (audioBlob) {
-      const ext = audioBlob.type.includes("mp4") ? "m4a" : "webm";
-      downloadBlob(audioBlob, `voiceover-${selectedPost.slug}.${ext}`);
+    if (mergedBlob) {
+      const ext = mergedBlob.type.includes("mp4") ? "mp4" : "webm";
+      downloadBlob(mergedBlob, `synced-${selectedPost.slug}.${ext}`);
+    } else if (mergedAsset?.signedUrl) {
+      void fetch(mergedAsset.signedUrl)
+        .then((r) => r.blob())
+        .then((blob) =>
+          downloadBlob(
+            blob,
+            mergedAsset.fileName || `synced-${selectedPost.slug}.mp4`,
+          ),
+        )
+        .catch(() => undefined);
+    } else {
+      if (videoFile) {
+        downloadBlob(videoFile, videoFile.name);
+      }
+      if (audioBlob) {
+        const ext = audioBlob.type.includes("mp4") ? "m4a" : "webm";
+        downloadBlob(audioBlob, `voiceover-${selectedPost.slug}.${ext}`);
+      }
     }
   }
 
@@ -802,20 +1092,26 @@ export default function VideoWizard() {
     setIdeasError(null);
     setPack(null);
     setPackError(null);
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setMergeError(null);
+    if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
+    if (audioUrl?.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+    if (mergedUrl?.startsWith("blob:")) URL.revokeObjectURL(mergedUrl);
     setVideoFile(null);
     setVideoUrl(null);
     setVideoAsset(null);
     setAudioBlob(null);
     setAudioUrl(null);
     setVoiceoverAsset(null);
+    setMergedBlob(null);
+    setMergedUrl(null);
+    setMergedAsset(null);
     setProject(null);
     setAssetUploadKind(null);
     setAssetError(null);
     setRecording(false);
     setRecordSeconds(0);
     void loadPosts();
+    void loadResumeProjects();
   }
 
   return (
@@ -830,6 +1126,61 @@ export default function VideoWizard() {
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
             Pulls your latest published posts. Tap one and we&apos;ll spin up 5
             short-form video angles.
+          </p>
+
+          <div className="space-y-3 border-2 border-brand-ink/10 bg-surface-elevated p-4">
+            <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+              Continue a shoot
+            </p>
+            {resumeLoading ? (
+              <p className="flex items-center gap-2 font-sans text-sm text-brand-muted">
+                <Spinner dark /> Loading saved shoots…
+              </p>
+            ) : null}
+            {resumeError ? (
+              <p
+                className="font-sans text-sm font-semibold text-red-700"
+                role="alert"
+              >
+                {resumeError}
+              </p>
+            ) : null}
+            {!resumeLoading && resumeProjects.length === 0 ? (
+              <p className="font-sans text-sm text-brand-muted">
+                No saved clips yet. Start a new shoot below.
+              </p>
+            ) : null}
+            <ul className="space-y-2">
+              {resumeProjects.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    disabled={resumingId !== null}
+                    onClick={() => void resumeProject(item)}
+                    className="w-full border-2 border-brand-ink/10 bg-surface px-4 py-3 text-left transition-colors hover:border-brand-orange disabled:opacity-60"
+                  >
+                    <span className="block font-display text-base text-brand-ink">
+                      {item.conceptTitle || item.blogTitle}
+                    </span>
+                    <span className="mt-1 block font-sans text-xs text-brand-muted">
+                      {item.blogTitle} · {statusLabel(item.status)} ·{" "}
+                      {item.hasMerged
+                        ? "synced"
+                        : item.hasVideo && item.hasVoiceover
+                          ? "clip + VO"
+                          : item.hasVideo
+                            ? "clip only"
+                            : "VO only"}
+                      {resumingId === item.id ? " · opening…" : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted">
+            Or start a new shoot
           </p>
 
           {postsLoading ? (
@@ -1221,7 +1572,7 @@ export default function VideoWizard() {
 
           <button
             type="button"
-            onClick={() => void buildProductionPack()}
+            onClick={() => goToSyncOrPack()}
             disabled={
               packLoading ||
               assetUploadKind !== null ||
@@ -1234,13 +1585,17 @@ export default function VideoWizard() {
                 <Spinner />
                 Building caption pack…
               </>
+            ) : videoAsset && voiceoverAsset ? (
+              "Sync clip + voiceover →"
             ) : (
               "Build Production Pack"
             )}
           </button>
           <p className="text-center font-sans text-xs text-brand-muted">
-            Need at least one completed secure upload to continue.
-            {project ? ` Project ${project.id.slice(0, 8)} is synced.` : ""}
+            {videoAsset && voiceoverAsset
+              ? "Next: mute gym audio and lay your voiceover under the picture."
+              : "Need at least one completed secure upload to continue."}
+            {project ? ` Project ${project.id.slice(0, 8)} is saved.` : ""}
           </p>
           <button
             type="button"
@@ -1249,6 +1604,124 @@ export default function VideoWizard() {
             className={secondaryButtonClass}
           >
             ← Pick a different idea
+          </button>
+        </section>
+      ) : null}
+
+      {phase === "SYNC_MERGE" && selectedPost && selectedIdea ? (
+        <section className="space-y-5" aria-label="Step 4: Sync clip and voiceover">
+          <h2 className="font-display text-[clamp(1.5rem,5.5vw,2rem)] leading-tight text-brand-ink">
+            Sync clip + voiceover
+          </h2>
+          <p className="font-sans text-sm leading-relaxed text-brand-muted">
+            We mute the gym mic and lay your narration under the picture — no
+            CapCut required. Keep the phone awake while it encodes.
+          </p>
+
+          <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4">
+            <ul className="space-y-2 font-sans text-sm text-brand-ink">
+              <li>
+                <span className="font-bold">Clip: </span>
+                {videoAsset ? videoAsset.fileName : "Missing"}
+              </li>
+              <li>
+                <span className="font-bold">Voiceover: </span>
+                {voiceoverAsset
+                  ? `Ready (${formatBytes(voiceoverAsset.size)})`
+                  : "Missing"}
+              </li>
+              <li>
+                <span className="font-bold">Synced: </span>
+                {mergedAsset
+                  ? `${mergedAsset.fileName} · saved`
+                  : "Not created yet"}
+              </li>
+            </ul>
+          </div>
+
+          {mergedUrl ? (
+            <video
+              src={mergedUrl}
+              controls
+              playsInline
+              className="aspect-[9/16] max-h-[50vh] w-full bg-surface-dark object-contain"
+            />
+          ) : null}
+
+          {mergeLoading ? (
+            <p className="flex items-center gap-2 font-sans text-sm text-brand-muted">
+              <Spinner dark />
+              {mergeProgress?.phase === "loading"
+                ? "Loading clip + voiceover…"
+                : `Syncing… ${Math.round((mergeProgress?.ratio ?? 0) * 100)}%`}
+            </p>
+          ) : null}
+
+          {mergeError ? (
+            <p
+              className="font-sans text-sm font-semibold text-red-700"
+              role="alert"
+            >
+              {mergeError}
+            </p>
+          ) : null}
+
+          {!canLikelyMergeInBrowser() ? (
+            <p className="font-sans text-sm text-brand-muted">
+              In-app sync isn&apos;t available here. Skip to captions and mix in
+              CapCut on your phone.
+            </p>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => void runSyncMerge()}
+            disabled={
+              mergeLoading ||
+              assetUploadKind !== null ||
+              !videoAsset ||
+              !voiceoverAsset ||
+              !canLikelyMergeInBrowser()
+            }
+            className={bigButtonClass}
+          >
+            {mergeLoading ? (
+              <>
+                <Spinner />
+                Syncing…
+              </>
+            ) : mergedAsset ? (
+              "Re-sync clip"
+            ) : (
+              "Sync now"
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void buildProductionPack()}
+            disabled={packLoading || mergeLoading || assetUploadKind !== null}
+            className={bigButtonClass}
+          >
+            {packLoading ? (
+              <>
+                <Spinner />
+                Building caption pack…
+              </>
+            ) : mergedAsset ? (
+              "Build Production Pack →"
+            ) : (
+              "Skip sync · Build captions"
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPhase("ASSET_COLLECTION")}
+            disabled={mergeLoading || packLoading}
+            className={secondaryButtonClass}
+          >
+            ← Back to assets
           </button>
         </section>
       ) : null}
@@ -1285,8 +1758,21 @@ export default function VideoWizard() {
                   ? `Recorded (${formatBytes(voiceoverAsset.size)}) · secure`
                   : "Not attached"}
               </li>
+              <li>
+                <span className="font-bold">Synced: </span>
+                {mergedAsset
+                  ? `${mergedAsset.fileName} · ready to post`
+                  : "Not synced"}
+              </li>
             </ul>
-            {videoUrl ? (
+            {mergedUrl ? (
+              <video
+                src={mergedUrl}
+                controls
+                playsInline
+                className="mt-4 aspect-[9/16] max-h-[40vh] w-full bg-surface-dark object-contain"
+              />
+            ) : videoUrl ? (
               <video
                 src={videoUrl}
                 controls
@@ -1294,7 +1780,7 @@ export default function VideoWizard() {
                 className="mt-4 aspect-[9/16] max-h-[40vh] w-full bg-surface-dark object-contain"
               />
             ) : null}
-            {audioUrl ? (
+            {!mergedUrl && audioUrl ? (
               <audio src={audioUrl} controls className="mt-3 w-full" />
             ) : null}
           </div>
@@ -1411,17 +1897,23 @@ export default function VideoWizard() {
             Download / Export Production Pack
           </button>
           <p className="text-center font-sans text-xs text-brand-muted">
-            Downloads a caption brief plus your clip and voice-over for manual
-            posting.
+            Downloads a caption brief plus your synced clip (or separate assets)
+            for manual posting.
           </p>
 
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setPhase("ASSET_COLLECTION")}
+              onClick={() =>
+                setPhase(
+                  videoAsset && voiceoverAsset
+                    ? "SYNC_MERGE"
+                    : "ASSET_COLLECTION",
+                )
+              }
               className={secondaryButtonClass}
             >
-              ← Assets
+              ← {videoAsset && voiceoverAsset ? "Sync" : "Assets"}
             </button>
             <button
               type="button"

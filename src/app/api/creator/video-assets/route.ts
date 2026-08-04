@@ -3,12 +3,15 @@ import { getCreatorRole } from "@/lib/auth/creator";
 import type {
   ShortFormVideoIdea,
   VideoAssetKind,
+  VideoAssetReference,
   VideoProjectState,
+  VideoProjectStatus,
+  VideoProjectSummary,
   VideoSocialPackage,
 } from "@/lib/video/video-studio";
 import { createClient } from "@/utils/supabase/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const BUCKET = "creator-video-assets";
@@ -17,6 +20,8 @@ const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 type VideoAssetsAction =
+  | "list_projects"
+  | "get_project"
   | "create_project"
   | "create_upload"
   | "confirm_upload"
@@ -41,6 +46,7 @@ type RequestBody = {
   publicVideoUrl?: string | null;
   thumbnailUrl?: string | null;
   embedPublished?: boolean;
+  limit?: number;
 };
 
 export async function POST(request: Request) {
@@ -62,6 +68,10 @@ export async function POST(request: Request) {
     }
 
     switch (body.action) {
+      case "list_projects":
+        return listProjects(supabase, user.id, body);
+      case "get_project":
+        return getProject(supabase, user.id, body);
       case "create_project":
         return createProject(supabase, user.id, body);
       case "create_upload":
@@ -74,7 +84,7 @@ export async function POST(request: Request) {
         return updateEmbed(supabase, user.id, body);
       default:
         return jsonError(
-          "Unknown action. Use create_project, create_upload, confirm_upload, save_social_package, or update_embed.",
+          "Unknown action. Use list_projects, get_project, create_project, create_upload, confirm_upload, save_social_package, or update_embed.",
           400,
         );
     }
@@ -83,6 +93,74 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : "Unexpected server error.";
     return jsonError(message, 500);
   }
+}
+
+async function listProjects(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  body: RequestBody,
+) {
+  const limit = Math.min(Math.max(Number(body.limit) || 12, 1), 40);
+  const { data, error } = await supabase
+    .from("video_projects")
+    .select(
+      "id, blog_title, post_slug, concept, status, video_path, voiceover_path, merged_path, social_package, updated_at",
+    )
+    .eq("creator_id", userId)
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return jsonError(error.message, 502);
+
+  const projects: VideoProjectSummary[] = (data ?? []).map((row) => {
+    const concept = normalizeConcept(
+      row.concept as Partial<ShortFormVideoIdea> | undefined,
+    );
+    return {
+      id: row.id as string,
+      blogTitle: (row.blog_title as string) ?? "",
+      postSlug: (row.post_slug as string | null) ?? null,
+      conceptTitle: concept.title,
+      status: row.status as VideoProjectStatus,
+      hasVideo: Boolean(row.video_path),
+      hasVoiceover: Boolean(row.voiceover_path),
+      hasMerged: Boolean(row.merged_path),
+      hasSocialPackage: Boolean(row.social_package),
+      updatedAt: (row.updated_at as string) ?? new Date().toISOString(),
+    };
+  });
+
+  return NextResponse.json({ ok: true, projects });
+}
+
+async function getProject(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  body: RequestBody,
+) {
+  const projectId = body.projectId?.trim() ?? "";
+  if (!projectId) return jsonError("projectId is required.", 400);
+
+  const project = await getOwnedProject(supabase, userId, projectId);
+  if (!project) return jsonError("Video project not found.", 404);
+
+  const mapped = mapProject(project);
+  const [video, voiceover, merged] = await Promise.all([
+    signAsset(supabase, "video", project.video_path),
+    signAsset(supabase, "voiceover", project.voiceover_path),
+    signAsset(supabase, "merged", project.merged_path),
+  ]);
+
+  return NextResponse.json({
+    ok: true,
+    project: {
+      ...mapped,
+      video: video ?? undefined,
+      voiceover: voiceover ?? undefined,
+      merged: merged ?? undefined,
+    },
+  });
 }
 
 async function createProject(
@@ -242,20 +320,40 @@ async function confirmUpload(
   if (!project) return jsonError("Video project not found.", 404);
 
   const update =
-    kind === "video" ? { video_path: path } : { voiceover_path: path };
+    kind === "video"
+      ? { video_path: path, merged_path: null }
+      : kind === "voiceover"
+        ? { voiceover_path: path, merged_path: null }
+        : { merged_path: path };
+
   const nextVideoPath = kind === "video" ? path : project.video_path;
   const nextVoicePath = kind === "voiceover" ? path : project.voiceover_path;
+  const nextMergedPath = kind === "merged" ? path : null;
   const hasPlayback =
-    Boolean(nextVideoPath) || Boolean(project.public_video_url?.trim());
+    Boolean(nextMergedPath) ||
+    Boolean(nextVideoPath) ||
+    Boolean(project.public_video_url?.trim());
   const embedPublished =
     Boolean(project.target_section_anchor?.trim()) && hasPlayback;
+
+  let status: VideoProjectStatus = project.status;
+  if (kind === "merged") {
+    status = "merged_ready";
+  } else if (nextVideoPath || nextVoicePath) {
+    // Replacing source assets invalidates a prior merge.
+    status =
+      project.status === "social_package_ready"
+        ? "social_package_ready"
+        : "assets_ready";
+  } else {
+    status = "collecting_assets";
+  }
 
   const { data, error } = await supabase
     .from("video_projects")
     .update({
       ...update,
-      status:
-        nextVideoPath || nextVoicePath ? "assets_ready" : "collecting_assets",
+      status,
       embed_published: embedPublished,
     })
     .eq("id", projectId)
@@ -288,7 +386,7 @@ async function confirmUpload(
       fileName: body.fileName ?? path.split("/").pop() ?? kind,
       contentType: body.contentType ?? "",
       size: Number(body.size) || 0,
-    },
+    } satisfies VideoAssetReference,
   });
 }
 
@@ -369,7 +467,9 @@ async function updateEmbed(
   }
 
   const hasPlayback =
-    Boolean(project.video_path?.trim()) || Boolean(publicVideoUrl);
+    Boolean(project.merged_path?.trim()) ||
+    Boolean(project.video_path?.trim()) ||
+    Boolean(publicVideoUrl);
   const embedPublished =
     typeof body.embedPublished === "boolean"
       ? body.embedPublished && Boolean(targetSectionAnchor) && hasPlayback
@@ -412,25 +512,55 @@ async function getOwnedProject(
   return (data as ProjectRow | null) ?? null;
 }
 
+async function signAsset(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  kind: VideoAssetKind,
+  path: string | null | undefined,
+): Promise<VideoAssetReference | null> {
+  const clean = path?.trim();
+  if (!clean) return null;
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(clean, SIGNED_URL_SECONDS);
+  if (error || !data?.signedUrl) return null;
+  return {
+    kind,
+    path: clean,
+    signedUrl: data.signedUrl,
+    expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
+    fileName: clean.split("/").pop() ?? kind,
+    contentType:
+      kind === "voiceover"
+        ? "audio/webm"
+        : kind === "merged"
+          ? "video/mp4"
+          : "video/mp4",
+    size: 0,
+  };
+}
+
 function validateAsset(
   kind: VideoAssetKind,
   contentType: string,
   size: number,
 ): string | null {
-  if (kind === "video") {
-    if (!contentType.startsWith("video/")) {
-      return "Gym clips must be video files.";
-    }
-    if (size > MAX_VIDEO_BYTES) {
-      return "Gym clips must be 250 MB or smaller.";
-    }
-  } else {
+  if (kind === "voiceover") {
     if (!contentType.startsWith("audio/")) {
       return "Voiceovers must be audio files.";
     }
     if (size > MAX_AUDIO_BYTES) {
       return "Voiceovers must be 25 MB or smaller.";
     }
+    return null;
+  }
+
+  if (!contentType.startsWith("video/")) {
+    return kind === "merged"
+      ? "Synced clips must be video files."
+      : "Gym clips must be video files.";
+  }
+  if (size > MAX_VIDEO_BYTES) {
+    return "Video files must be 250 MB or smaller.";
   }
   return null;
 }
@@ -463,14 +593,17 @@ type ProjectRow = {
   post_slug: string | null;
   blog_title: string;
   concept: ShortFormVideoIdea;
-  status: VideoProjectState["status"];
+  status: VideoProjectStatus;
   video_path: string | null;
   voiceover_path: string | null;
+  merged_path?: string | null;
+  social_package?: VideoSocialPackage | null;
   target_section_anchor?: string | null;
   checklist_key?: string | null;
   thumbnail_url?: string | null;
   public_video_url?: string | null;
   embed_published?: boolean | null;
+  updated_at?: string | null;
 };
 
 function mapProject(row: ProjectRow): VideoProjectState {
@@ -484,11 +617,14 @@ function mapProject(row: ProjectRow): VideoProjectState {
     status: row.status,
     videoPath: row.video_path,
     voiceoverPath: row.voiceover_path,
+    mergedPath: row.merged_path ?? null,
+    socialPackage: row.social_package ?? null,
     targetSectionAnchor: row.target_section_anchor?.trim() || null,
     checklistKey: row.checklist_key?.trim() || null,
     thumbnailUrl: row.thumbnail_url?.trim() || null,
     publicVideoUrl: row.public_video_url?.trim() || null,
     embedPublished: Boolean(row.embed_published),
+    updatedAt: row.updated_at ?? null,
   };
 }
 
