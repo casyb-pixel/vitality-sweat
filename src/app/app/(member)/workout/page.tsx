@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import WorkoutTracker from "@/components/app/WorkoutTracker";
+import type { NestedWorkoutProgram } from "@/components/app/WorkoutAgent";
+import WorkoutWorkspace from "@/components/app/WorkoutWorkspace";
 import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import {
   getFitnessProfile,
   isOnboardingComplete,
+  trainingPreferencesFromProfile,
 } from "@/lib/fitness/profile";
 import type { Exercise, WorkoutSession } from "@/lib/fitness/types";
 import { createClient } from "@/utils/supabase/server";
@@ -26,7 +28,11 @@ export default async function WorkoutPage() {
     redirect(completion);
   }
 
-  const [{ data: exercises }, { data: activeSession }] = await Promise.all([
+  const [
+    { data: exercises },
+    { data: activeSession },
+    { data: activeProgram },
+  ] = await Promise.all([
     supabase
       .from("exercises")
       .select(
@@ -42,24 +48,56 @@ export default async function WorkoutPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("workout_programs")
+      .select(
+        `
+        *,
+        days:workout_program_days (
+          *,
+          exercises:workout_program_exercises (
+            *,
+            exercise:exercises (
+              id, name, category, primary_muscle, equipment
+            )
+          )
+        )
+      `,
+      )
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
+  const prefs = profile
+    ? trainingPreferencesFromProfile(profile)
+    : {
+        days_per_week: null,
+        session_minutes: null,
+        equipment: [],
+        focus_muscles: [],
+        avoidances: null,
+        preferred_split: null,
+      };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="space-y-3">
         <p className="eyebrow text-brand-orange">Training</p>
         <h1 className="font-display text-[clamp(1.85rem,5vw,2.75rem)] leading-[1.05] text-brand-ink">
-          Log today’s workout
+          Workout Agent
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-          Narrow by equipment and focus, type to search the library, or look up
-          a new movement with AI — it matches synonyms and avoids duplicates.
-          Log weight, reps, and how hard it felt for progressive overload next
-          time.
+          Build a plan, start a programmed day, set baselines, and log sets with
+          coaching cues. Freeform logging is still available anytime.
         </p>
       </header>
 
-      <WorkoutTracker
+      <WorkoutWorkspace
+        initialProgram={(activeProgram as NestedWorkoutProgram | null) ?? null}
+        initialPrefs={prefs}
         exercises={(exercises as Exercise[] | null) ?? []}
         initialSession={(activeSession as WorkoutSession | null) ?? null}
       />

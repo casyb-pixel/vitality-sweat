@@ -140,10 +140,45 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("session_id")?.trim();
     const exerciseId = searchParams.get("exercise_id")?.trim();
+
+    if (sessionId) {
+      const { data: session } = await supabase
+        .from("workout_sessions")
+        .select("id")
+        .eq("id", sessionId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!session) {
+        return NextResponse.json(
+          { ok: false, error: "Session not found." },
+          { status: 404 },
+        );
+      }
+
+      const { data: sets, error } = await supabase
+        .from("workout_sets")
+        .select(
+          "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, created_at",
+        )
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return NextResponse.json(
+          { ok: false, error: error.message },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ ok: true, sets: sets ?? [] });
+    }
+
     if (!exerciseId) {
       return NextResponse.json(
-        { ok: false, error: "Pass exercise_id." },
+        { ok: false, error: "Pass exercise_id or session_id." },
         { status: 400 },
       );
     }

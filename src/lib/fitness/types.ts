@@ -49,6 +49,28 @@ export const TRAINING_EQUIPMENT_OPTIONS: readonly TrainingEquipment[] = [
   "cardio_machines",
 ] as const;
 
+export const TRAINING_EQUIPMENT_LABELS: Record<TrainingEquipment, string> = {
+  gym: "Full gym",
+  home: "Home gym",
+  free_weight: "Free weights",
+  machine: "Machines",
+  bodyweight: "Bodyweight",
+  bands: "Bands",
+  cable: "Cable",
+  cardio_machines: "Cardio machines",
+};
+
+export const FOCUS_MUSCLE_OPTIONS = [
+  "chest",
+  "back",
+  "shoulders",
+  "arms",
+  "legs",
+  "glutes",
+  "core",
+  "full body",
+] as const;
+
 export const PREFERRED_SPLIT_LABELS: Record<PreferredSplit, string> = {
   full_body: "Full body",
   upper_lower: "Upper / lower",
@@ -197,6 +219,14 @@ export const WORKOUT_SET_STYLE_LABELS: Record<WorkoutSetStyle, string> = {
   metabolic: "Metabolic",
 };
 
+/** Short coaching line shown in the interactive runner. */
+export const WORKOUT_SET_STYLE_COACHING: Record<WorkoutSetStyle, string> = {
+  strength_heavy: "Heavy, low reps near failure",
+  hypertrophy: "Moderate weight, 8-12 reps",
+  endurance_light: "Lighter load, higher reps, controlled pace",
+  metabolic: "Higher reps, shorter rest, keep moving",
+};
+
 export type WorkoutProgram = {
   id: string;
   user_id: string;
@@ -210,14 +240,26 @@ export type WorkoutProgram = {
   updated_at: string;
 };
 
+export type WorkoutProgramDayKind = "scheduled" | "bonus";
+export type WorkoutProgramDaySource = "program" | "bonus_agent";
+
 export type WorkoutProgramDay = {
   id: string;
   program_id: string;
-  day_index: number;
+  /**
+   * Mapped weekly plan order for scheduled days.
+   * Null for bonus extras (ordered by scheduled_date instead).
+   */
+  day_index: number | null;
   label: string;
   focus: string | null;
   estimated_minutes: number | null;
   notes: string | null;
+  day_kind?: WorkoutProgramDayKind;
+  scheduled_date?: string | null;
+  source?: WorkoutProgramDaySource;
+  /** Set when the member edits this day away from the AI draft. */
+  customized_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -235,6 +277,15 @@ export type WorkoutProgramExercise = {
   coach_notes: string | null;
   baseline_weight_lb: number | null;
   baseline_reps: number | null;
+  /** Optional cache of last coached targets; load math still uses progression.ts. */
+  last_prescription?: {
+    weight_lb: number | null;
+    reps: number | null;
+    set_style: WorkoutSetStyle | string;
+    message: string;
+    source: string;
+    updated_at: string;
+  } | null;
   created_at: string;
 };
 

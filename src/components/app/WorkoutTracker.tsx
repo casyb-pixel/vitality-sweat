@@ -14,6 +14,12 @@ import {
   filterExercises,
 } from "@/lib/fitness/exercises";
 import {
+  fetchExerciseSuggestion,
+  finishWorkoutSession,
+  logWorkoutSet,
+  startWorkoutSession,
+} from "@/lib/fitness/workout-logging";
+import {
   DIFFICULTY_LABELS,
   type Exercise,
   type ExerciseCategory,
@@ -27,14 +33,18 @@ import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 type WorkoutTrackerProps = {
   exercises: Exercise[];
   initialSession: WorkoutSession | null;
+  onSessionChange?: (session: WorkoutSession | null) => void;
 };
 
 export default function WorkoutTracker({
   exercises: initialExercises,
   initialSession,
+  onSessionChange,
 }: WorkoutTrackerProps) {
   const [catalog, setCatalog] = useState<Exercise[]>(initialExercises);
-  const [session, setSession] = useState<WorkoutSession | null>(initialSession);
+  const [session, setSessionState] = useState<WorkoutSession | null>(
+    initialSession,
+  );
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [equipment, setEquipment] = useState<ExerciseEquipment | "">("");
   const [category, setCategory] = useState<ExerciseCategory | "">("");
@@ -56,6 +66,15 @@ export default function WorkoutTracker({
   const [resolveChoices, setResolveChoices] = useState<Exercise[]>([]);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  function setSession(next: WorkoutSession | null) {
+    setSessionState(next);
+    onSessionChange?.(next);
+  }
+
+  useEffect(() => {
+    setSessionState(initialSession);
+  }, [initialSession]);
+
   const selected = useMemo(
     () => catalog.find((e) => e.id === exerciseId) ?? null,
     [catalog, exerciseId],
@@ -76,28 +95,17 @@ export default function WorkoutTracker({
       setSuggestion(null);
       return;
     }
-    try {
-      const res = await fetch(
-        `/api/app/workout/sets?exercise_id=${encodeURIComponent(id)}`,
-      );
-      const json = (await res.json()) as {
-        ok?: boolean;
-        suggestion?: ProgressionSuggestion | null;
-        error?: string;
-      };
-      if (!res.ok || !json.ok) {
-        setSuggestion(null);
-        return;
-      }
-      setSuggestion(json.suggestion ?? null);
-      if (json.suggestion?.suggestedWeightLb != null) {
-        setWeightLb(String(json.suggestion.suggestedWeightLb));
-      }
-      if (json.suggestion?.suggestedReps != null) {
-        setReps(String(json.suggestion.suggestedReps));
-      }
-    } catch {
+    const result = await fetchExerciseSuggestion(id);
+    if (!result.ok) {
       setSuggestion(null);
+      return;
+    }
+    setSuggestion(result.data.suggestion);
+    if (result.data.suggestion?.suggestedWeightLb != null) {
+      setWeightLb(String(result.data.suggestion.suggestedWeightLb));
+    }
+    if (result.data.suggestion?.suggestedReps != null) {
+      setReps(String(result.data.suggestion.suggestedReps));
     }
   }, []);
 
@@ -133,29 +141,19 @@ export default function WorkoutTracker({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      try {
-        const res = await fetch("/api/app/workout/session", { method: "POST" });
-        const json = (await res.json()) as {
-          ok?: boolean;
-          session?: WorkoutSession;
-          resumed?: boolean;
-          error?: string;
-        };
-        if (!res.ok || !json.ok || !json.session) {
-          setError(json.error ?? "Could not start workout.");
-          return;
-        }
-        setSession(json.session);
-        setLoggedSets([]);
-        setSetNumber(1);
-        setMessage(
-          json.resumed
-            ? "Resumed your active workout session."
-            : "Workout started — log your sets.",
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Start failed.");
+      const result = await startWorkoutSession(null);
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      setSession(result.data.session);
+      setLoggedSets([]);
+      setSetNumber(1);
+      setMessage(
+        result.data.resumed
+          ? "Resumed your active workout session."
+          : "Workout started. Log your sets.",
+      );
     });
   }
 
@@ -163,30 +161,17 @@ export default function WorkoutTracker({
     if (!session) return;
     setError(null);
     startTransition(async () => {
-      try {
-        const res = await fetch("/api/app/workout/session", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: session.id, status: "completed" }),
-        });
-        const json = (await res.json()) as {
-          ok?: boolean;
-          session?: WorkoutSession;
-          error?: string;
-        };
-        if (!res.ok || !json.ok) {
-          setError(json.error ?? "Could not finish workout.");
-          return;
-        }
-        setSession(null);
-        setLoggedSets([]);
-        setSetNumber(1);
-        setMessage("Workout completed. Nice work.");
-        setShowInvitePrompt(true);
-        void loadHistory(exerciseId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Finish failed.");
+      const result = await finishWorkoutSession(session.id, "completed");
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      setSession(null);
+      setLoggedSets([]);
+      setSetNumber(1);
+      setMessage("Workout completed. Nice work.");
+      setShowInvitePrompt(true);
+      void loadHistory(exerciseId);
     });
   }
 
@@ -204,36 +189,23 @@ export default function WorkoutTracker({
     setMessage(null);
 
     startTransition(async () => {
-      try {
-        const res = await fetch("/api/app/workout/sets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: session.id,
-            exercise_id: exerciseId,
-            set_number: setNumber,
-            weight_lb: weightLb === "" ? null : Number(weightLb),
-            reps: reps === "" ? null : Number(reps),
-            difficulty,
-          }),
-        });
-        const json = (await res.json()) as {
-          ok?: boolean;
-          set?: WorkoutSet;
-          error?: string;
-        };
-        if (!res.ok || !json.ok || !json.set) {
-          setError(json.error ?? "Could not log set.");
-          return;
-        }
-        setLoggedSets((prev) => [...prev, json.set!]);
-        setSetNumber((n) => n + 1);
-        setMessage(
-          `Logged set ${json.set.set_number} — ${DIFFICULTY_LABELS[difficulty] ?? difficulty}.`,
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Log failed.");
+      const result = await logWorkoutSet({
+        sessionId: session.id,
+        exerciseId,
+        setNumber,
+        weightLb: weightLb === "" ? null : Number(weightLb),
+        reps: reps === "" ? null : Number(reps),
+        difficulty,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      setLoggedSets((prev) => [...prev, result.data.set]);
+      setSetNumber((n) => n + 1);
+      setMessage(
+        `Logged set ${result.data.set.set_number}. ${DIFFICULTY_LABELS[difficulty] ?? difficulty}.`,
+      );
     });
   }
 

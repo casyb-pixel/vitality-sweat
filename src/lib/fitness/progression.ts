@@ -52,33 +52,33 @@ export function suggestProgression(
       if (suggestedWeightLb <= lastWeightLb) {
         suggestedWeightLb = lastWeightLb + 5;
       }
-      message = `Last time felt easy — try ${formatWeight(suggestedWeightLb)} next (${lastSets}×${lastReps ?? "?"} at ${formatWeight(lastWeightLb)}).`;
+      message = `Last time felt easy - try ${formatWeight(suggestedWeightLb)} next (${lastSets}×${lastReps ?? "?"} at ${formatWeight(lastWeightLb)}).`;
     } else {
       suggestedReps = lastReps != null ? lastReps + 2 : null;
       message =
-        "Last time felt easy — add a couple of reps or increase the load.";
+        "Last time felt easy - add a couple of reps or increase the load.";
     }
   } else if (avgDifficulty < 3.5) {
     suggestedReps = lastReps != null ? lastReps + 1 : null;
     message =
       lastWeightLb != null
-        ? `Solid effort — hold ${formatWeight(lastWeightLb)} and aim for ${(suggestedReps ?? lastReps ?? 0)} reps.`
-        : "Solid effort — try one more rep than last time.";
+        ? `Solid effort - hold ${formatWeight(lastWeightLb)} and aim for ${(suggestedReps ?? lastReps ?? 0)} reps.`
+        : "Solid effort - try one more rep than last time.";
   } else if (avgDifficulty < 4.5) {
     message =
       lastWeightLb != null
-        ? `That was hard — keep ${formatWeight(lastWeightLb)} and nail the same reps.`
-        : "That was hard — repeat the same target and focus on form.";
+        ? `That was hard - keep ${formatWeight(lastWeightLb)} and nail the same reps.`
+        : "That was hard - repeat the same target and focus on form.";
   } else {
     if (lastWeightLb != null && lastWeightLb > 0) {
       suggestedWeightLb = Math.max(5, roundToNearest5(lastWeightLb * 0.9));
       if (suggestedWeightLb >= lastWeightLb && lastWeightLb > 5) {
         suggestedWeightLb = lastWeightLb - 5;
       }
-      message = `Very hard last time — deload to ${formatWeight(suggestedWeightLb)} and rebuild.`;
+      message = `Very hard last time - deload to ${formatWeight(suggestedWeightLb)} and rebuild.`;
     } else {
       suggestedReps = lastReps != null ? Math.max(1, lastReps - 2) : null;
-      message = "Very hard last time — reduce volume a bit and rebuild.";
+      message = "Very hard last time - reduce volume a bit and rebuild.";
     }
   }
 

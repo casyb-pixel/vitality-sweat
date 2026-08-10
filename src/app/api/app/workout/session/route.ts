@@ -3,8 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
 
-/** Start a new active workout session (or return the existing active one). */
-export async function POST() {
+/** Start a new active workout session (or resume the existing one). */
+export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const {
@@ -18,6 +18,32 @@ export async function POST() {
       );
     }
 
+    let programDayId: string | null = null;
+    try {
+      const body = (await request.json()) as { program_day_id?: unknown };
+      if (typeof body.program_day_id === "string" && body.program_day_id.trim()) {
+        programDayId = body.program_day_id.trim();
+      }
+    } catch {
+      // Empty body is fine for freeform sessions.
+    }
+
+    if (programDayId) {
+      // RLS limits this to the member's own program days.
+      const { data: day } = await supabase
+        .from("workout_program_days")
+        .select("id")
+        .eq("id", programDayId)
+        .maybeSingle();
+
+      if (!day) {
+        return NextResponse.json(
+          { ok: false, error: "Program day not found." },
+          { status: 404 },
+        );
+      }
+    }
+
     const { data: existing } = await supabase
       .from("workout_sessions")
       .select("*")
@@ -28,12 +54,38 @@ export async function POST() {
       .maybeSingle();
 
     if (existing) {
+      if (programDayId && existing.program_day_id !== programDayId) {
+        const { data: patched, error: patchError } = await supabase
+          .from("workout_sessions")
+          .update({ program_day_id: programDayId })
+          .eq("id", existing.id)
+          .eq("user_id", user.id)
+          .select("*")
+          .single();
+
+        if (patchError || !patched) {
+          return NextResponse.json(
+            { ok: false, error: patchError?.message ?? "Could not attach day." },
+            { status: 500 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          session: patched,
+          resumed: true,
+        });
+      }
+
       return NextResponse.json({ ok: true, session: existing, resumed: true });
     }
 
     const { data, error } = await supabase
       .from("workout_sessions")
-      .insert({ user_id: user.id, status: "active" })
+      .insert({
+        user_id: user.id,
+        status: "active",
+        program_day_id: programDayId,
+      })
       .select("*")
       .single();
 
