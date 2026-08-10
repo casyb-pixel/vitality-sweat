@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
+import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
+import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import { getFeaturedBlogPostAsync } from "@/lib/blog/posts";
 import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 
@@ -78,12 +80,13 @@ export default async function HomePage() {
             athletes — one sweat-honest session at a time.
           </p>
           <div className="animate-fade-up-delay-2 mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/app"
+            <SignupCtaLink
+              location="home_hero"
+              label="Create free account"
               className="inline-flex items-center justify-center bg-brand-orange px-7 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
             >
-              Launch App
-            </Link>
+              Create free account
+            </SignupCtaLink>
             <Link
               href="/chronicles"
               className="inline-flex items-center justify-center border border-white/40 bg-white/5 px-7 py-3.5 font-sans text-sm font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm transition-colors hover:border-white hover:bg-white/15"
@@ -193,6 +196,10 @@ export default async function HomePage() {
         <AdSlot slotId="home-mid-content" size="banner" className="mx-auto" />
       </div>
 
+      <div className="site-shell pb-[var(--section-y)]">
+        <JoinEngineCTA location="home_mid" variant="mid" />
+      </div>
+
       {/* Field culture */}
       <section className="section-y bg-surface-elevated">
         <div className="site-shell grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
@@ -280,18 +287,28 @@ export default async function HomePage() {
         <div className="site-shell relative max-w-3xl text-center">
           <p className="eyebrow text-brand-orange">Ready when you are</p>
           <h2 className="mt-3 font-display text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.05] text-balance">
-            Launch the Vitality Sweat app experience.
+            Create your free Vitality Engine account.
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-sans text-lg leading-relaxed text-white/85">
-            Training videos, nutrition plans, and baseball lessons — organized
-            for the way you actually live and train.
+            Training videos, meal plans, and grocery lists — built for how you
+            train and eat in Southwest Louisiana. Train. Fuel. Compete.
           </p>
-          <Link
-            href="/app"
-            className="mt-9 inline-flex items-center justify-center bg-brand-orange px-8 py-4 font-sans text-sm font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-brand-orange-deep"
-          >
-            Launch App
-          </Link>
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <SignupCtaLink
+              location="home_bottom"
+              label="Create free account"
+              className="inline-flex items-center justify-center bg-brand-orange px-8 py-4 font-sans text-sm font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-brand-orange-deep"
+            >
+              Create free account
+            </SignupCtaLink>
+            <SignupCtaLink
+              location="home_bottom_launch"
+              label="Launch App"
+              className="inline-flex items-center justify-center border border-white/40 px-8 py-4 font-sans text-sm font-semibold uppercase tracking-[0.1em] text-white transition-colors hover:border-white hover:bg-white/10"
+            >
+              Launch App
+            </SignupCtaLink>
+          </div>
         </div>
       </section>
 

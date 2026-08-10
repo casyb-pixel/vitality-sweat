@@ -33,6 +33,7 @@ export type BlogPostRecord = {
   is_archived?: boolean;
   project_due_at?: string | null;
   generated_promos?: import("@/lib/marketing/project").GeneratedPromos | null;
+  growth_packaging?: import("@/lib/marketing/growth-packaging").PostGrowthPackaging | null;
 };
 
 export type SavePostInput = {
@@ -47,6 +48,8 @@ export type SavePostInput = {
   coverAlt?: string;
   featured?: boolean;
   bodyBlocks?: unknown;
+  /** Default true — append end CTA + store ad slot metadata. */
+  includeGrowthCta?: boolean;
 };
 
 export function slugifyTitle(title: string): string {

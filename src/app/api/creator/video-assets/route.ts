@@ -400,10 +400,25 @@ async function saveSocialPackage(
     return jsonError("projectId and socialPackage are required.", 400);
   }
 
+  const project = await getOwnedProject(supabase, userId, projectId);
+  if (!project) return jsonError("Video project not found.", 404);
+
+  const concept = normalizeConcept(project.concept);
+  const { buildVideoGrowthPromoPack } = await import(
+    "@/lib/marketing/growth-packaging"
+  );
+  const growthPromoPack = buildVideoGrowthPromoPack({
+    blogTitle: project.blog_title,
+    conceptTitle: concept.title,
+    baseCaption: body.socialPackage.caption,
+    baseDescription: body.socialPackage.seoMetadata?.description,
+  });
+
   const { data, error } = await supabase
     .from("video_projects")
     .update({
       social_package: body.socialPackage,
+      growth_promo_pack: growthPromoPack,
       status: "social_package_ready",
     })
     .eq("id", projectId)
@@ -415,6 +430,7 @@ async function saveSocialPackage(
   return NextResponse.json({
     ok: true,
     project: mapProject(data as ProjectRow),
+    growthPromoPack,
   });
 }
 
@@ -598,6 +614,7 @@ type ProjectRow = {
   voiceover_path: string | null;
   merged_path?: string | null;
   social_package?: VideoSocialPackage | null;
+  growth_promo_pack?: import("@/lib/marketing/growth-packaging").VideoGrowthPromoPack | null;
   target_section_anchor?: string | null;
   checklist_key?: string | null;
   thumbnail_url?: string | null;
@@ -619,6 +636,7 @@ function mapProject(row: ProjectRow): VideoProjectState {
     voiceoverPath: row.voiceover_path,
     mergedPath: row.merged_path ?? null,
     socialPackage: row.social_package ?? null,
+    growthPromoPack: row.growth_promo_pack ?? null,
     targetSectionAnchor: row.target_section_anchor?.trim() || null,
     checklistKey: row.checklist_key?.trim() || null,
     thumbnailUrl: row.thumbnail_url?.trim() || null,

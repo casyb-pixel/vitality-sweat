@@ -3,10 +3,14 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import LoginModal from "@/components/auth/LoginModal";
+import { trackSignupComplete } from "@/lib/analytics/ga";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
 
+type AuthIntent = "signin" | "signup";
+
 /**
- * Watches `?auth=required|forbidden` on public routes and opens LoginModal.
+ * Watches `?auth=required|forbidden|signup` on any route and opens LoginModal.
+ * Also completes growth tracking when `joined=1` is present after signup.
  */
 function AuthQueryListener() {
   const searchParams = useSearchParams();
@@ -23,11 +27,27 @@ function AuthQueryListener() {
   const initialView =
     authFlag === "forbidden" ? ("denied" as const) : ("form" as const);
 
+  const initialIntent: AuthIntent =
+    authFlag === "signup" ? "signup" : "signin";
+
   useEffect(() => {
-    if (authFlag === "required" || authFlag === "forbidden") {
+    if (
+      authFlag === "required" ||
+      authFlag === "forbidden" ||
+      authFlag === "signup"
+    ) {
       setOpen(true);
     }
   }, [authFlag]);
+
+  useEffect(() => {
+    if (searchParams.get("joined") !== "1") return;
+    trackSignupComplete("magic_or_confirm");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("joined");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   const clearAuthQuery = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -48,6 +68,7 @@ function AuthQueryListener() {
       open={open}
       nextPath={nextPath}
       initialView={initialView}
+      initialIntent={initialIntent}
       onClose={handleClose}
     />
   );

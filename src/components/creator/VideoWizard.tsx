@@ -15,6 +15,7 @@ import type {
   ShortFormVideoIdea,
   VideoAssetKind,
   VideoAssetReference,
+  VideoGrowthPromoPack,
   VideoProjectState,
   VideoProjectSummary,
   VideoSocialPackage,
@@ -167,6 +168,10 @@ export default function VideoWizard() {
   const [packLoading, setPackLoading] = useState(false);
   const [packError, setPackError] = useState<string | null>(null);
   const [pack, setPack] = useState<VideoSocialPackage | null>(null);
+  const [growthPack, setGrowthPack] = useState<VideoGrowthPromoPack | null>(
+    null,
+  );
+  const [copiedGrowthKey, setCopiedGrowthKey] = useState<string | null>(null);
   const [targetSectionAnchor, setTargetSectionAnchor] = useState("");
   const [embedSaving, setEmbedSaving] = useState(false);
   const [embedMessage, setEmbedMessage] = useState<string | null>(null);
@@ -261,6 +266,7 @@ export default function VideoWizard() {
     setIdeas([]);
     setIdeasError(null);
     setPack(null);
+    setGrowthPack(null);
     setPackError(null);
     setMergeError(null);
     setPhase("VIDEO_IDEAS_DISPLAY");
@@ -349,6 +355,7 @@ export default function VideoWizard() {
       setIdeasLocked(true);
       setProject(next);
       setPack(next.socialPackage ?? null);
+      setGrowthPack(next.growthPromoPack ?? null);
       setTargetSectionAnchor(next.targetSectionAnchor ?? "");
       setEmbedMessage(null);
       setAssetError(null);
@@ -579,6 +586,7 @@ export default function VideoWizard() {
     if (!selectedPost) return;
     setSelectedIdea(idea);
     setPack(null);
+    setGrowthPack(null);
     setPackError(null);
     setAssetError(null);
     setProject(null);
@@ -898,6 +906,7 @@ export default function VideoWizard() {
         ok: boolean;
         error?: string;
         project?: VideoProjectState;
+        growthPromoPack?: VideoGrowthPromoPack;
       };
       if (!saveRes.ok || !saved.ok || !saved.project) {
         setPackError(
@@ -907,6 +916,9 @@ export default function VideoWizard() {
         return;
       }
       setProject(saved.project);
+      setGrowthPack(
+        saved.growthPromoPack ?? saved.project.growthPromoPack ?? null,
+      );
       setTargetSectionAnchor(saved.project.targetSectionAnchor ?? "");
       setEmbedMessage(null);
       setPhase("PRODUCTION_REVIEW");
@@ -1091,6 +1103,7 @@ export default function VideoWizard() {
     setSelectedIdea(null);
     setIdeasError(null);
     setPack(null);
+    setGrowthPack(null);
     setPackError(null);
     setMergeError(null);
     if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
@@ -1794,6 +1807,74 @@ export default function VideoWizard() {
               {pack.hashtags.join(" ")}
             </p>
           </div>
+
+          {growthPack ? (
+            <div className="border-2 border-brand-orange/40 bg-brand-orange/5 p-4 sm:p-5">
+              <p className="eyebrow text-brand-orange">
+                Growth packaging applied
+              </p>
+              <ul className="mt-2 space-y-1 font-sans text-sm text-brand-ink">
+                <li>✓ Caption variants (IG / FB / YouTube Shorts) with free signup CTA</li>
+                <li>✓ Pinned comment + description with app link</li>
+                <li>✓ Companion Chronicles draft title/prompt</li>
+              </ul>
+
+              {(
+                [
+                  ["ig", "Instagram caption", growthPack.captionVariants.instagram],
+                  ["fb", "Facebook caption", growthPack.captionVariants.facebook],
+                  [
+                    "yt",
+                    "YouTube Shorts",
+                    growthPack.captionVariants.youtubeShorts,
+                  ],
+                  ["pin", "Pinned comment", growthPack.pinnedComment],
+                  [
+                    "desc",
+                    "Description + app link",
+                    growthPack.descriptionWithAppLink,
+                  ],
+                  [
+                    "companion",
+                    "Companion post prompt",
+                    `${growthPack.companionPostTitle}\n\n${growthPack.companionPostPrompt}`,
+                  ],
+                ] as const
+              ).map(([key, label, text]) => (
+                <div
+                  key={key}
+                  className="mt-4 border border-brand-ink/10 bg-surface px-3 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-muted">
+                      {label}
+                    </p>
+                    <button
+                      type="button"
+                      className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(text);
+                          setCopiedGrowthKey(key);
+                          window.setTimeout(
+                            () => setCopiedGrowthKey(null),
+                            1600,
+                          );
+                        } catch {
+                          setCopiedGrowthKey(null);
+                        }
+                      }}
+                    >
+                      {copiedGrowthKey === key ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
+                    {text}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
             <p className="eyebrow text-brand-orange">Thumbnail overlay</p>

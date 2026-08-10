@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
+import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import { getAllBlogPostsAsync } from "@/lib/blog/posts";
 import { buildCanonical } from "@/lib/seo/site";
 
@@ -61,6 +62,7 @@ export default async function ChroniclesPage() {
 
         <div className="section-y site-shell space-y-10">
           <AdSlot slotId="chronicles-top" size="banner" />
+          <JoinEngineCTA location="chronicles_mid" variant="strip" />
           <ul className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
               <li key={post.slug}>
@@ -91,6 +93,7 @@ export default async function ChroniclesPage() {
               </li>
             ))}
           </ul>
+          <JoinEngineCTA location="chronicles_end" variant="end" />
         </div>
       </div>
       <SiteFooter />

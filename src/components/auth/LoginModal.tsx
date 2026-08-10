@@ -8,6 +8,7 @@ import {
   isValidUsZip,
   normalizeUsZip,
 } from "@/lib/auth/member-profile";
+import { trackSignupComplete, trackSignupStart } from "@/lib/analytics/ga";
 import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
@@ -21,6 +22,7 @@ type LoginModalProps = {
   open: boolean;
   nextPath: string;
   initialView?: PortalView;
+  initialIntent?: AuthIntent;
   onClose: () => void;
 };
 
@@ -31,12 +33,13 @@ export default function LoginModal({
   open,
   nextPath,
   initialView = "form",
+  initialIntent = "signin",
   onClose,
 }: LoginModalProps) {
   const router = useRouter();
   const titleId = useId();
   const [mode, setMode] = useState<AuthMode>("password");
-  const [intent, setIntent] = useState<AuthIntent>("signin");
+  const [intent, setIntent] = useState<AuthIntent>(initialIntent);
   const [view, setView] = useState<PortalView>(initialView);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,9 +52,13 @@ export default function LoginModal({
   useEffect(() => {
     if (open) {
       setView(initialView);
+      setIntent(initialIntent);
       setError(null);
+      if (initialIntent === "signup" && initialView === "form") {
+        trackSignupStart("deep_link");
+      }
     }
-  }, [open, initialView]);
+  }, [open, initialView, initialIntent]);
 
   useEffect(() => {
     if (!open) return;
@@ -72,6 +79,13 @@ export default function LoginModal({
   const wantsCreatorStudio =
     safeNext === "/app/creator" || safeNext.startsWith("/app/creator/");
   const isSignup = intent === "signup";
+
+  function signupCallbackNext(): string {
+    if (safeNext.includes("joined=1")) return safeNext;
+    return safeNext.includes("?")
+      ? `${safeNext}&joined=1`
+      : `${safeNext}?joined=1`;
+  }
 
   function geoMetadata() {
     return {
@@ -148,7 +162,7 @@ export default function LoginModal({
             return;
           }
 
-          const redirectTo = buildAuthCallbackUrl(safeNext);
+          const redirectTo = buildAuthCallbackUrl(signupCallbackNext());
           const { data, error: signUpError } = await supabase.auth.signUp({
             email: email.trim(),
             password,
@@ -172,6 +186,7 @@ export default function LoginModal({
                 region: region.trim() || null,
               })
               .eq("id", data.session.user.id);
+            trackSignupComplete("password");
             await afterAuthenticated();
             return;
           }
@@ -210,7 +225,9 @@ export default function LoginModal({
         }
 
         const supabase = createClient();
-        const redirectTo = buildAuthCallbackUrl(safeNext);
+        const redirectTo = buildAuthCallbackUrl(
+          isSignup ? signupCallbackNext() : safeNext,
+        );
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: email.trim(),
           options: {
@@ -415,6 +432,9 @@ export default function LoginModal({
                     onClick={() => {
                       setIntent(tab.id);
                       setError(null);
+                      if (tab.id === "signup") {
+                        trackSignupStart("tab");
+                      }
                     }}
                     className={`min-h-10 flex-1 px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] transition-colors ${
                       intent === tab.id

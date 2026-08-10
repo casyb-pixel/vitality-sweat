@@ -48,6 +48,8 @@ export type VideoSocialPackage = {
   };
 };
 
+export type VideoGrowthPromoPack = import("@/lib/marketing/growth-packaging").VideoGrowthPromoPack;
+
 export type VideoAssetKind = "video" | "voiceover" | "merged";
 
 export type VideoAssetReference = {
@@ -86,6 +88,7 @@ export type VideoProjectState = {
   publicVideoUrl?: string | null;
   embedPublished?: boolean;
   socialPackage?: VideoSocialPackage | null;
+  growthPromoPack?: VideoGrowthPromoPack | null;
   updatedAt?: string | null;
   video?: VideoAssetReference;
   voiceover?: VideoAssetReference;

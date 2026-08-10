@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import GroceryShareClientActions from "@/components/app/GroceryShareClientActions";
+import GroceryShareViewTracker from "@/components/marketing/GroceryShareViewTracker";
+import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import type { GroceryItem } from "@/lib/fitness/types";
 import { createServiceRoleClient } from "@/utils/supabase/admin";
 
@@ -40,6 +42,7 @@ export default async function SharedGroceryPage({ params }: PageProps) {
 
   return (
     <main className="min-h-full bg-surface px-4 py-10 print:bg-white print:px-0 print:py-4">
+      <GroceryShareViewTracker />
       <div className="mx-auto w-full max-w-xl">
         <p className="font-sans text-xs font-bold uppercase tracking-[0.14em] text-brand-orange print:text-black">
           Vitality Sweat
@@ -76,6 +79,24 @@ export default async function SharedGroceryPage({ params }: PageProps) {
             ))}
           </ul>
         )}
+
+        <div className="mt-10 border border-brand-ink/10 bg-surface-elevated px-4 py-5 print:hidden">
+          <p className="eyebrow text-brand-orange">Vitality Engine · Free</p>
+          <h2 className="mt-2 font-display text-xl text-brand-ink">
+            Want your own meal plan &amp; grocery list?
+          </h2>
+          <p className="mt-2 font-sans text-sm leading-relaxed text-brand-muted">
+            Create a free account — train, fuel, and share lists like this one
+            with your household across Southwest Louisiana.
+          </p>
+          <SignupCtaLink
+            location="grocery_share"
+            label="Create free account"
+            className="mt-4 inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+          >
+            Create free account
+          </SignupCtaLink>
+        </div>
       </div>
     </main>
   );

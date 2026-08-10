@@ -382,10 +382,11 @@ async function handleGenerateSocialPackage(input: {
     NO_EM_DASH_RULE,
     "",
     "Requirements:",
-    "- caption: engaging, hook-first, line-broken, ready to paste; end with a soft CTA",
+    "- caption: engaging, hook-first, line-broken, ready to paste; end with a soft CTA to create a FREE Vitality Engine account (workouts + meal plans)",
+    "- Include a light Southwest Louisiana / Acadiana / SWLA angle when natural",
     "- hashtags: 5 to 8 hyper-targeted tags (include #VitalitySweat and #Sweatlife)",
     "- thumbnailTitle: short text overlay suggestion (max 6 words) for the first frame / thumbnail",
-    "- seoMetadata: platform keyword tags plus a 1-2 sentence SEO description",
+    "- seoMetadata: platform keyword tags plus a 1-2 sentence SEO description that mentions free signup",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({

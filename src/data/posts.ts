@@ -26,6 +26,12 @@ export type MigratedPost = {
   featured?: boolean;
   sourceUrl?: string;
   body: BlogBlock[];
+  /** Publish-time growth packaging (CTA + mid AdSlot). Defaults applied on render. */
+  growthPackaging?: {
+    ctaEnabled: boolean;
+    adSlotMid: string;
+    appliedAt: string;
+  } | null;
 };
 
 export const MIGRATED_POSTS: MigratedPost[] = [

@@ -105,6 +105,7 @@ export default function BlogWizard({
   // Phase 4
   const [article, setArticle] = useState<FinalizedPostResult | null>(null);
   const [draftConfirmed, setDraftConfirmed] = useState(false);
+  const [includeGrowthCta, setIncludeGrowthCta] = useState(true);
   const [publishStage, setPublishStage] = useState<PublishStage>("idle");
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishWarning, setPublishWarning] = useState<string | null>(null);
@@ -112,6 +113,11 @@ export default function BlogWizard({
   const [publishedStatus, setPublishedStatus] = useState<
     "published" | "draft" | null
   >(null);
+  const [growthChecklist, setGrowthChecklist] = useState<{
+    cta: boolean;
+    promoCopy: boolean;
+    slotId: string | null;
+  } | null>(null);
 
   const chosen = chosenIndex !== null ? options[chosenIndex] : null;
   const talkingPoints = promptsForOption(chosen);
@@ -308,12 +314,21 @@ export default function BlogWizard({
           status,
           coverImage,
           coverAlt: coverImage ? coverAlt : undefined,
+          includeGrowthCta,
         }),
       });
       const data = (await res.json()) as {
         ok: boolean;
         error?: string;
-        post?: { slug?: string };
+        promosWarning?: string;
+        growthPackaging?: {
+          ctaEnabled?: boolean;
+          adSlotMid?: string;
+        };
+        post?: {
+          slug?: string;
+          generated_promos?: unknown;
+        };
       };
 
       if (!res.ok || !data.ok) {
@@ -324,6 +339,18 @@ export default function BlogWizard({
 
       setPublishedSlug(data.post?.slug ?? publishSlug ?? null);
       setPublishedStatus(status);
+      setGrowthChecklist({
+        cta: data.growthPackaging?.ctaEnabled !== false && includeGrowthCta,
+        promoCopy: Boolean(data.post?.generated_promos) || status === "draft",
+        slotId: data.growthPackaging?.adSlotMid ?? null,
+      });
+      if (data.promosWarning) {
+        setPublishWarning((prev) =>
+          prev
+            ? `${prev} Promos: ${data.promosWarning}`
+            : `Promos: ${data.promosWarning}`,
+        );
+      }
       setPublishStage("done");
       const liveSlug = data.post?.slug ?? publishSlug ?? null;
       if (status === "published" && liveSlug) {
@@ -349,11 +376,13 @@ export default function BlogWizard({
     setDraftError(null);
     setArticle(null);
     setDraftConfirmed(false);
+    setIncludeGrowthCta(true);
     setPublishStage("idle");
     setPublishError(null);
     setPublishWarning(null);
     setPublishedSlug(null);
     setPublishedStatus(null);
+    setGrowthChecklist(null);
   }
 
   return (
@@ -595,9 +624,29 @@ export default function BlogWizard({
                   <a href={`/blog/${publishedSlug}`} className={bigButtonClass}>
                     View the post
                   </a>
+                  {growthChecklist ? (
+                    <ul className="space-y-1 font-sans text-sm text-brand-ink">
+                      <li>
+                        ✓ Growth packaging applied
+                        {growthChecklist.cta
+                          ? " — end CTA on"
+                          : " — end CTA opted out"}
+                      </li>
+                      <li>
+                        {growthChecklist.promoCopy ? "✓" : "…"} Promo copy
+                        (free app + SWLA angle)
+                      </li>
+                      <li>
+                        ✓ Mid AdSlot id:{" "}
+                        <span className="font-semibold">
+                          {growthChecklist.slotId ?? "blog-mid-…"}
+                        </span>
+                      </li>
+                    </ul>
+                  ) : null}
                   <p className="font-sans text-sm text-brand-muted">
-                    Promo captions are generating on the Projects tab — swipe
-                    copy will be ready in a few seconds.
+                    Marketing project is on the Projects tab — swipe copy is
+                    ready for local promotion.
                   </p>
                 </>
               ) : null}
@@ -634,6 +683,21 @@ export default function BlogWizard({
                 <span className="font-sans text-sm font-bold leading-snug text-brand-ink">
                   The article and cover artwork plan look good — commit this to
                   the blog.
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 border-2 border-brand-ink/15 bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={includeGrowthCta}
+                  onChange={(e) => setIncludeGrowthCta(e.target.checked)}
+                  disabled={publishStage !== "idle"}
+                  className="mt-0.5 h-6 w-6 shrink-0 accent-brand-orange"
+                />
+                <span className="font-sans text-sm leading-snug text-brand-ink">
+                  <span className="font-bold">Growth packaging</span> — append
+                  free Vitality Engine CTA, mid AdSlot id from slug, and
+                  generate SWLA-friendly promo captions on publish.
                 </span>
               </label>
 

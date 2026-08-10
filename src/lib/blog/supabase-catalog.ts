@@ -1,6 +1,7 @@
 import type { BlogBlock, MigratedPost } from "@/data/posts";
 import { markdownToBlocks } from "@/lib/blog/markdown-blocks";
 import type { BlogPostRecord } from "@/lib/blog/supabase-posts";
+import { blogMidAdSlotId } from "@/lib/marketing/growth-packaging";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceRoleClient } from "@/utils/supabase/admin";
 
@@ -17,6 +18,20 @@ export function mapSupabasePostToMigrated(
     row.cover_image ||
     blocks.find((b) => b.type === "image")?.src ||
     "/images/hero-strength-stamina-collage.png";
+
+  const growth = row.growth_packaging;
+  const growthPackaging =
+    growth && typeof growth === "object"
+      ? {
+          ctaEnabled: growth.ctaEnabled !== false,
+          adSlotMid: growth.adSlotMid || blogMidAdSlotId(row.slug),
+          appliedAt: growth.appliedAt || row.updated_at,
+        }
+      : {
+          ctaEnabled: true,
+          adSlotMid: blogMidAdSlotId(row.slug),
+          appliedAt: row.updated_at,
+        };
 
   return {
     slug: row.slug,
@@ -35,6 +50,7 @@ export function mapSupabasePostToMigrated(
     excerpt: row.excerpt || row.description || row.title,
     featured: Boolean(row.featured),
     body: blocks,
+    growthPackaging,
   };
 }
 

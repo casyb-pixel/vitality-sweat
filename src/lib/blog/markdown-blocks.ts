@@ -62,6 +62,11 @@ export function markdownToBlocks(markdown: string): BlogBlock[] {
       continue;
     }
 
+    // Skip HTML comments (e.g. growth CTA markers).
+    if (/^<!--[\s\S]*-->$/.test(trimmed)) {
+      continue;
+    }
+
     const imageMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
     if (imageMatch) {
       flushList();

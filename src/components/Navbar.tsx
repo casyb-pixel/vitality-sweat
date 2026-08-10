@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import { SOCIAL_LINKS } from "@/lib/seo/site";
+import { createClient } from "@/utils/supabase/client";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -14,6 +16,7 @@ const NAV_LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -28,6 +31,64 @@ export default function Navbar() {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setSignedIn(Boolean(data.user));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(Boolean(session?.user));
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const primaryCta =
+    signedIn === true ? (
+      <Link
+        href="/app"
+        className="animate-cta-pulse inline-flex items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white transition-[background-color,transform] hover:bg-brand-orange-deep active:scale-[0.98]"
+      >
+        Launch App
+      </Link>
+    ) : (
+      <SignupCtaLink
+        location="navbar_desktop"
+        label="Create free account"
+        className="animate-cta-pulse inline-flex items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white transition-[background-color,transform] hover:bg-brand-orange-deep active:scale-[0.98]"
+      >
+        Create free account
+      </SignupCtaLink>
+    );
+
+  const mobileCta =
+    signedIn === true ? (
+      <Link
+        href="/app"
+        onClick={() => setOpen(false)}
+        className="mt-6 inline-flex items-center justify-center bg-brand-orange px-6 py-4 font-sans text-base font-bold uppercase tracking-[0.1em] text-white"
+      >
+        Launch App
+      </Link>
+    ) : (
+      <SignupCtaLink
+        location="navbar_mobile"
+        label="Create free account"
+        onNavigate={() => setOpen(false)}
+        className="mt-6 inline-flex items-center justify-center bg-brand-orange px-6 py-4 font-sans text-base font-bold uppercase tracking-[0.1em] text-white"
+      >
+        Create free account
+      </SignupCtaLink>
+    );
 
   return (
     <header
@@ -80,12 +141,7 @@ export default function Navbar() {
               </a>
             ))}
           </div>
-          <Link
-            href="/app"
-            className="animate-cta-pulse inline-flex items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white transition-[background-color,transform] hover:bg-brand-orange-deep active:scale-[0.98]"
-          >
-            Launch App
-          </Link>
+          {primaryCta}
         </nav>
 
         <button
@@ -161,13 +217,7 @@ export default function Navbar() {
               </a>
             ))}
           </div>
-          <Link
-            href="/app"
-            onClick={() => setOpen(false)}
-            className="mt-6 inline-flex items-center justify-center bg-brand-orange px-6 py-4 font-sans text-base font-bold uppercase tracking-[0.1em] text-white"
-          >
-            Launch App
-          </Link>
+          {mobileCta}
         </nav>
       </div>
     </header>

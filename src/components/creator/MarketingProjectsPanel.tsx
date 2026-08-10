@@ -25,6 +25,19 @@ export default function MarketingProjectsPanel({
   onPromosReady,
 }: MarketingProjectsPanelProps) {
   const [projects, setProjects] = useState<MarketingProject[]>([]);
+  const [videoQueue, setVideoQueue] = useState<
+    {
+      id: string;
+      blogTitle: string;
+      postSlug: string | null;
+      conceptTitle: string;
+      checklistKey: string | null;
+      updatedAt: string | null;
+      hasGrowthPack: boolean;
+      previewCaption: string | null;
+      signupUrl: string | null;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -39,12 +52,14 @@ export default function MarketingProjectsPanel({
         ok: boolean;
         error?: string;
         projects?: MarketingProject[];
+        videoPromoQueue?: typeof videoQueue;
       };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Could not load marketing projects.");
         return;
       }
       setProjects(data.projects ?? []);
+      setVideoQueue(data.videoPromoQueue ?? []);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Network error loading projects.",
@@ -73,6 +88,7 @@ export default function MarketingProjectsPanel({
           ok: boolean;
           error?: string;
           projects?: MarketingProject[];
+          videoPromoQueue?: typeof videoQueue;
         };
         if (cancelled) return;
         if (!res.ok || !data.ok) {
@@ -81,6 +97,7 @@ export default function MarketingProjectsPanel({
         }
         const list = data.projects ?? [];
         setProjects(list);
+        setVideoQueue(data.videoPromoQueue ?? []);
         setLoading(false);
 
         const match = list.find((p) => p.slug === highlightSlug);
@@ -349,6 +366,61 @@ export default function MarketingProjectsPanel({
         >
           {error}
         </p>
+      ) : null}
+
+      {videoQueue.length > 0 ? (
+        <div className="border-2 border-brand-orange/30 bg-brand-orange/5 p-4 sm:p-5">
+          <p className="eyebrow text-brand-orange">Video promo queue</p>
+          <p className="mt-1 font-sans text-sm text-brand-muted">
+            Export-ready Video Studio packs with growth packaging — still need
+            posting on Reels / TikTok / Shorts.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {videoQueue.map((item) => (
+              <li
+                key={item.id}
+                className="border border-brand-ink/10 bg-surface px-3 py-3"
+              >
+                <p className="font-sans text-sm font-bold text-brand-ink">
+                  {item.conceptTitle}
+                </p>
+                <p className="mt-0.5 font-sans text-xs text-brand-muted">
+                  {item.blogTitle}
+                  {item.hasGrowthPack ? " · Growth pack ready" : ""}
+                  {item.checklistKey ? ` · ${item.checklistKey}` : ""}
+                </p>
+                {item.previewCaption ? (
+                  <pre className="mt-2 max-h-24 overflow-hidden whitespace-pre-wrap font-sans text-xs leading-relaxed text-brand-ink">
+                    {item.previewCaption}
+                  </pre>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {item.previewCaption ? (
+                    <button
+                      type="button"
+                      className={secondaryBtn}
+                      onClick={() =>
+                        void copyText(`vq-${item.id}`, item.previewCaption!)
+                      }
+                    >
+                      {copiedKey === `vq-${item.id}` ? "Copied" : "Copy caption"}
+                    </button>
+                  ) : null}
+                  {item.postSlug ? (
+                    <a
+                      href={`/blog/${item.postSlug}`}
+                      className={secondaryBtn}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open Chronicle
+                    </a>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       {projects.length === 0 ? (

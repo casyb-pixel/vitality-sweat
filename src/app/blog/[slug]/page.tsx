@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdSlot from "@/components/AdSlot";
 import DynamicVideoEmbedder from "@/components/blog/DynamicVideoEmbedder";
 import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
+import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import JsonLd from "@/components/seo/JsonLd";
 import FeaturedGearSlider from "@/components/store/FeaturedGearSlider";
 import {
@@ -12,6 +14,7 @@ import {
   getBlogPostBySlugAsync,
 } from "@/lib/blog/posts";
 import { fetchPublishedVideoEmbedsForPost } from "@/lib/blog/video-embeds";
+import { blogMidAdSlotId } from "@/lib/marketing/growth-packaging";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
 import { getFeaturedGear } from "@/lib/store/products";
 
@@ -98,6 +101,10 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
     slug: post.slug,
   });
 
+  const growth = post.growthPackaging;
+  const showGrowthCta = growth?.ctaEnabled !== false;
+  const midSlotId = growth?.adSlotMid || blogMidAdSlotId(post.slug);
+
   return (
     <>
       <Navbar />
@@ -138,6 +145,16 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
               embeds={videoEmbeds}
               fallbackThumbnail={coverSrc}
             />
+            <div className="my-8">
+              <AdSlot
+                slotId={midSlotId}
+                label="Local partner placement"
+                size="banner"
+              />
+            </div>
+            {showGrowthCta ? (
+              <JoinEngineCTA location="blog_mid" variant="mid" />
+            ) : null}
             <Link
               href="/chronicles"
               className="mt-10 inline-flex font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange hover:text-brand-orange-deep"
@@ -168,6 +185,12 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
           </aside>
         </div>
       </article>
+
+      <div className="site-shell pb-[var(--section-y)]">
+        {showGrowthCta ? (
+          <JoinEngineCTA location="blog_end" variant="end" />
+        ) : null}
+      </div>
 
       <FeaturedGearSlider products={featuredGear} />
       <SiteFooter />

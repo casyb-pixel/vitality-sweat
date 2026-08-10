@@ -38,13 +38,20 @@ export async function GET(request: Request) {
         const wantsCreator =
           next === "/app/creator" || next.startsWith("/app/creator/");
         const completion = await getMemberCompletionRedirect(supabase, user.id);
-        const destination =
+        const rawDestination =
           completion ??
           (wantsCreator
             ? "/app"
             : next.startsWith("/app") || next.startsWith("/profile")
               ? next
               : "/app");
+        // Keep growth marker so AuthGate can emit signup_complete after email confirm.
+        const destination =
+          next.includes("joined=1") && !rawDestination.includes("joined=1")
+            ? rawDestination.includes("?")
+              ? `${rawDestination}&joined=1`
+              : `${rawDestination}?joined=1`
+            : rawDestination;
         return NextResponse.redirect(`${origin}${destination}`);
       }
     } else {

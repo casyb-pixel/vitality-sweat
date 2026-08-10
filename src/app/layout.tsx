@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Vesper_Libre } from "next/font/google";
+import AuthGate from "@/components/auth/AuthGate";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import JsonLd from "@/components/seo/JsonLd";
 import { buildOrganizationJsonLd } from "@/lib/blog/posts";
@@ -102,6 +103,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <GoogleAnalytics />
+        <AuthGate />
         <JsonLd data={buildOrganizationJsonLd()} />
         <main className="flex-1">{children}</main>
       </body>

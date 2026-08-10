@@ -36,7 +36,11 @@ function GaPageViews() {
   return null;
 }
 
-/** Loads GA4 and reports App Router navigations as page_view events. */
+/**
+ * Loads GA4 and reports App Router navigations as page_view events.
+ * Growth events (signup_start, signup_complete, cta_click, grocery_share_view)
+ * are fired via `trackGaEvent` in `@/lib/analytics/ga`.
+ */
 export default function GoogleAnalytics() {
   if (!GA_MEASUREMENT_ID) return null;
 

@@ -5,6 +5,11 @@ import {
   type PostStatus,
   type SavePostInput,
 } from "@/lib/blog/supabase-posts";
+import {
+  applyBlogGrowthCta,
+  buildPostGrowthPackaging,
+} from "@/lib/marketing/growth-packaging";
+import { generateMarketingPromos } from "@/lib/marketing/generate-promos";
 import { stripEmDashes } from "@/lib/text/humanize-copy";
 import { createClient } from "@/utils/supabase/server";
 
@@ -24,11 +29,12 @@ type SavePostBody = {
   coverAlt?: string;
   cover_alt?: string;
   featured?: boolean;
+  includeGrowthCta?: boolean;
 };
 
 /**
  * Persist a Creator Studio article draft to Supabase `public.posts`.
- * Requires authenticated admin/creator (app_metadata.role).
+ * On publish: applies growth packaging (CTA + ad slot meta) and boots promo copy.
  */
 export async function POST(request: Request) {
   try {
@@ -70,11 +76,17 @@ export async function POST(request: Request) {
       input.excerpt.trim() ||
       input.title.trim();
 
+    const includeGrowthCta = input.includeGrowthCta !== false;
+    const packagedBody = applyBlogGrowthCta(input.bodyMarkdown, {
+      includeCta: includeGrowthCta,
+    });
+    const growthPackaging = buildPostGrowthPackaging(slug, includeGrowthCta);
+
     const row: Record<string, unknown> = {
       slug,
       title: input.title.trim(),
       excerpt: input.excerpt.trim(),
-      body_markdown: input.bodyMarkdown,
+      body_markdown: packagedBody,
       description,
       status: input.status,
       author_id: user.id,
@@ -89,6 +101,7 @@ export async function POST(request: Request) {
       featured: Boolean(input.featured),
       published_at: input.status === "published" ? now : null,
       updated_at: now,
+      growth_packaging: growthPackaging,
     };
 
     // Fresh marketing project window when publishing (trigger also sets due date).
@@ -130,6 +143,33 @@ export async function POST(request: Request) {
       );
     }
 
+    let promosWarning: string | null = null;
+    if (input.status === "published" && data) {
+      try {
+        const promos = await generateMarketingPromos({
+          title: data.title as string,
+          excerpt: data.excerpt as string,
+          bodyMarkdown: data.body_markdown as string,
+          slug: data.slug as string,
+        });
+        const { error: promoError } = await supabase
+          .from("posts")
+          .update({ generated_promos: promos })
+          .eq("id", data.id);
+        if (promoError) {
+          promosWarning = promoError.message;
+        } else {
+          (data as Record<string, unknown>).generated_promos = promos;
+        }
+      } catch (promoErr) {
+        promosWarning =
+          promoErr instanceof Error
+            ? promoErr.message
+            : "Promo generation failed.";
+        console.error("[save-post] promo bootstrap", promosWarning);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       message:
@@ -137,6 +177,8 @@ export async function POST(request: Request) {
           ? "Post published to Supabase."
           : "Draft saved to Supabase.",
       post: data,
+      growthPackaging,
+      promosWarning,
     });
   } catch (error) {
     const message =
@@ -188,6 +230,7 @@ function validateSaveBody(
         return alt ? stripEmDashes(alt) : undefined;
       })(),
       featured: body.featured,
+      includeGrowthCta: body.includeGrowthCta !== false,
     },
   };
 }
