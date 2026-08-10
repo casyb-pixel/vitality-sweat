@@ -151,8 +151,7 @@ export default async function MemberDashboardPage() {
 
         {!activeProgram ? (
           <p className="mt-3 font-sans text-sm text-brand-muted">
-            Use the Workout Agent to generate a mapped weekly plan. If generation
-            fails, confirm GEMINI_API_KEY is set on the server.
+            Use the Workout Agent to generate a mapped weekly plan.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
