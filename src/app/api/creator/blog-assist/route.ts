@@ -50,6 +50,8 @@ type BlogAssistBody = {
   details?: string | string[];
   talkingPoints?: string[];
   answers?: { prompt?: string; answer?: string }[];
+  /** Phase 1b — Local growth biases SWLA / Engine CTA content. */
+  articleType?: "standard" | "local_growth";
 };
 
 /**
@@ -99,7 +101,11 @@ export async function POST(request: Request) {
           400,
         );
       }
-      return handleGenerateIdeas({ apiKey, notes });
+      return handleGenerateIdeas({
+        apiKey,
+        notes,
+        articleType: body.articleType === "local_growth" ? "local_growth" : "standard",
+      });
     }
 
     const title = (body.title ?? "").trim();
@@ -114,6 +120,7 @@ export async function POST(request: Request) {
       targetAudience: (body.targetAudience ?? "").trim(),
       details: collectDetails(body),
       talkingPoints: asStringArray(body.talkingPoints).slice(0, 3),
+      articleType: body.articleType === "local_growth" ? "local_growth" : "standard",
     });
   } catch (error) {
     const message =
@@ -164,7 +171,11 @@ function collectDetails(body: BlogAssistBody): string {
   return "";
 }
 
-async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
+async function handleGenerateIdeas(input: {
+  apiKey: string;
+  notes: string;
+  articleType: "standard" | "local_growth";
+}) {
   const model = getGeminiModel();
   const notes = input.notes.trim();
 
@@ -191,7 +202,11 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
   }
 
   // 2) Synthesize Hunter's notes with (optional) Tavily findings → 3 options.
-  const prompt = buildGenerateIdeasPrompt({ notes, research });
+  const prompt = buildGenerateIdeasPrompt({
+    notes,
+    research,
+    articleType: input.articleType,
+  });
 
   try {
     const ai = createGeminiClient(input.apiKey);
@@ -249,6 +264,7 @@ async function handleGenerateIdeas(input: { apiKey: string; notes: string }) {
 function buildGenerateIdeasPrompt(input: {
   notes: string;
   research: TrendResearch | null;
+  articleType: "standard" | "local_growth";
 }): string {
   const trendBlock = input.research
     ? [
@@ -263,10 +279,23 @@ function buildGenerateIdeasPrompt(input: {
         "Still ground every option in Hunter's actual notes — invent nothing he didn't write.",
       ].join("\n");
 
+  const localGrowthBlock =
+    input.articleType === "local_growth"
+      ? [
+          "ARTICLE TYPE: LOCAL GROWTH (required bias)",
+          "- Every option must serve Southwest Louisiana / Acadiana / Lafayette readers.",
+          "- Prefer angles: SWLA fitness habits, meal prep for a Rouses run, gym tracking habits vs notes apps.",
+          "- Include a natural path to the free Vitality Engine (workouts + meal plans + grocery share) without sounding like an ad.",
+          "- Target audiences should be local gym-goers, busy parents, or high school athletes in the region.",
+        ].join("\n")
+      : "ARTICLE TYPE: standard Sweatlife Chronicle.";
+
   return [
     "You are the Vitality Sweat AI Blog Architect for Sweatlife Chronicles.",
     "Hunter is a 17-year-old high school athlete logging messy gym notes on his phone.",
     "Your job: synthesize his real-life training/nutrition experience with current search trends, then pitch content he can tap through on mobile.",
+    "",
+    localGrowthBlock,
     "",
     "OUTPUT RULES:",
     "- Return exactly 3 DISTINCT blog options.",
@@ -301,6 +330,7 @@ async function handleFinalizePost(input: {
   targetAudience: string;
   details: string;
   talkingPoints: string[];
+  articleType: "standard" | "local_growth";
 }) {
   const { fingerprintSummary, getArchiveFingerprint } = await import(
     "@/lib/blog/archive-fingerprint"
@@ -363,6 +393,7 @@ function buildFinalizePrompt(
     targetAudience: string;
     details: string;
     talkingPoints: string[];
+    articleType: "standard" | "local_growth";
   },
   fingerprint: {
     cadenceNotes: string[];
@@ -377,6 +408,17 @@ function buildFinalizePrompt(
   },
   fingerprintSummaryText: string,
 ): string {
+  const localGrowthRules =
+    input.articleType === "local_growth"
+      ? [
+          "LOCAL GROWTH MODE:",
+          "- Frame for Southwest Louisiana / Acadiana / Lafayette readers.",
+          "- Prefer practical SWLA fitness, Rouses-run meal prep, or gym tracking habits.",
+          "- Near the end (before any CTA the CMS may append), include one short paragraph inviting readers to create a free Vitality Engine account for workouts + meal plans + grocery lists.",
+          "- Do not invent paid offers or discounts.",
+        ].join("\n")
+      : "";
+
   return [
     "You are a world-class fitness editor for Vitality Sweat / Sweatlife Chronicles.",
     "Hunter is a 17-year-old athlete logging from the gym. He gave a selected title, messy raw notes, and bulleted fragment details. NOT full paragraphs.",
@@ -384,6 +426,7 @@ function buildFinalizePrompt(
     "Ensure absolute grammatical perfection. Expand fragments into full sentences. Do NOT invent PRs, weights, or numbers he did not provide.",
     NO_EM_DASH_RULE,
     "Write like a real coach-athlete voice. Avoid AI tells: no em dashes, no stiff transitions like 'In conclusion' or 'It is important to note'.",
+    localGrowthRules,
     "",
     "MATCH OUR HISTORICAL H2/H3 FINGERPRINT (calorie-deficit archive baseline):",
     fingerprintSummaryText,

@@ -38,6 +38,8 @@ export type AudienceZipRow = {
   region: string | null;
   registered: number;
   active28d: number;
+  /** Members in this ZIP who signed up via a referral code. */
+  referred: number;
   /** True when ZIP is in the Acadiana / Lafayette focus set. */
   isFocus: boolean;
 };
@@ -46,6 +48,7 @@ export type AudienceCityRow = {
   city: string;
   registered: number;
   active28d: number;
+  referred: number;
 };
 
 export type AudienceMetrics = {
@@ -63,6 +66,10 @@ export type AudienceMetrics = {
   groceryListsShareable28d: number;
   lafayetteCoreActive28d: number;
   acadianaFocusActive28d: number;
+  /** Profiles with referred_by set (platform-wide). */
+  referredTotal: number;
+  /** Referred members who also have a ZIP on file. */
+  referredWithZip: number;
   byZip: AudienceZipRow[];
   byCity: AudienceCityRow[];
   pitchSummary: string;
@@ -91,6 +98,7 @@ type ProfileGeoRow = {
   city: string | null;
   zip_code: string | null;
   region: string | null;
+  referred_by?: string | null;
 };
 
 type WorkoutRow = { user_id: string; id: string };
@@ -104,6 +112,7 @@ export function buildAudienceMetrics(input: {
   sinceIso: string;
   profiles: ProfileGeoRow[];
   registeredTotal: number;
+  referredTotal?: number;
   workouts: WorkoutRow[];
   mealPlans: MealPlanRow[];
 }): AudienceMetrics {
@@ -127,17 +136,26 @@ export function buildAudienceMetrics(input: {
       region: string | null;
       registeredIds: Set<string>;
       activeIds: Set<string>;
+      referredIds: Set<string>;
     }
   >();
 
   const cityBuckets = new Map<
     string,
-    { registeredIds: Set<string>; activeIds: Set<string> }
+    {
+      registeredIds: Set<string>;
+      activeIds: Set<string>;
+      referredIds: Set<string>;
+    }
   >();
+
+  let referredWithZip = 0;
 
   for (const profile of profilesWithZip) {
     const zip5 = normalizeZip5(profile.zip_code);
     if (!zip5) continue;
+    const isReferred = Boolean(profile.referred_by);
+    if (isReferred) referredWithZip += 1;
 
     let zipBucket = zipBuckets.get(zip5);
     if (!zipBucket) {
@@ -146,6 +164,7 @@ export function buildAudienceMetrics(input: {
         region: profile.region?.trim() || null,
         registeredIds: new Set(),
         activeIds: new Set(),
+        referredIds: new Set(),
       };
       zipBuckets.set(zip5, zipBucket);
     }
@@ -162,16 +181,26 @@ export function buildAudienceMetrics(input: {
     if (activeIds.has(profile.id)) {
       zipBucket.activeIds.add(profile.id);
     }
+    if (isReferred) {
+      zipBucket.referredIds.add(profile.id);
+    }
 
     const cityKey = profile.city?.trim() || "Unknown city";
     let cityBucket = cityBuckets.get(cityKey);
     if (!cityBucket) {
-      cityBucket = { registeredIds: new Set(), activeIds: new Set() };
+      cityBucket = {
+        registeredIds: new Set(),
+        activeIds: new Set(),
+        referredIds: new Set(),
+      };
       cityBuckets.set(cityKey, cityBucket);
     }
     cityBucket.registeredIds.add(profile.id);
     if (activeIds.has(profile.id)) {
       cityBucket.activeIds.add(profile.id);
+    }
+    if (isReferred) {
+      cityBucket.referredIds.add(profile.id);
     }
   }
 
@@ -182,6 +211,7 @@ export function buildAudienceMetrics(input: {
       region: b.region,
       registered: b.registeredIds.size,
       active28d: b.activeIds.size,
+      referred: b.referredIds.size,
       isFocus: focusSet.has(zipCode),
     }))
     .sort((a, b) => {
@@ -196,6 +226,7 @@ export function buildAudienceMetrics(input: {
       city,
       registered: b.registeredIds.size,
       active28d: b.activeIds.size,
+      referred: b.referredIds.size,
     }))
     .sort((a, b) => {
       if (b.active28d !== a.active28d) return b.active28d - a.active28d;
@@ -219,6 +250,8 @@ export function buildAudienceMetrics(input: {
     (p) => p.grocery_share_token,
   ).length;
 
+  const referredTotal = input.referredTotal ?? 0;
+
   const pitchSummary = buildPitchSummary({
     lafayetteCoreActive28d,
     acadianaFocusActive28d,
@@ -227,6 +260,8 @@ export function buildAudienceMetrics(input: {
     groceryListsCreated28d,
     activeUsers28d: activeIds.size,
     registeredWithZip: profilesWithZip.length,
+    referredTotal,
+    referredWithZip,
   });
 
   return {
@@ -242,6 +277,8 @@ export function buildAudienceMetrics(input: {
     groceryListsShareable28d,
     lafayetteCoreActive28d,
     acadianaFocusActive28d,
+    referredTotal,
+    referredWithZip,
     byZip,
     byCity,
     pitchSummary,
@@ -256,6 +293,8 @@ export function buildPitchSummary(input: {
   groceryListsCreated28d: number;
   activeUsers28d: number;
   registeredWithZip: number;
+  referredTotal: number;
+  referredWithZip: number;
 }): string {
   const lines: string[] = [];
   lines.push(
@@ -267,6 +306,9 @@ export function buildPitchSummary(input: {
   lines.push(
     `${input.registeredWithZip} registered members with ZIP on file · ${input.activeUsers28d} active platform-wide · ${input.workoutsLogged28d} workouts logged · ${input.groceryListsCreated28d} grocery lists created.`,
   );
+  lines.push(
+    `${input.referredTotal} referred signups platform-wide · ${input.referredWithZip} referred with ZIP (local virality).`,
+  );
 
   const topFocus = input.byZip
     .filter((z) => z.isFocus && (z.active28d > 0 || z.registered > 0))
@@ -275,7 +317,7 @@ export function buildPitchSummary(input: {
     const detail = topFocus
       .map(
         (z) =>
-          `${z.zipCode}${z.city ? ` (${z.city})` : ""}: ${z.active28d} active / ${z.registered} registered`,
+          `${z.zipCode}${z.city ? ` (${z.city})` : ""}: ${z.active28d} active / ${z.registered} registered / ${z.referred} referred`,
       )
       .join("; ");
     lines.push(`Top focus ZIPs — ${detail}.`);

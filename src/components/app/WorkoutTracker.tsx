@@ -22,6 +22,7 @@ import {
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/fitness/types";
+import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 
 type WorkoutTrackerProps = {
   exercises: Exercise[];
@@ -34,6 +35,7 @@ export default function WorkoutTracker({
 }: WorkoutTrackerProps) {
   const [catalog, setCatalog] = useState<Exercise[]>(initialExercises);
   const [session, setSession] = useState<WorkoutSession | null>(initialSession);
+  const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [equipment, setEquipment] = useState<ExerciseEquipment | "">("");
   const [category, setCategory] = useState<ExerciseCategory | "">("");
   const [search, setSearch] = useState("");
@@ -180,6 +182,7 @@ export default function WorkoutTracker({
         setLoggedSets([]);
         setSetNumber(1);
         setMessage("Workout completed. Nice work.");
+        setShowInvitePrompt(true);
         void loadHistory(exerciseId);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Finish failed.");
@@ -348,6 +351,14 @@ export default function WorkoutTracker({
           </>
         )}
       </div>
+
+      {showInvitePrompt ? (
+        <InviteFriendsPrompt
+          variant="post_workout"
+          visible
+          onDismiss={() => setShowInvitePrompt(false)}
+        />
+      ) : null}
 
       {suggestion ? (
         <div className="border border-brand-orange/30 bg-brand-orange/5 p-4">

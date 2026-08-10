@@ -120,9 +120,9 @@ export default function AudiencePanel() {
             hint={`${metrics.activeUsersWithZip28d} with ZIP`}
           />
           <Stat
-            label="Workouts logged"
-            value={metrics.workoutsLogged28d}
-            hint="sessions started"
+            label="Referred signups"
+            value={metrics.referredTotal}
+            hint={`${metrics.referredWithZip} with ZIP`}
           />
           <Stat
             label="Grocery lists"
@@ -131,7 +131,12 @@ export default function AudiencePanel() {
           />
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Stat
+            label="Workouts logged"
+            value={metrics.workoutsLogged28d}
+            hint="sessions started"
+          />
           <Stat
             label="Active in 70501–70508"
             value={metrics.lafayetteCoreActive28d}
@@ -177,7 +182,8 @@ export default function AudiencePanel() {
                   <th className="py-2 pr-3 font-bold">ZIP</th>
                   <th className="py-2 pr-3 font-bold">City</th>
                   <th className="py-2 pr-3 font-bold">Registered</th>
-                  <th className="py-2 font-bold">Active 28d</th>
+                  <th className="py-2 pr-3 font-bold">Active 28d</th>
+                  <th className="py-2 font-bold">Referred</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,7 +207,8 @@ export default function AudiencePanel() {
                       ) : null}
                     </td>
                     <td className="py-2.5 pr-3">{row.registered}</td>
-                    <td className="py-2.5">{row.active28d}</td>
+                    <td className="py-2.5 pr-3">{row.active28d}</td>
+                    <td className="py-2.5">{row.referred}</td>
                   </tr>
                 ))}
               </tbody>
@@ -223,7 +230,8 @@ export default function AudiencePanel() {
                 <tr className="border-b border-brand-ink/15 text-xs font-bold uppercase tracking-[0.08em] text-brand-muted">
                   <th className="py-2 pr-3 font-bold">City</th>
                   <th className="py-2 pr-3 font-bold">Registered</th>
-                  <th className="py-2 font-bold">Active 28d</th>
+                  <th className="py-2 pr-3 font-bold">Active 28d</th>
+                  <th className="py-2 font-bold">Referred</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,7 +242,8 @@ export default function AudiencePanel() {
                   >
                     <td className="py-2.5 pr-3 font-semibold">{row.city}</td>
                     <td className="py-2.5 pr-3">{row.registered}</td>
-                    <td className="py-2.5">{row.active28d}</td>
+                    <td className="py-2.5 pr-3">{row.active28d}</td>
+                    <td className="py-2.5">{row.referred}</td>
                   </tr>
                 ))}
               </tbody>

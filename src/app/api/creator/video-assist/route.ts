@@ -56,6 +56,8 @@ type VideoAssistBody = {
   assetsReady?: boolean;
   hasVideo?: boolean;
   hasVoiceOver?: boolean;
+  /** Phase 1b — App invite script structure. */
+  scriptPreset?: "standard" | "app_invite";
 };
 
 /**
@@ -107,7 +109,13 @@ export async function POST(request: Request) {
           400,
         );
       }
-      return handleGenerateVideoIdeas({ apiKey, blogTitle, markdown });
+      return handleGenerateVideoIdeas({
+        apiKey,
+        blogTitle,
+        markdown,
+        scriptPreset:
+          body.scriptPreset === "app_invite" ? "app_invite" : "standard",
+      });
     }
 
     if (action === "regenerate_video_idea") {
@@ -133,6 +141,8 @@ export async function POST(request: Request) {
         markdown,
         replaceIndex,
         existingIdeas: existing,
+        scriptPreset:
+          body.scriptPreset === "app_invite" ? "app_invite" : "standard",
       });
     }
 
@@ -204,8 +214,50 @@ async function handleGenerateVideoIdeas(input: {
   apiKey: string;
   blogTitle: string;
   markdown: string;
+  scriptPreset: "standard" | "app_invite";
 }) {
   const model = getGeminiModel();
+  const appInvite =
+    input.scriptPreset === "app_invite"
+      ? [
+          "SCRIPT PRESET: APP INVITE (required)",
+          "Every idea must follow: hook (0–2s) → one tip (middle) → free Vitality Engine CTA (last 5s).",
+          "Include scriptBeats { hook, tip, cta } for each idea.",
+          "CTA must invite a free account for workouts + meal plans — SWLA / Acadiana framing.",
+          "At least 3 of 5 ideas should explicitly mention the free app invite.",
+        ].join("\n")
+      : "SCRIPT PRESET: standard short-form concepts.";
+
+  const shape =
+    input.scriptPreset === "app_invite"
+      ? {
+          ideas: [
+            {
+              title: "string — punchy short-form video title",
+              videoHook:
+                "string — exactly 1 sentence hook for the first 1–2 seconds",
+              shootingConcept:
+                "string — brief note of what Hunter should visually capture in the gym",
+              scriptBeats: {
+                hook: "string — spoken/on-screen hook",
+                tip: "string — one actionable tip",
+                cta: "string — free Vitality Engine invite line",
+              },
+            },
+          ],
+        }
+      : {
+          ideas: [
+            {
+              title: "string — punchy short-form video title",
+              videoHook:
+                "string — exactly 1 sentence hook for the first 1–2 seconds",
+              shootingConcept:
+                "string — brief note of what Hunter should visually capture in the gym",
+            },
+          ],
+        };
+
   const prompt = [
     "You are the Vitality Sweat AI Director for short-form social video.",
     "Hunter is a 17-year-old athlete filming on his phone at the gym.",
@@ -215,17 +267,10 @@ async function handleGenerateVideoIdeas(input: {
     "Voice: direct, sweaty, encouraging — never corporate.",
     "Do not invent facts that contradict the article.",
     "",
+    appInvite,
+    "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
-    JSON.stringify({
-      ideas: [
-        {
-          title: "string — punchy short-form video title",
-          videoHook: "string — exactly 1 sentence hook for the first 1–2 seconds",
-          shootingConcept:
-            "string — brief note of what Hunter should visually capture in the gym",
-        },
-      ],
-    }),
+    JSON.stringify(shape),
     "",
     `BLOG TITLE:\n${input.blogTitle}`,
     "",
@@ -277,6 +322,7 @@ async function handleRegenerateVideoIdea(input: {
   markdown: string;
   replaceIndex: number;
   existingIdeas: ShortFormVideoIdea[];
+  scriptPreset: "standard" | "app_invite";
 }) {
   const model = getGeminiModel();
   const avoid = input.existingIdeas
@@ -289,22 +335,41 @@ async function handleRegenerateVideoIdea(input: {
     .join("\n");
 
   const rejected = input.existingIdeas[input.replaceIndex];
+  const appInvite =
+    input.scriptPreset === "app_invite"
+      ? "Use APP INVITE structure: hook → tip → free Vitality Engine CTA. Include scriptBeats."
+      : "";
   const prompt = [
     "You are the Vitality Sweat AI Director for short-form social video.",
     "Hunter rejected ONE idea from a locked set of five. Generate exactly ONE replacement concept.",
     "It must be distinct from the other kept ideas and different from the rejected one.",
     "Optimize for TikTok / Reels / YouTube Shorts. Gym-native, under 45 seconds.",
     "Voice: direct, sweaty, encouraging — never corporate.",
+    appInvite,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
-    JSON.stringify({
-      idea: {
-        title: "string — punchy short-form video title",
-        videoHook: "string — exactly 1 sentence hook for the first 1–2 seconds",
-        shootingConcept:
-          "string — brief note of what Hunter should visually capture in the gym",
-      },
-    }),
+    JSON.stringify(
+      input.scriptPreset === "app_invite"
+        ? {
+            idea: {
+              title: "string — punchy short-form video title",
+              videoHook:
+                "string — exactly 1 sentence hook for the first 1–2 seconds",
+              shootingConcept:
+                "string — brief note of what Hunter should visually capture in the gym",
+              scriptBeats: { hook: "string", tip: "string", cta: "string" },
+            },
+          }
+        : {
+            idea: {
+              title: "string — punchy short-form video title",
+              videoHook:
+                "string — exactly 1 sentence hook for the first 1–2 seconds",
+              shootingConcept:
+                "string — brief note of what Hunter should visually capture in the gym",
+            },
+          },
+    ),
     "",
     `BLOG TITLE:\n${input.blogTitle}`,
     "",
@@ -513,7 +578,21 @@ function coerceIdea(item: unknown): ShortFormVideoIdea | null {
       : "") ||
     (typeof row.whyItWorks === "string" ? row.whyItWorks.trim() : "");
 
-  return { title, videoHook, shootingConcept };
+  const scriptBeats = coerceScriptBeats(row.scriptBeats);
+
+  return { title, videoHook, shootingConcept, scriptBeats };
+}
+
+function coerceScriptBeats(
+  value: unknown,
+): ShortFormVideoIdea["scriptBeats"] | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const hook = typeof row.hook === "string" ? row.hook.trim() : "";
+  const tip = typeof row.tip === "string" ? row.tip.trim() : "";
+  const cta = typeof row.cta === "string" ? row.cta.trim() : "";
+  if (!hook && !tip && !cta) return null;
+  return { hook, tip, cta };
 }
 
 function parseSocialPackage(raw: string): VideoSocialPackage {

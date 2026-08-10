@@ -4,8 +4,13 @@ import { useCallback, useState } from "react";
 import AudiencePanel from "@/components/creator/AudiencePanel";
 import BlogWizard from "@/components/creator/BlogWizard";
 import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
+import GrowthCampaignPanel from "@/components/creator/GrowthCampaignPanel";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
+import type {
+  BlogArticleType,
+  VideoScriptPreset,
+} from "@/lib/marketing/campaign-templates";
 
 type StudioTab = "projects" | "blog" | "video" | "audience";
 
@@ -28,10 +33,14 @@ export default function CreatorStudio({
   const [tab, setTab] = useState<StudioTab>("projects");
   const [highlightSlug, setHighlightSlug] = useState<string | null>(null);
   const [seedNotes, setSeedNotes] = useState<string | null>(null);
+  const [articleType, setArticleType] = useState<BlogArticleType>("standard");
+  const [videoScriptPreset, setVideoScriptPreset] =
+    useState<VideoScriptPreset>("standard");
 
   const handlePublished = useCallback((slug: string) => {
     setHighlightSlug(slug);
     setSeedNotes(null);
+    setArticleType("standard");
     setTab("projects");
   }, []);
 
@@ -41,12 +50,27 @@ export default function CreatorStudio({
 
   const handleWriteAbout = useCallback((topic: string) => {
     const trimmed = topic.trim();
+    setArticleType("standard");
     setSeedNotes(
       trimmed
         ? `Member Library search interest: ${trimmed}\n\nWrite a Chronicle that covers this topic for people training (treadmill-friendly tips welcome).`
         : null,
     );
     setTab("blog");
+  }, []);
+
+  const handleLaunchCampaignBlog = useCallback(
+    (input: { outline: string }) => {
+      setArticleType("local_growth");
+      setSeedNotes(input.outline);
+      setTab("blog");
+    },
+    [],
+  );
+
+  const handleLaunchCampaignVideo = useCallback(() => {
+    setVideoScriptPreset("app_invite");
+    setTab("video");
   }, []);
 
   const headline =
@@ -65,7 +89,7 @@ export default function CreatorStudio({
         ? " Four quick steps from gym notes to a live Chronicle — no paragraphs required."
         : tab === "audience"
           ? " ZIP-level active members for gym and grocery sponsorship pitches — real counts only."
-          : " Active publishes stay on the board with swipe copy + a 6-item delivery checklist.";
+          : " Growth Campaign templates + active publishes with swipe copy and a 6-item delivery checklist.";
 
   return (
     <div className="space-y-6 pb-10 pt-4 sm:space-y-8 sm:pt-6">
@@ -117,6 +141,10 @@ export default function CreatorStudio({
           aria-labelledby="studio-tab-projects"
           className="space-y-6"
         >
+          <GrowthCampaignPanel
+            onLaunchBlog={handleLaunchCampaignBlog}
+            onLaunchVideo={handleLaunchCampaignVideo}
+          />
           <CreatorContentGaps onWriteAbout={handleWriteAbout} />
           <MarketingProjectsPanel
             highlightSlug={highlightSlug}
@@ -125,16 +153,17 @@ export default function CreatorStudio({
         </div>
       ) : null}
 
-      {/* Keep Video Studio mounted so mid-session state survives tab switches;
-          locked ideas also persist in the database for gym trips. */}
       <div
         id="studio-panel-video"
         role="tabpanel"
         aria-labelledby="studio-tab-video"
         hidden={tab !== "video"}
-        className={tab === "video" ? undefined : "hidden"}
+        className={tab !== "video" ? "hidden" : undefined}
       >
-        <VideoWizard />
+        <VideoWizard
+          scriptPreset={videoScriptPreset}
+          onScriptPresetConsumed={() => setVideoScriptPreset("standard")}
+        />
       </div>
 
       {tab === "blog" ? (
@@ -143,7 +172,11 @@ export default function CreatorStudio({
           role="tabpanel"
           aria-labelledby="studio-tab-blog"
         >
-          <BlogWizard onPublished={handlePublished} seedNotes={seedNotes} />
+          <BlogWizard
+            onPublished={handlePublished}
+            seedNotes={seedNotes}
+            initialArticleType={articleType}
+          />
         </div>
       ) : null}
 

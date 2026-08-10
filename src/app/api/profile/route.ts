@@ -71,7 +71,7 @@ export async function PATCH(request: Request) {
       .update(payload)
       .eq("id", user.id)
       .select(
-        "id, email, role, display_name, avatar_url, city, zip_code, region, created_at, updated_at",
+        "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, created_at, updated_at",
       )
       .single();
 

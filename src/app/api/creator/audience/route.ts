@@ -46,15 +46,20 @@ export async function GET() {
     const [
       profilesRes,
       totalRes,
+      referredRes,
       workoutsRes,
       mealPlansCreatedRes,
       mealPlansUpdatedRes,
     ] = await Promise.all([
       admin
         .from("profiles")
-        .select("id, city, zip_code, region")
+        .select("id, city, zip_code, region, referred_by")
         .not("zip_code", "is", null),
       admin.from("profiles").select("id", { count: "exact", head: true }),
+      admin
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .not("referred_by", "is", null),
       admin
         .from("workout_sessions")
         .select("id, user_id")
@@ -111,6 +116,7 @@ export async function GET() {
       sinceIso,
       profiles: profilesRes.data ?? [],
       registeredTotal: totalRes.count ?? 0,
+      referredTotal: referredRes.count ?? 0,
       workouts: workoutsRes.data ?? [],
       mealPlans: [...mealById.values()],
     });

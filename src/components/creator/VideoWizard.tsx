@@ -35,6 +35,8 @@ import {
   type MergeProgress,
 } from "@/lib/video/merge-av";
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
+import type { VideoScriptPreset } from "@/lib/marketing/campaign-templates";
+import { APP_INVITE_SCRIPT_GUIDANCE } from "@/lib/marketing/campaign-templates";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
   "SELECT_BLOG_CONTEXT",
@@ -99,10 +101,25 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function VideoWizard() {
+export default function VideoWizard({
+  scriptPreset: scriptPresetProp = "standard",
+  onScriptPresetConsumed,
+}: {
+  scriptPreset?: VideoScriptPreset;
+  onScriptPresetConsumed?: () => void;
+} = {}) {
   const videoInputId = useId();
   const videoCameraInputId = useId();
   const [phase, setPhase] = useState<VideoStudioPhase>("SELECT_BLOG_CONTEXT");
+  const [scriptPreset, setScriptPreset] =
+    useState<VideoScriptPreset>(scriptPresetProp);
+
+  useEffect(() => {
+    if (scriptPresetProp === "app_invite") {
+      setScriptPreset("app_invite");
+      onScriptPresetConsumed?.();
+    }
+  }, [scriptPresetProp, onScriptPresetConsumed]);
 
   // Step 1
   const [posts, setPosts] = useState<CreatorPublishedPost[]>([]);
@@ -448,6 +465,7 @@ export default function VideoWizard() {
           action: "generate_video_ideas",
           blogTitle: post.title,
           bodyMarkdown: post.bodyMarkdown || post.bodyPreview,
+          scriptPreset,
           post: {
             title: post.title,
             excerpt: post.excerpt,
@@ -520,6 +538,7 @@ export default function VideoWizard() {
           bodyMarkdown: selectedPost.bodyMarkdown || selectedPost.bodyPreview,
           replaceIndex: index,
           existingIdeas: ideas,
+          scriptPreset,
           post: {
             title: selectedPost.title,
             bodyMarkdown:
@@ -1196,6 +1215,41 @@ export default function VideoWizard() {
             Or start a new shoot
           </p>
 
+          <fieldset className="space-y-2">
+            <legend className="font-sans text-xs font-bold uppercase tracking-[0.1em] text-brand-muted">
+              Script preset
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setScriptPreset("standard")}
+                className={`min-h-10 border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] ${
+                  scriptPreset === "standard"
+                    ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                type="button"
+                onClick={() => setScriptPreset("app_invite")}
+                className={`min-h-10 border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] ${
+                  scriptPreset === "app_invite"
+                    ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                App invite
+              </button>
+            </div>
+            {scriptPreset === "app_invite" ? (
+              <p className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-brand-muted">
+                {APP_INVITE_SCRIPT_GUIDANCE}
+              </p>
+            ) : null}
+          </fieldset>
+
           {postsLoading ? (
             <p className="flex items-center gap-2 font-sans text-sm text-brand-muted">
               <Spinner dark /> Loading published posts…
@@ -1320,6 +1374,22 @@ export default function VideoWizard() {
                     <span className="font-bold text-brand-orange">Shoot: </span>
                     {idea.shootingConcept}
                   </p>
+                ) : null}
+                {idea.scriptBeats ? (
+                  <ol className="mt-3 space-y-1 border border-brand-ink/10 bg-surface px-3 py-2 font-sans text-xs leading-relaxed text-brand-ink">
+                    <li>
+                      <span className="font-bold text-brand-orange">Hook: </span>
+                      {idea.scriptBeats.hook}
+                    </li>
+                    <li>
+                      <span className="font-bold text-brand-orange">Tip: </span>
+                      {idea.scriptBeats.tip}
+                    </li>
+                    <li>
+                      <span className="font-bold text-brand-orange">CTA: </span>
+                      {idea.scriptBeats.cta}
+                    </li>
+                  </ol>
                 ) : null}
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                   <button

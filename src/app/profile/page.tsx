@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
+import InviteFriendsCard from "@/components/auth/InviteFriendsCard";
 import ProfileGeoForm from "@/components/auth/ProfileGeoForm";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import {
@@ -35,6 +36,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const access = await resolveAccessDecision(supabase, user);
   const profile = await getMemberProfile(supabase, user.id);
   const geoReady = hasRequiredGeo(profile);
+
+  const { count: referralCount } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("referred_by", user.id);
 
   return (
     <>
@@ -95,6 +101,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           <ProfileGeoForm
             profile={profile}
             requireGeo={requireGeo && !geoReady}
+          />
+
+          <InviteFriendsCard
+            referralCode={profile?.referral_code ?? null}
+            referralCount={referralCount ?? 0}
           />
 
           {access.status === "creator" ? (

@@ -10,6 +10,10 @@ import type {
 } from "@/lib/blog/blog-assist";
 import { markdownToBlocks } from "@/lib/blog/markdown-blocks";
 import { readApiJson } from "@/lib/http/read-api-json";
+import {
+  LOCAL_GROWTH_ARTICLE_SEED,
+  type BlogArticleType,
+} from "@/lib/marketing/campaign-templates";
 
 type WizardPhase =
   | "PHASE_1_INPUT"
@@ -70,24 +74,21 @@ type BlogWizardProps = {
   onPublished?: (slug: string) => void;
   /** Prefill Phase 1 notes (e.g. from member Library search gaps). */
   seedNotes?: string | null;
+  /** Phase 1b article type — Local growth forces Engine CTA packaging. */
+  initialArticleType?: BlogArticleType;
 };
 
 export default function BlogWizard({
   onPublished,
   seedNotes = null,
+  initialArticleType = "standard",
 }: BlogWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("PHASE_1_INPUT");
 
   // Phase 1
   const [notes, setNotes] = useState(() => seedNotes?.trim() || "");
-
-  useEffect(() => {
-    const next = seedNotes?.trim();
-    if (!next) return;
-    setNotes(next);
-    setPhase("PHASE_1_INPUT");
-  }, [seedNotes]);
-
+  const [articleType, setArticleType] =
+    useState<BlogArticleType>(initialArticleType);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
 
@@ -119,6 +120,20 @@ export default function BlogWizard({
     slotId: string | null;
   } | null>(null);
 
+  useEffect(() => {
+    const next = seedNotes?.trim();
+    if (!next) return;
+    setNotes(next);
+    setPhase("PHASE_1_INPUT");
+  }, [seedNotes]);
+
+  useEffect(() => {
+    setArticleType(initialArticleType);
+    if (initialArticleType === "local_growth") {
+      setIncludeGrowthCta(true);
+    }
+  }, [initialArticleType]);
+
   const chosen = chosenIndex !== null ? options[chosenIndex] : null;
   const talkingPoints = promptsForOption(chosen);
 
@@ -132,7 +147,11 @@ export default function BlogWizard({
       const res = await fetch("/api/creator/blog-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate_ideas", notes }),
+        body: JSON.stringify({
+          action: "generate_ideas",
+          notes,
+          articleType,
+        }),
       });
       const parsed = await readApiJson<{
         ok: boolean;
@@ -205,6 +224,7 @@ export default function BlogWizard({
           notes,
           targetAudience: chosen.targetAudience,
           talkingPoints,
+          articleType,
           answers: talkingPoints.map((prompt, i) => ({
             prompt,
             answer: answers[i] ?? "",
@@ -314,7 +334,8 @@ export default function BlogWizard({
           status,
           coverImage,
           coverAlt: coverImage ? coverAlt : undefined,
-          includeGrowthCta,
+          includeGrowthCta:
+            articleType === "local_growth" ? true : includeGrowthCta,
         }),
       });
       const data = (await res.json()) as {
@@ -401,6 +422,47 @@ export default function BlogWizard({
             Workouts, incline bench PRs, meals, mental wins... quick fragments
             are perfect. No paragraphs needed.
           </p>
+
+          <fieldset className="space-y-2">
+            <legend className="font-sans text-xs font-bold uppercase tracking-[0.1em] text-brand-muted">
+              Article type
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setArticleType("standard")}
+                className={`min-h-10 border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] ${
+                  articleType === "standard"
+                    ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                Standard Chronicle
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setArticleType("local_growth");
+                  setIncludeGrowthCta(true);
+                  if (!notes.trim()) setNotes(LOCAL_GROWTH_ARTICLE_SEED);
+                }}
+                className={`min-h-10 border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] ${
+                  articleType === "local_growth"
+                    ? "border-brand-orange bg-brand-orange/10 text-brand-orange"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                Local growth
+              </button>
+            </div>
+            {articleType === "local_growth" ? (
+              <p className="font-sans text-xs leading-relaxed text-brand-muted">
+                SWLA fitness, Rouses-run meal prep, or gym tracking habits —
+                publish always inserts Engine CTA + mid AdSlot (Phase 0d).
+              </p>
+            ) : null}
+          </fieldset>
+
           <textarea
             id="wizard-notes"
             value={notes}

@@ -1,4 +1,8 @@
 import { GA_MEASUREMENT_ID } from "@/lib/seo/site";
+import {
+  buildCampaignSignupPath,
+  type SignupCampaignParams,
+} from "@/lib/marketing/campaign-attribution";
 
 declare global {
   interface Window {
@@ -11,7 +15,8 @@ export type GaGrowthEvent =
   | "signup_start"
   | "signup_complete"
   | "cta_click"
-  | "grocery_share_view";
+  | "grocery_share_view"
+  | "invite_landing_view";
 
 type GaEventParams = Record<string, string | number | boolean | undefined>;
 
@@ -50,8 +55,21 @@ export function trackGroceryShareView(): void {
   trackGaEvent("grocery_share_view");
 }
 
+export function trackInviteLandingView(src?: string, gym?: string): void {
+  trackGaEvent("invite_landing_view", {
+    campaign_src: src,
+    campaign_gym: gym,
+  });
+}
+
 /** Public signup deep-link used across marketing CTAs. */
-export function signupHref(nextPath = "/app"): string {
+export function signupHref(
+  nextPath = "/app",
+  campaign?: SignupCampaignParams,
+): string {
+  if (campaign) {
+    return buildCampaignSignupPath({ ...campaign, nextPath });
+  }
   const next = encodeURIComponent(nextPath);
   return `/?auth=signup&next=${next}`;
 }

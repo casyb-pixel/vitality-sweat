@@ -30,6 +30,12 @@ export type ShortFormVideoIdea = {
   videoHook: string;
   /** What Hunter should visually capture in the gym. */
   shootingConcept: string;
+  /** Optional App invite beat sheet (hook → tip → CTA). */
+  scriptBeats?: {
+    hook: string;
+    tip: string;
+    cta: string;
+  } | null;
 };
 
 /**

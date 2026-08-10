@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { trackCtaClick, signupHref } from "@/lib/analytics/ga";
+import type { SignupCampaignParams } from "@/lib/marketing/campaign-attribution";
 
 type SignupCtaLinkProps = {
   location: string;
   label?: string;
   href?: string;
   nextPath?: string;
+  campaign?: SignupCampaignParams;
   className?: string;
   children: React.ReactNode;
   onNavigate?: () => void;
@@ -21,11 +23,14 @@ export default function SignupCtaLink({
   label,
   href,
   nextPath = "/app",
+  campaign,
   className,
   children,
   onNavigate,
 }: SignupCtaLinkProps) {
-  const target = href ?? signupHref(nextPath);
+  const target =
+    href ??
+    signupHref(nextPath, campaign ? { ...campaign, nextPath } : undefined);
   const resolvedLabel =
     label ?? (typeof children === "string" ? children : "Create free account");
 

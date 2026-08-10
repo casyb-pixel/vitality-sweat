@@ -12,6 +12,8 @@ export type MemberProfile = {
   city: string | null;
   zip_code: string | null;
   region: string | null;
+  referral_code: string | null;
+  referred_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -92,7 +94,7 @@ export async function getMemberProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, role, display_name, avatar_url, city, zip_code, region, created_at, updated_at",
+      "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, created_at, updated_at",
     )
     .eq("id", userId)
     .maybeSingle();

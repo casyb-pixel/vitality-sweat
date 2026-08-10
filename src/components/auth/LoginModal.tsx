@@ -12,6 +12,16 @@ import { trackSignupComplete, trackSignupStart } from "@/lib/analytics/ga";
 import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
+import {
+  clearRememberedReferralCode,
+  normalizeReferralCode,
+  readRememberedReferralCode,
+} from "@/lib/referrals/codes";
+import {
+  campaignToSignupMetadata,
+  clearRememberedCampaignAttribution,
+  readRememberedCampaignAttribution,
+} from "@/lib/marketing/campaign-attribution";
 import { createClient } from "@/utils/supabase/client";
 
 type AuthMode = "password" | "magic";
@@ -23,6 +33,7 @@ type LoginModalProps = {
   nextPath: string;
   initialView?: PortalView;
   initialIntent?: AuthIntent;
+  initialReferralCode?: string | null;
   onClose: () => void;
 };
 
@@ -34,6 +45,7 @@ export default function LoginModal({
   nextPath,
   initialView = "form",
   initialIntent = "signin",
+  initialReferralCode = null,
   onClose,
 }: LoginModalProps) {
   const router = useRouter();
@@ -46,19 +58,28 @@ export default function LoginModal({
   const [city, setCity] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [region, setRegion] = useState("");
+  const [referralCode, setReferralCode] = useState<string | null>(
+    normalizeReferralCode(initialReferralCode),
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (open) {
       setView(initialView);
-      setIntent(initialIntent);
+      const remembered = readRememberedReferralCode();
+      const resolvedRef =
+        normalizeReferralCode(initialReferralCode) ?? remembered;
+      setReferralCode(resolvedRef);
+      const nextIntent =
+        initialIntent === "signup" || resolvedRef ? "signup" : initialIntent;
+      setIntent(nextIntent);
       setError(null);
-      if (initialIntent === "signup" && initialView === "form") {
+      if (nextIntent === "signup" && initialView === "form") {
         trackSignupStart("deep_link");
       }
     }
-  }, [open, initialView, initialIntent]);
+  }, [open, initialView, initialIntent, initialReferralCode]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,11 +109,25 @@ export default function LoginModal({
   }
 
   function geoMetadata() {
-    return {
+    const meta: Record<string, string> = {
       city: city.trim(),
       zip_code: normalizeUsZip(zipCode),
-      region: region.trim() || undefined,
     };
+    if (region.trim()) meta.region = region.trim();
+    if (referralCode) meta.ref = referralCode;
+    Object.assign(
+      meta,
+      campaignToSignupMetadata(readRememberedCampaignAttribution()),
+    );
+    return meta;
+  }
+
+  function triggerWelcomeEmail() {
+    void fetch("/api/app/emails/welcome", { method: "POST" }).catch(() => {
+      // Non-blocking
+    });
+    clearRememberedReferralCode();
+    clearRememberedCampaignAttribution();
   }
 
   function validateSignupGeo(): string | null {
@@ -187,6 +222,7 @@ export default function LoginModal({
               })
               .eq("id", data.session.user.id);
             trackSignupComplete("password");
+            triggerWelcomeEmail();
             await afterAuthenticated();
             return;
           }
@@ -601,6 +637,16 @@ export default function LoginModal({
                       />
                     </div>
                   </div>
+                ) : null}
+
+                {isSignup && referralCode ? (
+                  <p className="font-sans text-xs text-brand-muted">
+                    Joining via invite code{" "}
+                    <span className="font-semibold text-brand-ink">
+                      {referralCode}
+                    </span>
+                    .
+                  </p>
                 ) : null}
 
                 {error ? (

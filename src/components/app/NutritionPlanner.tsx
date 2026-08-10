@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
+import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import { normalizeDishKey } from "@/lib/fitness/dishes";
 import type {
   DishRatingsMap,
@@ -497,6 +498,7 @@ export default function NutritionPlanner({
             Share sends a link your spouse can open without signing in — print
             works from here or the share page.
           </p>
+          <InviteFriendsPrompt variant="nutrition" />
         </section>
       ) : null}
 
