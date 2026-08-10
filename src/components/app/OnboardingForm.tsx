@@ -9,6 +9,7 @@ import {
 } from "@/lib/fitness/profile";
 import {
   FITNESS_LEVEL_LABELS,
+  GOALS_REQUIRING_TARGET_WEIGHT,
   PRIMARY_GOAL_LABELS,
   type FitnessLevel,
   type PrimaryGoal,
@@ -94,6 +95,13 @@ export default function OnboardingForm({
         if (!primaryGoal) {
           setError("Select a primary fitness goal.");
           return;
+        }
+        if (GOALS_REQUIRING_TARGET_WEIGHT.has(primaryGoal)) {
+          const target = Number(targetWeightLb);
+          if (!Number.isFinite(target) || target <= 0) {
+            setError("Enter your target weight in pounds.");
+            return;
+          }
         }
 
         const res = await fetch("/api/app/fitness-profile", {
@@ -335,7 +343,9 @@ export default function OnboardingForm({
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="targetWeight" className={labelClass}>
-              Target weight (lb, optional)
+              {primaryGoal && GOALS_REQUIRING_TARGET_WEIGHT.has(primaryGoal)
+                ? "Target weight (lb)"
+                : "Target weight (lb, optional)"}
             </label>
             <input
               id="targetWeight"
@@ -343,6 +353,11 @@ export default function OnboardingForm({
               min={50}
               max={800}
               step="0.1"
+              required={
+                Boolean(
+                  primaryGoal && GOALS_REQUIRING_TARGET_WEIGHT.has(primaryGoal),
+                )
+              }
               value={targetWeightLb}
               onChange={(e) => setTargetWeightLb(e.target.value)}
               className={fieldClass}

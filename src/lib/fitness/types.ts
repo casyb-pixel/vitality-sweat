@@ -3,12 +3,76 @@ export type Sex = "male" | "female";
 export type FitnessLevel = "beginner" | "intermediate" | "advanced";
 
 export type PrimaryGoal =
-  | "target_weight"
-  | "marathon_training"
-  | "sports_training"
-  | "general_fitness"
+  | "weight_loss"
   | "muscle_gain"
-  | "endurance";
+  | "strength"
+  | "endurance"
+  | "general_fitness"
+  | "sports_training"
+  | "marathon_training";
+
+/** Goals that need a numeric target weight for diet + training alignment. */
+export const GOALS_REQUIRING_TARGET_WEIGHT: ReadonlySet<PrimaryGoal> = new Set([
+  "weight_loss",
+  "muscle_gain",
+]);
+
+/**
+ * Training prefs for AI workout generation.
+ * Stored as real fitness_profiles columns (not goal_details).
+ * Left unset at onboarding; the Workout Agent (or a later settings UI) fills them.
+ */
+export type PreferredSplit =
+  | "full_body"
+  | "upper_lower"
+  | "push_pull_legs"
+  | "ai_choose";
+
+export type TrainingEquipment =
+  | "gym"
+  | "home"
+  | "free_weight"
+  | "machine"
+  | "bodyweight"
+  | "bands"
+  | "cable"
+  | "cardio_machines";
+
+export const TRAINING_EQUIPMENT_OPTIONS: readonly TrainingEquipment[] = [
+  "gym",
+  "home",
+  "free_weight",
+  "machine",
+  "bodyweight",
+  "bands",
+  "cable",
+  "cardio_machines",
+] as const;
+
+export const PREFERRED_SPLIT_LABELS: Record<PreferredSplit, string> = {
+  full_body: "Full body",
+  upper_lower: "Upper / lower",
+  push_pull_legs: "Push / pull / legs",
+  ai_choose: "Let AI choose",
+};
+
+export type TrainingPreferences = {
+  days_per_week: number | null;
+  session_minutes: number | null;
+  equipment: string[];
+  focus_muscles: string[];
+  avoidances: string | null;
+  preferred_split: PreferredSplit | null;
+};
+
+export type TrainingPreferencesInput = {
+  days_per_week?: number | null;
+  session_minutes?: number | null;
+  equipment?: string[];
+  focus_muscles?: string[];
+  avoidances?: string | null;
+  preferred_split?: PreferredSplit | null;
+};
 
 export type UnitSystem = "imperial" | "metric";
 
@@ -37,6 +101,13 @@ export type FitnessProfile = {
   food_allergies: string[];
   health_conditions: string[];
   activity_restrictions: string | null;
+  /** Training prefs for AI workouts; optional until Workout Agent collects them. */
+  days_per_week: number | null;
+  session_minutes: number | null;
+  equipment: string[];
+  focus_muscles: string[];
+  avoidances: string | null;
+  preferred_split: PreferredSplit | null;
   meal_rejects?: string[];
   dish_ratings?: DishRatingsMap;
   onboarding_completed_at: string | null;
@@ -59,6 +130,13 @@ export type FitnessProfileInput = {
   food_allergies?: string[];
   health_conditions?: string[];
   activity_restrictions?: string | null;
+  /** Optional; usually filled later by the Workout Agent. */
+  days_per_week?: number | null;
+  session_minutes?: number | null;
+  equipment?: string[];
+  focus_muscles?: string[];
+  avoidances?: string | null;
+  preferred_split?: PreferredSplit | null;
   /** Written to public.profiles (not fitness_profiles). */
   city: string;
   zip_code: string;
@@ -98,8 +176,66 @@ export type WorkoutSession = {
   ended_at: string | null;
   status: WorkoutSessionStatus;
   notes: string | null;
+  /** Optional link to a planned workout_program_days row. */
+  program_day_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type WorkoutProgramStatus = "draft" | "active" | "archived";
+
+export type WorkoutSetStyle =
+  | "strength_heavy"
+  | "hypertrophy"
+  | "endurance_light"
+  | "metabolic";
+
+export const WORKOUT_SET_STYLE_LABELS: Record<WorkoutSetStyle, string> = {
+  strength_heavy: "Strength (heavy)",
+  hypertrophy: "Hypertrophy",
+  endurance_light: "Endurance (light)",
+  metabolic: "Metabolic",
+};
+
+export type WorkoutProgram = {
+  id: string;
+  user_id: string;
+  status: WorkoutProgramStatus;
+  primary_goal: PrimaryGoal | null;
+  days_per_week: number | null;
+  session_minutes: number | null;
+  summary: string | null;
+  preferences: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkoutProgramDay = {
+  id: string;
+  program_id: string;
+  day_index: number;
+  label: string;
+  focus: string | null;
+  estimated_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkoutProgramExercise = {
+  id: string;
+  day_id: string;
+  exercise_id: string;
+  sort_order: number;
+  sets: number;
+  rep_min: number | null;
+  rep_max: number | null;
+  set_style: WorkoutSetStyle;
+  rest_sec: number | null;
+  coach_notes: string | null;
+  baseline_weight_lb: number | null;
+  baseline_reps: number | null;
+  created_at: string;
 };
 
 export type WorkoutSet = {
@@ -224,12 +360,13 @@ export const FITNESS_LEVEL_LABELS: Record<FitnessLevel, string> = {
 };
 
 export const PRIMARY_GOAL_LABELS: Record<PrimaryGoal, string> = {
-  target_weight: "Target weight",
-  marathon_training: "Marathon training",
-  sports_training: "Sports training",
-  general_fitness: "General fitness",
-  muscle_gain: "Muscle gain",
+  weight_loss: "Weight loss",
+  muscle_gain: "Muscle gain / bodybuilding",
+  strength: "Strength",
   endurance: "Endurance",
+  general_fitness: "General fitness",
+  sports_training: "Sports training",
+  marathon_training: "Marathon training",
 };
 
 export const DIFFICULTY_LABELS: Record<number, string> = {

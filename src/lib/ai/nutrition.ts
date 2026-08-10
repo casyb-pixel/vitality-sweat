@@ -3,6 +3,7 @@ import type {
   GroceryItem,
   MealDay,
   MealPlanPayload,
+  PrimaryGoal,
 } from "@/lib/fitness/types";
 import {
   FITNESS_LEVEL_LABELS,
@@ -15,6 +16,23 @@ import {
   stripEmDashesDeep,
 } from "@/lib/text/humanize-copy";
 
+const PRIMARY_GOAL_NUTRITION_COACHING: Record<PrimaryGoal, string> = {
+  weight_loss:
+    "Bias toward a moderate calorie deficit with high protein, high volume vegetables, and filling fiber so meals support fat loss without leaving them drained.",
+  muscle_gain:
+    "Prioritize a calorie surplus with protein at every meal, carb timing around training, and enough total food to support muscle growth and recovery.",
+  strength:
+    "Emphasize protein plus carb-rich meals that fuel heavy lifting sessions, with enough total calories to recover between hard training days.",
+  endurance:
+    "Lean on steady carbs for sustained energy, solid hydration-friendly meals, and enough protein to protect muscle during longer aerobic work.",
+  general_fitness:
+    "Keep meals balanced and sustainable: solid protein, colorful plants, and practical portions that support everyday energy without extremes.",
+  sports_training:
+    "Fuel practices and games with carbs for explosive work, protein for repair, and simple meals that sit well before and after competition.",
+  marathon_training:
+    "Center the plan on carb availability for long runs, easy-to-digest pre-run meals, and post-run protein plus carbs for recovery.",
+};
+
 function profileContext(profile: FitnessProfile): string[] {
   const age = profile.birthdate ? ageFromBirthdate(profile.birthdate) : null;
   const level = profile.fitness_level
@@ -23,6 +41,9 @@ function profileContext(profile: FitnessProfile): string[] {
   const goal = profile.primary_goal
     ? PRIMARY_GOAL_LABELS[profile.primary_goal]
     : "general fitness";
+  const goalCoaching = profile.primary_goal
+    ? PRIMARY_GOAL_NUTRITION_COACHING[profile.primary_goal]
+    : PRIMARY_GOAL_NUTRITION_COACHING.general_fitness;
   const rejects = profile.meal_rejects ?? [];
 
   return [
@@ -33,6 +54,7 @@ function profileContext(profile: FitnessProfile): string[] {
     `- Target weight: ${profile.target_weight_lb ?? "none"} lb`,
     `- Fitness level: ${level}`,
     `- Primary goal: ${goal}`,
+    `- Goal nutrition coaching: ${goalCoaching}`,
     `- Disliked foods: ${profile.disliked_foods.join(", ") || "none listed"}`,
     `- Food allergies: ${profile.food_allergies.join(", ") || "none listed"}`,
     `- Health conditions: ${profile.health_conditions.join(", ") || "none listed"}`,
