@@ -26,6 +26,7 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
   const params = searchParams ? await searchParams : {};
   const src = firstParam(params.src);
   const gym = firstParam(params.gym);
+  const market = firstParam(params.market);
   const utmSource = firstParam(params.utm_source);
   const utmMedium = firstParam(params.utm_medium);
   const utmCampaign = firstParam(params.utm_campaign);
@@ -40,6 +41,7 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
           <InviteLandingClient
             src={src}
             gym={gym}
+            market={market}
             utmSource={utmSource}
             utmMedium={utmMedium}
             utmCampaign={utmCampaign}

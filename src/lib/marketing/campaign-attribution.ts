@@ -10,6 +10,7 @@ const STORAGE_KEY = "vs_campaign_attribution";
 export type CampaignAttribution = {
   src: string | null;
   gym: string | null;
+  market: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -20,6 +21,7 @@ export type CampaignAttribution = {
 export type CampaignQueryInput = {
   src?: string | null;
   gym?: string | null;
+  market?: string | null;
   utm_source?: string | null;
   utm_medium?: string | null;
   utm_campaign?: string | null;
@@ -49,18 +51,28 @@ export function parseCampaignAttribution(
 
   const src = cleanParam(get("src"));
   const gym = cleanParam(get("gym"), 48);
+  const market = cleanParam(get("market"), 32);
   const utmSource = cleanParam(get("utm_source"));
   const utmMedium = cleanParam(get("utm_medium"));
   const utmCampaign = cleanParam(get("utm_campaign"), 80);
   const utmContent = cleanParam(get("utm_content"), 80);
 
-  if (!src && !gym && !utmSource && !utmMedium && !utmCampaign && !utmContent) {
+  if (
+    !src &&
+    !gym &&
+    !market &&
+    !utmSource &&
+    !utmMedium &&
+    !utmCampaign &&
+    !utmContent
+  ) {
     return null;
   }
 
   return {
     src,
     gym,
+    market,
     utmSource,
     utmMedium,
     utmCampaign,
@@ -115,6 +127,7 @@ export function campaignToSignupMetadata(
   const meta: Record<string, string> = {};
   if (campaign.src) meta.campaign_src = campaign.src;
   if (campaign.gym) meta.campaign_gym = campaign.gym;
+  if (campaign.market) meta.campaign_market = campaign.market;
   if (campaign.utmSource) meta.utm_source = campaign.utmSource;
   if (campaign.utmMedium) meta.utm_medium = campaign.utmMedium;
   if (campaign.utmCampaign) meta.utm_campaign = campaign.utmCampaign;
@@ -125,6 +138,7 @@ export function campaignToSignupMetadata(
 export type SignupCampaignParams = {
   src?: string | null;
   gym?: string | null;
+  market?: string | null;
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
@@ -141,6 +155,7 @@ export function buildCampaignSignupPath(params: SignupCampaignParams = {}): stri
   if (params.ref) query.set("ref", params.ref);
   if (params.src) query.set("src", params.src);
   if (params.gym) query.set("gym", params.gym);
+  if (params.market) query.set("market", params.market);
   if (params.utmSource) query.set("utm_source", params.utmSource);
   if (params.utmMedium) query.set("utm_medium", params.utmMedium);
   if (params.utmCampaign) query.set("utm_campaign", params.utmCampaign);

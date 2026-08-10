@@ -3,6 +3,12 @@
  * Aggregates only — never return member emails or other PII.
  */
 
+import {
+  METROS,
+  metroForZip,
+  type MetroId,
+} from "@/lib/markets/metros";
+
 /** Lafayette core ZIPs commonly used in local gym/grocery pitches. */
 export const LAFAYETTE_CORE_ZIPS = [
   "70501",
@@ -42,10 +48,19 @@ export type AudienceZipRow = {
   referred: number;
   /** True when ZIP is in the Acadiana / Lafayette focus set. */
   isFocus: boolean;
+  metroId: MetroId | null;
 };
 
 export type AudienceCityRow = {
   city: string;
+  registered: number;
+  active28d: number;
+  referred: number;
+};
+
+export type AudienceMetroRow = {
+  metroId: MetroId | "unmapped";
+  label: string;
   registered: number;
   active28d: number;
   referred: number;
@@ -72,6 +87,7 @@ export type AudienceMetrics = {
   referredWithZip: number;
   byZip: AudienceZipRow[];
   byCity: AudienceCityRow[];
+  byMetro: AudienceMetroRow[];
   pitchSummary: string;
 };
 
@@ -149,6 +165,15 @@ export function buildAudienceMetrics(input: {
     }
   >();
 
+  const metroBuckets = new Map<
+    MetroId | "unmapped",
+    {
+      registeredIds: Set<string>;
+      activeIds: Set<string>;
+      referredIds: Set<string>;
+    }
+  >();
+
   let referredWithZip = 0;
 
   for (const profile of profilesWithZip) {
@@ -156,6 +181,7 @@ export function buildAudienceMetrics(input: {
     if (!zip5) continue;
     const isReferred = Boolean(profile.referred_by);
     if (isReferred) referredWithZip += 1;
+    const metroId = metroForZip(zip5);
 
     let zipBucket = zipBuckets.get(zip5);
     if (!zipBucket) {
@@ -202,6 +228,24 @@ export function buildAudienceMetrics(input: {
     if (isReferred) {
       cityBucket.referredIds.add(profile.id);
     }
+
+    const metroKey = metroId ?? "unmapped";
+    let metroBucket = metroBuckets.get(metroKey);
+    if (!metroBucket) {
+      metroBucket = {
+        registeredIds: new Set(),
+        activeIds: new Set(),
+        referredIds: new Set(),
+      };
+      metroBuckets.set(metroKey, metroBucket);
+    }
+    metroBucket.registeredIds.add(profile.id);
+    if (activeIds.has(profile.id)) {
+      metroBucket.activeIds.add(profile.id);
+    }
+    if (isReferred) {
+      metroBucket.referredIds.add(profile.id);
+    }
   }
 
   const byZip: AudienceZipRow[] = [...zipBuckets.entries()]
@@ -213,6 +257,7 @@ export function buildAudienceMetrics(input: {
       active28d: b.activeIds.size,
       referred: b.referredIds.size,
       isFocus: focusSet.has(zipCode),
+      metroId: metroForZip(zipCode),
     }))
     .sort((a, b) => {
       if (a.isFocus !== b.isFocus) return a.isFocus ? -1 : 1;
@@ -231,6 +276,26 @@ export function buildAudienceMetrics(input: {
     .sort((a, b) => {
       if (b.active28d !== a.active28d) return b.active28d - a.active28d;
       return b.registered - a.registered;
+    });
+
+  const metroLabel = (id: MetroId | "unmapped") =>
+    id === "unmapped"
+      ? "Unmapped ZIP"
+      : (METROS.find((m) => m.id === id)?.label ?? id);
+
+  const byMetro: AudienceMetroRow[] = [...metroBuckets.entries()]
+    .map(([metroId, b]) => ({
+      metroId,
+      label: metroLabel(metroId),
+      registered: b.registeredIds.size,
+      active28d: b.activeIds.size,
+      referred: b.referredIds.size,
+    }))
+    .sort((a, b) => {
+      if (a.metroId === "lafayette") return -1;
+      if (b.metroId === "lafayette") return 1;
+      if (b.active28d !== a.active28d) return b.active28d - a.active28d;
+      return a.label.localeCompare(b.label);
     });
 
   let lafayetteCoreActive28d = 0;
@@ -256,6 +321,7 @@ export function buildAudienceMetrics(input: {
     lafayetteCoreActive28d,
     acadianaFocusActive28d,
     byZip,
+    byMetro,
     workoutsLogged28d: input.workouts.length,
     groceryListsCreated28d,
     activeUsers28d: activeIds.size,
@@ -281,6 +347,7 @@ export function buildAudienceMetrics(input: {
     referredWithZip,
     byZip,
     byCity,
+    byMetro,
     pitchSummary,
   };
 }
@@ -289,6 +356,7 @@ export function buildPitchSummary(input: {
   lafayetteCoreActive28d: number;
   acadianaFocusActive28d: number;
   byZip: AudienceZipRow[];
+  byMetro: AudienceMetroRow[];
   workoutsLogged28d: number;
   groceryListsCreated28d: number;
   activeUsers28d: number;
@@ -310,6 +378,15 @@ export function buildPitchSummary(input: {
     `${input.referredTotal} referred signups platform-wide · ${input.referredWithZip} referred with ZIP (local virality).`,
   );
 
+  const metroLine = input.byMetro
+    .filter((m) => m.metroId !== "unmapped")
+    .slice(0, 6)
+    .map((m) => `${m.label}: ${m.active28d} active / ${m.registered} registered`)
+    .join("; ");
+  if (metroLine) {
+    lines.push(`By metro — ${metroLine}.`);
+  }
+
   const topFocus = input.byZip
     .filter((z) => z.isFocus && (z.active28d > 0 || z.registered > 0))
     .slice(0, 6);
@@ -320,10 +397,10 @@ export function buildPitchSummary(input: {
           `${z.zipCode}${z.city ? ` (${z.city})` : ""}: ${z.active28d} active / ${z.registered} registered / ${z.referred} referred`,
       )
       .join("; ");
-    lines.push(`Top focus ZIPs — ${detail}.`);
+    lines.push(`Top focus ZIPs - ${detail}.`);
   } else {
     lines.push(
-      "No ZIP-tagged members in the Acadiana focus set yet — empty state, not estimated.",
+      "No ZIP-tagged members in the Acadiana focus set yet - empty state, not estimated.",
     );
   }
 

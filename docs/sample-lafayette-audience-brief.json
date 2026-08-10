@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-08-10T15:40:00.000Z",
+  "marketFocus": "lafayette",
+  "marketLabel": "Lafayette metro",
+  "goalNote": "Playbook toward ~5,000 actives: densify Lafayette, then replicate Lake Charles / New Iberia with the same free Engine + sponsor slots.",
+  "activeDefinition": "Active (28d) = member with ≥1 workout session started OR ≥1 meal plan created/updated in the last 28 days.",
+  "metrics": {
+    "registeredWithZip": 0,
+    "registeredTotal": 4,
+    "activeUsers28d": 2,
+    "workoutsLogged28d": 0,
+    "groceryListsCreated28d": 2,
+    "referredTotal": 0,
+    "referredWithZip": 0
+  },
+  "byMetro": [],
+  "byZipTop": [],
+  "engagement": {
+    "workoutsLogged28d": 0,
+    "groceryListsCreated28d": 2,
+    "groceryListsShareable28d": 2
+  },
+  "topSlots": [],
+  "campaignProof": null,
+  "rateCardPackages": [
+    {
+      "id": "starter",
+      "name": "Starter flight (30 days)",
+      "impressions": "~25k–50k estimated impressions*",
+      "slots": "home-below-hero + chronicles-top",
+      "notes": "Best for a single gym or grocery test in one metro."
+    },
+    {
+      "id": "growth",
+      "name": "Growth flight (60 days)",
+      "impressions": "~75k–150k estimated impressions*",
+      "slots": "home + chronicles + blog-inline",
+      "notes": "Includes grocery-footer add-on for Rouses-style share loops."
+    },
+    {
+      "id": "beachhead",
+      "name": "Beachhead metro (90 days)",
+      "impressions": "~200k+ estimated impressions*",
+      "slots": "Full public + app-home inventory",
+      "notes": "Paired with Audience Brief + weekly challenge content cadence."
+    }
+  ],
+  "_note": "Sample from live DB shape 2026-08-10. Export live from /api/creator/audience/brief?market=lafayette"
+}

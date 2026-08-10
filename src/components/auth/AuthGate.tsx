@@ -89,6 +89,7 @@ function AuthQueryListener() {
     params.delete("utm_medium");
     params.delete("utm_campaign");
     params.delete("utm_content");
+    params.delete("market");
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);

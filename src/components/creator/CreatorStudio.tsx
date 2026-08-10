@@ -6,13 +6,14 @@ import BlogWizard from "@/components/creator/BlogWizard";
 import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
 import GrowthCampaignPanel from "@/components/creator/GrowthCampaignPanel";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
+import SponsorsPanel from "@/components/creator/SponsorsPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
 import type {
   BlogArticleType,
   VideoScriptPreset,
 } from "@/lib/marketing/campaign-templates";
 
-type StudioTab = "projects" | "blog" | "video" | "audience";
+type StudioTab = "projects" | "blog" | "video" | "audience" | "sponsors";
 
 type CreatorStudioProps = {
   creatorLabel: string;
@@ -23,6 +24,7 @@ const TABS: { id: StudioTab; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
+  { id: "sponsors", label: "Sponsors" },
   { id: "audience", label: "Audience" },
 ];
 
@@ -80,7 +82,9 @@ export default function CreatorStudio({
         ? "Log today, publish tonight"
         : tab === "audience"
           ? "Prove local density"
-          : "7-Day Marketing Projects";
+          : tab === "sponsors"
+            ? "Sell local slots"
+            : "7-Day Marketing Projects";
 
   const blurb =
     tab === "video"
@@ -88,8 +92,10 @@ export default function CreatorStudio({
       : tab === "blog"
         ? " Four quick steps from gym notes to a live Chronicle — no paragraphs required."
         : tab === "audience"
-          ? " ZIP-level active members for gym and grocery sponsorship pitches — real counts only."
-          : " Growth Campaign templates + active publishes with swipe copy and a 6-item delivery checklist.";
+          ? " ZIP-level active members plus campaign deliverable proof for sponsorship pitches."
+          : tab === "sponsors"
+            ? " CRUD sponsors, flights, creatives, and slot assignments — house CTA fills unsold inventory."
+            : " Growth Campaign templates + active publishes with swipe copy and a 6-item delivery checklist.";
 
   return (
     <div className="space-y-6 pb-10 pt-4 sm:space-y-8 sm:pt-6">
@@ -177,6 +183,16 @@ export default function CreatorStudio({
             seedNotes={seedNotes}
             initialArticleType={articleType}
           />
+        </div>
+      ) : null}
+
+      {tab === "sponsors" ? (
+        <div
+          id="studio-panel-sponsors"
+          role="tabpanel"
+          aria-labelledby="studio-tab-sponsors"
+        >
+          <SponsorsPanel />
         </div>
       ) : null}
 

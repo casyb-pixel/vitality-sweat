@@ -202,7 +202,10 @@ export function campaignCtaAbsoluteUrl(
 }
 
 /** Public invite landing for gym QR prints. */
-export function buildGymInvitePath(gymSlug: string): string {
+export function buildGymInvitePath(
+  gymSlug: string,
+  market?: string | null,
+): string {
   const gym = gymSlug.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
   const qs = new URLSearchParams({
     src: "gym",
@@ -211,6 +214,7 @@ export function buildGymInvitePath(gymSlug: string): string {
     utm_medium: "offline",
     utm_campaign: "gym_partner",
   });
+  if (market) qs.set("market", market);
   return `/invite?${qs.toString()}`;
 }
 

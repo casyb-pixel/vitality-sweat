@@ -11,7 +11,7 @@ import {
 } from "@/lib/referrals/codes";
 
 /**
- * Persist `?ref=`, `?src=`, `?gym=`, and UTM params from any public URL
+ * Persist `?ref=`, `?src=`, `?gym=`, `?market=`, and UTM params from any public URL
  * (including /invite and /app) before auth redirects.
  */
 export default function ReferralCapture() {

@@ -47,6 +47,8 @@ type RequestBody = {
   thumbnailUrl?: string | null;
   embedPublished?: boolean;
   limit?: number;
+  /** Phase 3 market playbook for localized growth promo pack. */
+  market?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -407,11 +409,13 @@ async function saveSocialPackage(
   const { buildVideoGrowthPromoPack } = await import(
     "@/lib/marketing/growth-packaging"
   );
+  const { normalizeMarketParam } = await import("@/lib/markets/metros");
   const growthPromoPack = buildVideoGrowthPromoPack({
     blogTitle: project.blog_title,
     conceptTitle: concept.title,
     baseCaption: body.socialPackage.caption,
     baseDescription: body.socialPackage.seoMetadata?.description,
+    market: normalizeMarketParam(body.market),
   });
 
   const { data, error } = await supabase

@@ -14,6 +14,7 @@ import {
   LOCAL_GROWTH_ARTICLE_SEED,
   type BlogArticleType,
 } from "@/lib/marketing/campaign-templates";
+import { METROS, type MetroId } from "@/lib/markets/metros";
 
 type WizardPhase =
   | "PHASE_1_INPUT"
@@ -107,6 +108,7 @@ export default function BlogWizard({
   const [article, setArticle] = useState<FinalizedPostResult | null>(null);
   const [draftConfirmed, setDraftConfirmed] = useState(false);
   const [includeGrowthCta, setIncludeGrowthCta] = useState(true);
+  const [market, setMarket] = useState<MetroId>("lafayette");
   const [publishStage, setPublishStage] = useState<PublishStage>("idle");
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishWarning, setPublishWarning] = useState<string | null>(null);
@@ -336,6 +338,7 @@ export default function BlogWizard({
           coverAlt: coverImage ? coverAlt : undefined,
           includeGrowthCta:
             articleType === "local_growth" ? true : includeGrowthCta,
+          market,
         }),
       });
       const data = (await res.json()) as {
@@ -461,6 +464,23 @@ export default function BlogWizard({
                 publish always inserts Engine CTA + mid AdSlot (Phase 0d).
               </p>
             ) : null}
+            <label className="block font-sans text-sm text-brand-ink">
+              <span className="font-semibold">Market playbook</span>
+              <select
+                value={market}
+                onChange={(e) => setMarket(e.target.value as MetroId)}
+                className="mt-1.5 w-full max-w-xs border border-brand-ink/15 bg-surface-elevated px-3 py-2.5 font-sans text-sm outline-none focus:border-brand-orange"
+              >
+                {METROS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.shortLabel}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-brand-muted">
+                Localizes growth CTA copy (Train with us in {METROS.find((m) => m.id === market)?.shortLabel}…).
+              </span>
+            </label>
           </fieldset>
 
           <textarea

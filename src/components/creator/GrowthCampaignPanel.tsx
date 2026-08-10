@@ -8,6 +8,7 @@ import {
   type GrowthCampaignTemplate,
   type GrowthCampaignTemplateId,
 } from "@/lib/marketing/campaign-templates";
+import { METROS } from "@/lib/markets/metros";
 import { absoluteUrl } from "@/lib/seo/site";
 
 type GrowthCampaignPanelProps = {
@@ -28,6 +29,7 @@ export default function GrowthCampaignPanel({
     "weekly_challenge",
   );
   const [gymSlug, setGymSlug] = useState("reds");
+  const [market, setMarket] = useState("lafayette");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const expanded = useMemo(
@@ -91,6 +93,8 @@ export default function GrowthCampaignPanel({
           template={expanded}
           gymSlug={gymSlug}
           onGymSlugChange={setGymSlug}
+          market={market}
+          onMarketChange={setMarket}
           copiedKey={copiedKey}
           onCopy={copyText}
           onLaunchBlog={() =>
@@ -110,6 +114,8 @@ function TemplateDetail({
   template,
   gymSlug,
   onGymSlugChange,
+  market,
+  onMarketChange,
   copiedKey,
   onCopy,
   onLaunchBlog,
@@ -118,17 +124,19 @@ function TemplateDetail({
   template: GrowthCampaignTemplate;
   gymSlug: string;
   onGymSlugChange: (value: string) => void;
+  market: string;
+  onMarketChange: (value: string) => void;
   copiedKey: string | null;
   onCopy: (key: string, text: string) => void;
   onLaunchBlog: () => void;
   onLaunchVideo: () => void;
 }) {
   const isGym = template.id === "gym_qr";
-  const ctaUrl = campaignCtaAbsoluteUrl(
-    template,
-    isGym ? { gym: gymSlug.trim() || "reds", src: "gym" } : undefined,
-  );
-  const invitePath = buildGymInvitePath(gymSlug.trim() || "reds");
+  const ctaUrl = campaignCtaAbsoluteUrl(template, {
+    market,
+    ...(isGym ? { gym: gymSlug.trim() || "reds", src: "gym" } : {}),
+  });
+  const invitePath = buildGymInvitePath(gymSlug.trim() || "reds", market);
   const inviteAbsolute = absoluteUrl(invitePath);
 
   return (
@@ -155,6 +163,21 @@ function TemplateDetail({
           </span>
         </label>
       ) : null}
+
+      <label className="block font-sans text-sm text-brand-ink">
+        <span className="font-semibold">Market playbook</span>
+        <select
+          value={market}
+          onChange={(e) => onMarketChange(e.target.value)}
+          className="mt-1.5 w-full max-w-xs border border-brand-ink/15 bg-surface-elevated px-3 py-2.5 font-sans text-sm outline-none focus:border-brand-orange"
+        >
+          {METROS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.shortLabel}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div>
         <p className="font-sans text-xs font-bold uppercase tracking-[0.1em] text-brand-muted">

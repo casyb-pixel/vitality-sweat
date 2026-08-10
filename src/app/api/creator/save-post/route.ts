@@ -10,6 +10,7 @@ import {
   buildPostGrowthPackaging,
 } from "@/lib/marketing/growth-packaging";
 import { generateMarketingPromos } from "@/lib/marketing/generate-promos";
+import { normalizeMarketParam } from "@/lib/markets/metros";
 import { stripEmDashes } from "@/lib/text/humanize-copy";
 import { createClient } from "@/utils/supabase/server";
 
@@ -30,6 +31,8 @@ type SavePostBody = {
   cover_alt?: string;
   featured?: boolean;
   includeGrowthCta?: boolean;
+  /** Phase 3 market playbook id (lafayette, lake-charles, …). */
+  market?: string | null;
 };
 
 /**
@@ -77,10 +80,16 @@ export async function POST(request: Request) {
       input.title.trim();
 
     const includeGrowthCta = input.includeGrowthCta !== false;
+    const market = normalizeMarketParam(input.market ?? null);
     const packagedBody = applyBlogGrowthCta(input.bodyMarkdown, {
       includeCta: includeGrowthCta,
+      market,
     });
-    const growthPackaging = buildPostGrowthPackaging(slug, includeGrowthCta);
+    const growthPackaging = buildPostGrowthPackaging(
+      slug,
+      includeGrowthCta,
+      market,
+    );
 
     const row: Record<string, unknown> = {
       slug,
@@ -189,7 +198,12 @@ export async function POST(request: Request) {
 
 function validateSaveBody(
   body: SavePostBody,
-): { ok: true; data: SavePostInput } | { ok: false; error: string } {
+):
+  | {
+      ok: true;
+      data: SavePostInput & { includeGrowthCta?: boolean; market?: string | null };
+    }
+  | { ok: false; error: string } {
   const title = (body.title ?? "").trim();
   const excerpt = (body.excerpt ?? "").trim();
   const bodyMarkdown = (body.bodyMarkdown ?? body.body_markdown ?? "").trim();
@@ -231,6 +245,7 @@ function validateSaveBody(
       })(),
       featured: body.featured,
       includeGrowthCta: body.includeGrowthCta !== false,
+      market: typeof body.market === "string" ? body.market : body.market ?? null,
     },
   };
 }

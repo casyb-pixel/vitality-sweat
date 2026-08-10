@@ -8,6 +8,7 @@ import {
   rememberCampaignAttribution,
   type SignupCampaignParams,
 } from "@/lib/marketing/campaign-attribution";
+import { marketSignupCopy, normalizeMarketParam } from "@/lib/markets/metros";
 import {
   normalizeReferralCode,
   rememberReferralCode,
@@ -16,6 +17,7 @@ import {
 type InviteLandingClientProps = {
   src: string | null;
   gym: string | null;
+  market: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -26,6 +28,7 @@ type InviteLandingClientProps = {
 export default function InviteLandingClient({
   src,
   gym,
+  market: marketRaw,
   utmSource,
   utmMedium,
   utmCampaign,
@@ -34,11 +37,14 @@ export default function InviteLandingClient({
 }: InviteLandingClientProps) {
   const gymLabel = formatGymLabel(gym);
   const isGym = (src ?? "").toLowerCase() === "gym" || Boolean(gym);
+  const market = normalizeMarketParam(marketRaw);
+  const copy = marketSignupCopy(market);
 
   useEffect(() => {
     rememberCampaignAttribution({
       src,
       gym,
+      market: marketRaw,
       utm_source: utmSource,
       utm_medium: utmMedium,
       utm_campaign: utmCampaign,
@@ -47,14 +53,30 @@ export default function InviteLandingClient({
     const code = normalizeReferralCode(refCode);
     if (code) rememberReferralCode(code);
     trackInviteLandingView(src ?? undefined, gym ?? undefined);
-  }, [src, gym, utmSource, utmMedium, utmCampaign, utmContent, refCode]);
+  }, [
+    src,
+    gym,
+    marketRaw,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    utmContent,
+    refCode,
+  ]);
 
   const campaign: SignupCampaignParams = {
     src: src ?? (isGym ? "gym" : "invite"),
     gym,
+    market,
     utmSource: utmSource ?? (isGym ? "gym_qr" : "invite"),
     utmMedium: utmMedium ?? (isGym ? "offline" : "landing"),
-    utmCampaign: utmCampaign ?? (isGym ? "gym_partner" : "invite_page"),
+    utmCampaign:
+      utmCampaign ??
+      (market
+        ? `market_${market}`
+        : isGym
+          ? "gym_partner"
+          : "invite_page"),
     utmContent,
     ref: normalizeReferralCode(refCode) ?? undefined,
     nextPath: "/app",
@@ -63,15 +85,21 @@ export default function InviteLandingClient({
   return (
     <div className="section-y site-shell max-w-2xl">
       <p className="eyebrow text-brand-orange">
-        {isGym && gymLabel ? `${gymLabel} · Partner invite` : "Vitality Engine"}
+        {isGym && gymLabel
+          ? `${gymLabel} · Partner invite`
+          : market
+            ? `${copy.shortLabel} · Vitality Engine`
+            : "Vitality Engine"}
       </p>
       <h1 className="mt-3 font-display text-[clamp(2.2rem,6vw,3.4rem)] leading-[1.05] text-brand-ink">
-        Train. Fuel. Compete. — free.
+        Train. Fuel. Compete. - free.
       </h1>
       <p className="mt-4 font-sans text-base leading-relaxed text-brand-muted sm:text-lg">
         {isGym && gymLabel
-          ? `You're one scan away from the free Vitality Engine — workouts, meal plans, and grocery lists built for how Southwest Louisiana trains. Thanks for training with ${gymLabel}.`
-          : "Create a free Vitality Engine account for workouts, meal plans, and shareable grocery lists — built for Acadiana / SWLA."}
+          ? `You're one scan away from the free Vitality Engine - workouts, meal plans, and grocery lists built for how Southwest Louisiana trains. Thanks for training with ${gymLabel}.`
+          : market
+            ? `${copy.heroSupport} ${copy.trainWithUs}.`
+            : "Create a free Vitality Engine account for workouts, meal plans, and shareable grocery lists - built for Acadiana / SWLA."}
       </p>
 
       <ul className="mt-8 space-y-3 font-sans text-sm text-brand-ink">
@@ -91,7 +119,7 @@ export default function InviteLandingClient({
           <span className="text-brand-orange" aria-hidden>
             →
           </span>
-          Invite friends — soft shoutouts, no paywall
+          Invite friends - soft shoutouts, no paywall
         </li>
       </ul>
 
@@ -107,7 +135,8 @@ export default function InviteLandingClient({
 
       <p className="mt-4 font-sans text-xs text-brand-muted">
         Free forever for members. Campaign tags ({src || "invite"}
-        {gym ? ` · ${gym}` : ""}) are stored for sponsor attribution after
+        {gym ? ` · ${gym}` : ""}
+        {market ? ` · ${market}` : ""}) are stored for sponsor attribution after
         signup.
       </p>
     </div>

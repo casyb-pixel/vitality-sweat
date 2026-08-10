@@ -6,6 +6,11 @@ import SiteFooter from "@/components/SiteFooter";
 import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import { getFeaturedBlogPostAsync } from "@/lib/blog/posts";
+import {
+  getMetro,
+  marketSignupCopy,
+  normalizeMarketParam,
+} from "@/lib/markets/metros";
 import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -26,7 +31,7 @@ export const metadata: Metadata = {
 const PILLARS = [
   {
     title: "General Fitness",
-    copy: "On-demand training that builds strength, stamina, and consistency — wherever you train.",
+    copy: "On-demand training that builds strength, stamina, and consistency - wherever you train.",
     image: "/images/pillar-general-fitness.png",
     alt: "Athlete training for general fitness",
   },
@@ -44,8 +49,24 @@ const PILLARS = [
   },
 ] as const;
 
-export default async function HomePage() {
+type HomePageProps = {
+  searchParams?: Promise<{ market?: string }>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   const featuredPost = await getFeaturedBlogPostAsync();
+  const params = searchParams ? await searchParams : {};
+  const market = normalizeMarketParam(params.market ?? null);
+  const metro = market ? getMetro(market) : null;
+  const copy = marketSignupCopy(market);
+  const signupCampaign = market
+    ? {
+        market,
+        utmSource: "home",
+        utmMedium: "hero",
+        utmCampaign: `market_${market}`,
+      }
+    : undefined;
 
   return (
     <>
@@ -53,7 +74,7 @@ export default async function HomePage() {
       <section className="relative isolate min-h-[min(92vh,56rem)] overflow-hidden bg-surface-dark text-white">
         <Image
           src="/images/gallery-battle-ropes-beach.jpg"
-          alt="Athlete driving battle ropes on the sand — raw effort, focused sweat"
+          alt="Athlete driving battle ropes on the sand - raw effort, focused sweat"
           fill
           priority
           sizes="100vw"
@@ -70,19 +91,22 @@ export default async function HomePage() {
 
         <div className="site-shell relative flex min-h-[min(92vh,56rem)] flex-col justify-end pb-16 pt-28 sm:pb-20 sm:pt-32">
           <p className="animate-fade-up eyebrow text-white/75">
-            Hunter Broussard · Southwest Louisiana
+            Hunter Broussard ·{" "}
+            {metro ? metro.shortLabel : "Southwest Louisiana"}
           </p>
           <h1 className="animate-fade-up-delay mt-4 max-w-3xl font-display text-[clamp(2.75rem,8vw,5.25rem)] leading-[0.95] tracking-tight text-balance">
             Vitality Sweat
           </h1>
           <p className="animate-fade-up-delay-2 mt-5 max-w-xl font-sans text-lg leading-relaxed text-white/88 sm:text-xl">
-            Train with purpose. Eat for performance. Build the next generation of
-            athletes — one sweat-honest session at a time.
+            {market
+              ? copy.heroSupport
+              : "Train with purpose. Eat for performance. Build the next generation of athletes - one sweat-honest session at a time."}
           </p>
           <div className="animate-fade-up-delay-2 mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
             <SignupCtaLink
               location="home_hero"
               label="Create free account"
+              campaign={signupCampaign}
               className="inline-flex items-center justify-center bg-brand-orange px-7 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
             >
               Create free account
@@ -197,7 +221,7 @@ export default async function HomePage() {
       </div>
 
       <div className="site-shell pb-[var(--section-y)]">
-        <JoinEngineCTA location="home_mid" variant="mid" />
+        <JoinEngineCTA location="home_mid" variant="mid" market={market} />
       </div>
 
       {/* Field culture */}

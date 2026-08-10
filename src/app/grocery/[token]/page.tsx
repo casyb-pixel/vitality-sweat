@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import AdSlot from "@/components/AdSlot";
 import GroceryShareClientActions from "@/components/app/GroceryShareClientActions";
 import GroceryShareViewTracker from "@/components/marketing/GroceryShareViewTracker";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
@@ -96,6 +97,14 @@ export default async function SharedGroceryPage({ params }: PageProps) {
           >
             Create free account
           </SignupCtaLink>
+        </div>
+
+        <div className="mt-8 print:hidden">
+          <AdSlot
+            slotId="grocery-footer"
+            label="Local partner"
+            size="banner"
+          />
         </div>
       </div>
     </main>

@@ -5,6 +5,11 @@ import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
 import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import { getAllBlogPostsAsync } from "@/lib/blog/posts";
+import {
+  getMetro,
+  marketSignupCopy,
+  normalizeMarketParam,
+} from "@/lib/markets/metros";
 import { buildCanonical } from "@/lib/seo/site";
 
 export const revalidate = 60;
@@ -32,8 +37,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ChroniclesPage() {
+type ChroniclesPageProps = {
+  searchParams?: Promise<{ market?: string }>;
+};
+
+export default async function ChroniclesPage({
+  searchParams,
+}: ChroniclesPageProps) {
   const posts = await getAllBlogPostsAsync();
+  const params = searchParams ? await searchParams : {};
+  const market = normalizeMarketParam(params.market ?? null);
+  const metro = market ? getMetro(market) : null;
+  const copy = marketSignupCopy(market);
 
   return (
     <>
@@ -49,20 +64,28 @@ export default async function ChroniclesPage() {
           />
           <div aria-hidden className="absolute inset-0 bg-brand-ink/70" />
           <div className="site-shell relative flex min-h-[42vh] flex-col justify-end pb-14 pt-24">
-            <p className="eyebrow text-brand-orange">Blog</p>
+            <p className="eyebrow text-brand-orange">
+              Blog
+              {metro ? ` · ${metro.shortLabel}` : ""}
+            </p>
             <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.5rem,6vw,4.25rem)] leading-[0.95]">
               The Sweatlife Chronicles
             </h1>
             <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
-              Training truths, nutrition that travels, and field notes from
-              Hunter&apos;s coaching life.
+              {market
+                ? `${copy.trainWithUs}. Training truths, nutrition that travels, and field notes from Hunter's coaching life.`
+                : "Training truths, nutrition that travels, and field notes from Hunter's coaching life."}
             </p>
           </div>
         </section>
 
         <div className="section-y site-shell space-y-10">
           <AdSlot slotId="chronicles-top" size="banner" />
-          <JoinEngineCTA location="chronicles_mid" variant="strip" />
+          <JoinEngineCTA
+            location="chronicles_mid"
+            variant="strip"
+            market={market}
+          />
           <ul className="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
               <li key={post.slug}>
@@ -93,7 +116,11 @@ export default async function ChroniclesPage() {
               </li>
             ))}
           </ul>
-          <JoinEngineCTA location="chronicles_end" variant="end" />
+          <JoinEngineCTA
+            location="chronicles_end"
+            variant="end"
+            market={market}
+          />
         </div>
       </div>
       <SiteFooter />

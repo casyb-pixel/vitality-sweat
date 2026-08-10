@@ -37,6 +37,7 @@ import {
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
 import type { VideoScriptPreset } from "@/lib/marketing/campaign-templates";
 import { APP_INVITE_SCRIPT_GUIDANCE } from "@/lib/marketing/campaign-templates";
+import { METROS, type MetroId } from "@/lib/markets/metros";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
   "SELECT_BLOG_CONTEXT",
@@ -113,6 +114,7 @@ export default function VideoWizard({
   const [phase, setPhase] = useState<VideoStudioPhase>("SELECT_BLOG_CONTEXT");
   const [scriptPreset, setScriptPreset] =
     useState<VideoScriptPreset>(scriptPresetProp);
+  const [market, setMarket] = useState<MetroId>("lafayette");
 
   useEffect(() => {
     if (scriptPresetProp === "app_invite") {
@@ -919,6 +921,7 @@ export default function VideoWizard({
           action: "save_social_package",
           projectId: project.id,
           socialPackage,
+          market,
         }),
       });
       const saved = (await saveRes.json()) as {
@@ -1248,6 +1251,20 @@ export default function VideoWizard({
                 {APP_INVITE_SCRIPT_GUIDANCE}
               </p>
             ) : null}
+            <label className="block font-sans text-sm text-brand-ink">
+              <span className="font-semibold">Market playbook</span>
+              <select
+                value={market}
+                onChange={(e) => setMarket(e.target.value as MetroId)}
+                className="mt-1.5 w-full max-w-xs border border-brand-ink/15 bg-surface-elevated px-3 py-2.5 font-sans text-sm outline-none focus:border-brand-orange"
+              >
+                {METROS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.shortLabel}
+                  </option>
+                ))}
+              </select>
+            </label>
           </fieldset>
 
           {postsLoading ? (

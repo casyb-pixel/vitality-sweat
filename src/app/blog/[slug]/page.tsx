@@ -186,7 +186,12 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
         </div>
       </article>
 
-      <div className="site-shell pb-[var(--section-y)]">
+      <div className="site-shell space-y-8 pb-[var(--section-y)]">
+        <AdSlot
+          slotId="blog-end"
+          label="Local partner placement"
+          size="banner"
+        />
         {showGrowthCta ? (
           <JoinEngineCTA location="blog_end" variant="end" />
         ) : null}
