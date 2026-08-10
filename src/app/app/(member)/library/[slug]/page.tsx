@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import DynamicVideoEmbedder from "@/components/blog/DynamicVideoEmbedder";
 import SafeCoverImage from "@/components/blog/SafeCoverImage";
+import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import { getBlogPostBySlugAsync } from "@/lib/blog/posts";
 import { fetchPublishedVideoEmbedsForPost } from "@/lib/blog/video-embeds";
@@ -35,9 +36,11 @@ export default async function MemberLibraryArticlePage({
   const { user } = await requireMemberAccess(`/app/library/${slug}`);
   const supabase = await createClient();
   const profile = await getFitnessProfile(supabase, user.id);
-
-  if (!isOnboardingComplete(profile)) {
-    redirect("/app/onboarding");
+  const completion = await getMemberCompletionRedirect(supabase, user.id, {
+    fitnessOnboardingComplete: isOnboardingComplete(profile),
+  });
+  if (completion) {
+    redirect(completion);
   }
 
   const post = await getBlogPostBySlugAsync(slug);

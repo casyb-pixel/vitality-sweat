@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
+import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
 import { createClient } from "@/utils/supabase/server";
 
@@ -36,11 +37,14 @@ export async function GET(request: Request) {
       if (user) {
         const wantsCreator =
           next === "/app/creator" || next.startsWith("/app/creator/");
-        const destination = wantsCreator
-          ? "/app"
-          : next.startsWith("/app") || next.startsWith("/profile")
-            ? next
-            : "/app";
+        const completion = await getMemberCompletionRedirect(supabase, user.id);
+        const destination =
+          completion ??
+          (wantsCreator
+            ? "/app"
+            : next.startsWith("/app") || next.startsWith("/profile")
+              ? next
+              : "/app");
         return NextResponse.redirect(`${origin}${destination}`);
       }
     } else {

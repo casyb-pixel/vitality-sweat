@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import LibraryBrowser from "@/components/app/LibraryBrowser";
+import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import { getAllBlogPostsAsync } from "@/lib/blog/posts";
 import {
@@ -20,9 +21,11 @@ export default async function LibraryPage() {
   const { user } = await requireMemberAccess("/app/library");
   const supabase = await createClient();
   const profile = await getFitnessProfile(supabase, user.id);
-
-  if (!isOnboardingComplete(profile)) {
-    redirect("/app/onboarding");
+  const completion = await getMemberCompletionRedirect(supabase, user.id, {
+    fitnessOnboardingComplete: isOnboardingComplete(profile),
+  });
+  if (completion) {
+    redirect(completion);
   }
 
   const [{ data: videos }, posts] = await Promise.all([

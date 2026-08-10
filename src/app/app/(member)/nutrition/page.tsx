@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import NutritionPlanner from "@/components/app/NutritionPlanner";
+import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import {
   getFitnessProfile,
@@ -18,9 +19,11 @@ export default async function NutritionPage() {
   const { user } = await requireMemberAccess("/app/nutrition");
   const supabase = await createClient();
   const profile = await getFitnessProfile(supabase, user.id);
-
-  if (!isOnboardingComplete(profile)) {
-    redirect("/app/onboarding");
+  const completion = await getMemberCompletionRedirect(supabase, user.id, {
+    fitnessOnboardingComplete: isOnboardingComplete(profile),
+  });
+  if (completion) {
+    redirect(completion);
   }
 
   let { data: mealPlan } = await supabase

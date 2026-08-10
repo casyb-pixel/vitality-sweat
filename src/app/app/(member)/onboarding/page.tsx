@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import OnboardingForm from "@/components/app/OnboardingForm";
+import { getMemberProfile } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
+import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
   title: "Discovery onboarding",
@@ -8,7 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-  await requireMemberAccess("/app/onboarding");
+  const { user } = await requireMemberAccess("/app/onboarding");
+  const supabase = await createClient();
+  const profile = await getMemberProfile(supabase, user.id);
 
   return (
     <div className="space-y-6">
@@ -19,10 +23,14 @@ export default async function OnboardingPage() {
         </h1>
         <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
           We’ll use this discovery info for workout progression, meal planning,
-          and grocery lists tailored to your goals and kitchen.
+          grocery lists, and local community offers near your ZIP.
         </p>
       </header>
-      <OnboardingForm />
+      <OnboardingForm
+        initialCity={profile?.city ?? ""}
+        initialZipCode={profile?.zip_code ?? ""}
+        initialRegion={profile?.region ?? ""}
+      />
     </div>
   );
 }

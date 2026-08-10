@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import WorkoutTracker from "@/components/app/WorkoutTracker";
+import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import {
   getFitnessProfile,
@@ -18,9 +19,11 @@ export default async function WorkoutPage() {
   const { user } = await requireMemberAccess("/app/workout");
   const supabase = await createClient();
   const profile = await getFitnessProfile(supabase, user.id);
-
-  if (!isOnboardingComplete(profile)) {
-    redirect("/app/onboarding");
+  const completion = await getMemberCompletionRedirect(supabase, user.id, {
+    fitnessOnboardingComplete: isOnboardingComplete(profile),
+  });
+  if (completion) {
+    redirect(completion);
   }
 
   const [{ data: exercises }, { data: activeSession }] = await Promise.all([

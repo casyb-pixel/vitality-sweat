@@ -3,13 +3,19 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
+import {
+  getMemberCompletionRedirect,
+  isValidUsZip,
+  normalizeUsZip,
+} from "@/lib/auth/member-profile";
 import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
 import { createClient } from "@/utils/supabase/client";
 
 type AuthMode = "password" | "magic";
-type PortalView = "form" | "denied" | "magic-sent" | "reset-sent";
+type AuthIntent = "signin" | "signup";
+type PortalView = "form" | "denied" | "magic-sent" | "reset-sent" | "confirm-sent";
 
 type LoginModalProps = {
   open: boolean;
@@ -30,9 +36,13 @@ export default function LoginModal({
   const router = useRouter();
   const titleId = useId();
   const [mode, setMode] = useState<AuthMode>("password");
+  const [intent, setIntent] = useState<AuthIntent>("signin");
   const [view, setView] = useState<PortalView>(initialView);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [city, setCity] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [region, setRegion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -61,6 +71,23 @@ export default function LoginModal({
   const safeNext = sanitizeNextPath(nextPath, "/app");
   const wantsCreatorStudio =
     safeNext === "/app/creator" || safeNext.startsWith("/app/creator/");
+  const isSignup = intent === "signup";
+
+  function geoMetadata() {
+    return {
+      city: city.trim(),
+      zip_code: normalizeUsZip(zipCode),
+      region: region.trim() || undefined,
+    };
+  }
+
+  function validateSignupGeo(): string | null {
+    if (!city.trim()) return "Enter your city.";
+    if (!isValidUsZip(zipCode)) {
+      return "Enter a valid US ZIP code (12345 or 12345-6789).";
+    }
+    return null;
+  }
 
   async function afterAuthenticated() {
     const supabase = createClient();
@@ -91,11 +118,13 @@ export default function LoginModal({
       return;
     }
 
+    const completion = await getMemberCompletionRedirect(supabase, user.id);
     onClose();
     const destination =
-      safeNext.startsWith("/app") || safeNext.startsWith("/profile")
+      completion ??
+      (safeNext.startsWith("/app") || safeNext.startsWith("/profile")
         ? safeNext
-        : "/app";
+        : "/app");
     router.replace(destination);
     router.refresh();
   }
@@ -107,6 +136,50 @@ export default function LoginModal({
     startTransition(async () => {
       try {
         const supabase = createClient();
+
+        if (isSignup) {
+          const geoError = validateSignupGeo();
+          if (geoError) {
+            setError(geoError);
+            return;
+          }
+          if (password.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+          }
+
+          const redirectTo = buildAuthCallbackUrl(safeNext);
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              emailRedirectTo: redirectTo,
+              data: geoMetadata(),
+            },
+          });
+          if (signUpError) {
+            setError(signUpError.message);
+            return;
+          }
+
+          if (data.session) {
+            // Persist geo in case the trigger missed metadata.
+            await supabase
+              .from("profiles")
+              .update({
+                city: city.trim(),
+                zip_code: normalizeUsZip(zipCode),
+                region: region.trim() || null,
+              })
+              .eq("id", data.session.user.id);
+            await afterAuthenticated();
+            return;
+          }
+
+          setView("confirm-sent");
+          return;
+        }
+
         const { error: signError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
@@ -128,6 +201,14 @@ export default function LoginModal({
 
     startTransition(async () => {
       try {
+        if (isSignup) {
+          const geoError = validateSignupGeo();
+          if (geoError) {
+            setError(geoError);
+            return;
+          }
+        }
+
         const supabase = createClient();
         const redirectTo = buildAuthCallbackUrl(safeNext);
         const { error: otpError } = await supabase.auth.signInWithOtp({
@@ -135,6 +216,7 @@ export default function LoginModal({
           options: {
             emailRedirectTo: redirectTo,
             shouldCreateUser: true,
+            data: isSignup ? geoMetadata() : undefined,
           },
         });
         if (otpError) {
@@ -182,6 +264,9 @@ export default function LoginModal({
     router.push("/profile");
   }
 
+  const formTitle = isSignup ? "Create free account" : "Sign in to continue";
+  const formEyebrow = view === "denied" ? "Creator access" : "Vitality Engine";
+
   return (
     <div className="fixed inset-0 z-[80]" role="presentation">
       <button
@@ -207,18 +292,18 @@ export default function LoginModal({
                 height={40}
                 className="h-9 w-auto"
               />
-              <p className="eyebrow mt-4 text-brand-orange">
-                {view === "denied" ? "Creator access" : "Vitality Engine"}
-              </p>
+              <p className="eyebrow mt-4 text-brand-orange">{formEyebrow}</p>
               <h2
                 id={titleId}
                 className="mt-2 font-display text-2xl text-brand-ink sm:text-[1.75rem]"
               >
                 {view === "denied"
                   ? "Studio access denied"
-                  : view === "magic-sent" || view === "reset-sent"
+                  : view === "magic-sent" ||
+                      view === "reset-sent" ||
+                      view === "confirm-sent"
                     ? "Check your email"
-                    : "Sign in to continue"}
+                    : formTitle}
               </h2>
             </div>
             <button
@@ -245,8 +330,22 @@ export default function LoginModal({
                   type="button"
                   onClick={() => {
                     onClose();
-                    router.replace("/app");
-                    router.refresh();
+                    startTransition(async () => {
+                      const supabase = createClient();
+                      const {
+                        data: { user },
+                      } = await supabase.auth.getUser();
+                      if (!user) {
+                        router.replace("/app");
+                        return;
+                      }
+                      const completion = await getMemberCompletionRedirect(
+                        supabase,
+                        user.id,
+                      );
+                      router.replace(completion ?? "/app");
+                      router.refresh();
+                    });
                   }}
                   className="inline-flex min-h-11 flex-1 items-center justify-center bg-brand-orange px-4 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
                 >
@@ -261,7 +360,9 @@ export default function LoginModal({
                 </button>
               </div>
             </div>
-          ) : view === "magic-sent" || view === "reset-sent" ? (
+          ) : view === "magic-sent" ||
+            view === "reset-sent" ||
+            view === "confirm-sent" ? (
             <div className="space-y-4">
               <p className="font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
                 {view === "reset-sent" ? (
@@ -270,11 +371,18 @@ export default function LoginModal({
                     <span className="font-semibold text-brand-ink">{email}</span>.
                     Open it to choose your own password, then sign in.
                   </>
+                ) : view === "confirm-sent" ? (
+                  <>
+                    We sent a confirmation link to{" "}
+                    <span className="font-semibold text-brand-ink">{email}</span>.
+                    Open it on this device to finish creating your free account.
+                  </>
                 ) : (
                   <>
                     We sent a magic link to{" "}
                     <span className="font-semibold text-brand-ink">{email}</span>.
-                    Open it on this device to finish signing in.
+                    Open it on this device to finish{" "}
+                    {isSignup ? "creating your account" : "signing in"}.
                   </>
                 )}
               </p>
@@ -288,9 +396,41 @@ export default function LoginModal({
             </div>
           ) : (
             <>
-              <p className="font-sans text-sm leading-relaxed text-brand-muted">
-                Sign in to your Vitality Engine account with email and password,
-                or request a one-tap magic link.
+              <div
+                role="tablist"
+                aria-label="Account action"
+                className="flex gap-1 border border-brand-ink/10 bg-surface p-1"
+              >
+                {(
+                  [
+                    { id: "signin", label: "Sign in" },
+                    { id: "signup", label: "Create free account" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={intent === tab.id}
+                    onClick={() => {
+                      setIntent(tab.id);
+                      setError(null);
+                    }}
+                    className={`min-h-10 flex-1 px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] transition-colors ${
+                      intent === tab.id
+                        ? "bg-brand-ink text-white"
+                        : "text-brand-ink hover:text-brand-orange"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-4 font-sans text-sm leading-relaxed text-brand-muted">
+                {isSignup
+                  ? "Create a free Vitality Engine account with email and password, or a one-tap magic link. City and ZIP are required."
+                  : "Sign in to your Vitality Engine account with email and password, or request a one-tap magic link."}
               </p>
 
               <div
@@ -353,25 +493,93 @@ export default function LoginModal({
                       >
                         Password
                       </label>
-                      <button
-                        type="button"
-                        onClick={sendPasswordReset}
-                        disabled={isPending}
-                        className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange hover:text-brand-orange-deep disabled:opacity-60"
-                      >
-                        Forgot password?
-                      </button>
+                      {!isSignup ? (
+                        <button
+                          type="button"
+                          onClick={sendPasswordReset}
+                          disabled={isPending}
+                          className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange hover:text-brand-orange-deep disabled:opacity-60"
+                        >
+                          Forgot password?
+                        </button>
+                      ) : null}
                     </div>
                     <input
                       id="auth-password"
                       type="password"
-                      autoComplete="current-password"
+                      autoComplete={
+                        isSignup ? "new-password" : "current-password"
+                      }
                       required
+                      minLength={isSignup ? 8 : undefined}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className={fieldClass}
                       placeholder="••••••••"
                     />
+                  </div>
+                ) : null}
+
+                {isSignup ? (
+                  <div className="space-y-4 border border-brand-ink/10 bg-surface p-3">
+                    <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted">
+                      Your location
+                    </p>
+                    <div>
+                      <label
+                        htmlFor="auth-city"
+                        className="mb-2 block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted"
+                      >
+                        City
+                      </label>
+                      <input
+                        id="auth-city"
+                        type="text"
+                        required
+                        autoComplete="address-level2"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className={fieldClass}
+                        placeholder="e.g. Lafayette"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="auth-zip"
+                        className="mb-2 block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted"
+                      >
+                        ZIP code
+                      </label>
+                      <input
+                        id="auth-zip"
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        value={zipCode}
+                        onChange={(e) => setZipCode(e.target.value)}
+                        className={fieldClass}
+                        placeholder="70501"
+                        pattern="\d{5}(-\d{4})?"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="auth-region"
+                        className="mb-2 block font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-muted"
+                      >
+                        Parish / region (optional)
+                      </label>
+                      <input
+                        id="auth-region"
+                        type="text"
+                        autoComplete="address-level1"
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value)}
+                        className={fieldClass}
+                        placeholder="e.g. Lafayette Parish"
+                      />
+                    </div>
                   </div>
                 ) : null}
 
@@ -395,10 +603,20 @@ export default function LoginModal({
                         className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"
                         aria-hidden
                       />
-                      {mode === "password" ? "Signing in…" : "Sending link…"}
+                      {mode === "password"
+                        ? isSignup
+                          ? "Creating account…"
+                          : "Signing in…"
+                        : "Sending link…"}
                     </>
                   ) : mode === "password" ? (
-                    "Sign in"
+                    isSignup ? (
+                      "Create free account"
+                    ) : (
+                      "Sign in"
+                    )
+                  ) : isSignup ? (
+                    "Email magic link to join"
                   ) : (
                     "Email magic link"
                   )}

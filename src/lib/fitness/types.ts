@@ -59,6 +59,10 @@ export type FitnessProfileInput = {
   food_allergies?: string[];
   health_conditions?: string[];
   activity_restrictions?: string | null;
+  /** Written to public.profiles (not fitness_profiles). */
+  city: string;
+  zip_code: string;
+  region?: string | null;
 };
 
 export type ExerciseTrackingType =

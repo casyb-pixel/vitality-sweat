@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import AudiencePanel from "@/components/creator/AudiencePanel";
 import BlogWizard from "@/components/creator/BlogWizard";
 import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
 
-type StudioTab = "projects" | "blog" | "video";
+type StudioTab = "projects" | "blog" | "video" | "audience";
 
 type CreatorStudioProps = {
   creatorLabel: string;
@@ -17,6 +18,7 @@ const TABS: { id: StudioTab; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
+  { id: "audience", label: "Audience" },
 ];
 
 export default function CreatorStudio({
@@ -52,14 +54,18 @@ export default function CreatorStudio({
       ? "Film the Chronicle"
       : tab === "blog"
         ? "Log today, publish tonight"
-        : "7-Day Marketing Projects";
+        : tab === "audience"
+          ? "Prove local density"
+          : "7-Day Marketing Projects";
 
   const blurb =
     tab === "video"
       ? " Pick a published post, grab a gym clip + voice-over, export a Shorts/TikTok/Reels pack."
       : tab === "blog"
         ? " Four quick steps from gym notes to a live Chronicle — no paragraphs required."
-        : " Active publishes stay on the board with swipe copy + a 6-item delivery checklist.";
+        : tab === "audience"
+          ? " ZIP-level active members for gym and grocery sponsorship pitches — real counts only."
+          : " Active publishes stay on the board with swipe copy + a 6-item delivery checklist.";
 
   return (
     <div className="space-y-6 pb-10 pt-4 sm:space-y-8 sm:pt-6">
@@ -78,7 +84,7 @@ export default function CreatorStudio({
         <div
           role="tablist"
           aria-label="Creator studio mode"
-          className="flex gap-1 border border-brand-ink/10 bg-surface p-1 sm:inline-flex sm:max-w-xl"
+          className="flex flex-wrap gap-1 border border-brand-ink/10 bg-surface p-1 sm:inline-flex sm:max-w-2xl"
         >
           {TABS.map((item) => {
             const selected = tab === item.id;
@@ -91,7 +97,7 @@ export default function CreatorStudio({
                 id={`studio-tab-${item.id}`}
                 aria-controls={`studio-panel-${item.id}`}
                 onClick={() => setTab(item.id)}
-                className={`min-h-11 flex-1 px-2.5 py-2.5 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] transition-colors sm:px-4 sm:text-sm ${
+                className={`min-h-11 flex-1 px-2.5 py-2.5 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] transition-colors sm:px-3 sm:text-sm ${
                   selected
                     ? "bg-brand-orange text-white"
                     : "bg-transparent text-brand-ink hover:text-brand-orange"
@@ -138,6 +144,16 @@ export default function CreatorStudio({
           aria-labelledby="studio-tab-blog"
         >
           <BlogWizard onPublished={handlePublished} seedNotes={seedNotes} />
+        </div>
+      ) : null}
+
+      {tab === "audience" ? (
+        <div
+          id="studio-panel-audience"
+          role="tabpanel"
+          aria-labelledby="studio-tab-audience"
+        >
+          <AudiencePanel />
         </div>
       ) : null}
     </div>

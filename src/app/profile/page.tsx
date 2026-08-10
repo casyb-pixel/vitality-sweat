@@ -3,7 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
+import ProfileGeoForm from "@/components/auth/ProfileGeoForm";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
+import {
+  getMemberProfile,
+  hasRequiredGeo,
+} from "@/lib/auth/member-profile";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
@@ -11,7 +16,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function ProfilePage() {
+type ProfilePageProps = {
+  searchParams?: Promise<{ complete?: string }>;
+};
+
+export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,7 +30,11 @@ export default async function ProfilePage() {
     redirect("/?auth=required&next=/profile");
   }
 
+  const params = searchParams ? await searchParams : {};
+  const requireGeo = params.complete === "geo";
   const access = await resolveAccessDecision(supabase, user);
+  const profile = await getMemberProfile(supabase, user.id);
+  const geoReady = hasRequiredGeo(profile);
 
   return (
     <>
@@ -39,6 +52,50 @@ export default async function ProfilePage() {
             </span>
             .
           </p>
+
+          {requireGeo && !geoReady ? (
+            <div className="mt-6 border border-brand-orange/30 bg-brand-orange/5 p-4">
+              <p className="font-sans text-sm leading-relaxed text-brand-ink">
+                Add your city and ZIP to finish setting up your account.
+              </p>
+            </div>
+          ) : null}
+
+          {geoReady ? (
+            <dl className="mt-8 grid gap-3 border border-brand-ink/10 bg-surface-elevated p-5 font-sans text-sm text-brand-muted sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-[0.1em]">
+                  City
+                </dt>
+                <dd className="mt-1 font-semibold text-brand-ink">
+                  {profile?.city}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-[0.1em]">
+                  ZIP
+                </dt>
+                <dd className="mt-1 font-semibold text-brand-ink">
+                  {profile?.zip_code}
+                </dd>
+              </div>
+              {profile?.region ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-bold uppercase tracking-[0.1em]">
+                    Parish / region
+                  </dt>
+                  <dd className="mt-1 font-semibold text-brand-ink">
+                    {profile.region}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+
+          <ProfileGeoForm
+            profile={profile}
+            requireGeo={requireGeo && !geoReady}
+          />
 
           {access.status === "creator" ? (
             <div className="mt-8 border border-brand-orange/30 bg-brand-orange/5 p-5">
@@ -63,15 +120,18 @@ export default async function ProfilePage() {
           ) : (
             <div className="mt-8 border border-brand-ink/10 bg-surface-elevated p-5">
               <p className="font-sans text-sm leading-relaxed text-brand-muted">
-                Your member profile is ready. Open the Vitality Engine app for
-                workouts, meal planning, and the video library.
+                {geoReady
+                  ? "Your member profile is ready. Open the Vitality Engine app for workouts, meal planning, and the video library."
+                  : "Save your city and ZIP, then open the Vitality Engine app."}
               </p>
-              <Link
-                href="/app"
-                className="mt-4 inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
-              >
-                Open Vitality Engine
-              </Link>
+              {geoReady ? (
+                <Link
+                  href="/app"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+                >
+                  Open Vitality Engine
+                </Link>
+              ) : null}
             </div>
           )}
         </div>

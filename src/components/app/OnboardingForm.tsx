@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { isValidUsZip, normalizeUsZip } from "@/lib/auth/member-profile";
 import {
   birthdateFromAge,
   parseCommaList,
@@ -17,11 +18,24 @@ import {
 const LEVELS = Object.keys(FITNESS_LEVEL_LABELS) as FitnessLevel[];
 const GOALS = Object.keys(PRIMARY_GOAL_LABELS) as PrimaryGoal[];
 
-export default function OnboardingForm() {
+type OnboardingFormProps = {
+  initialCity?: string;
+  initialZipCode?: string;
+  initialRegion?: string;
+};
+
+export default function OnboardingForm({
+  initialCity = "",
+  initialZipCode = "",
+  initialRegion = "",
+}: OnboardingFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [city, setCity] = useState(initialCity);
+  const [zipCode, setZipCode] = useState(initialZipCode);
+  const [region, setRegion] = useState(initialRegion);
   const [sex, setSex] = useState<Sex | "">("");
   const [age, setAge] = useState("");
   const [heightFt, setHeightFt] = useState("");
@@ -42,6 +56,16 @@ export default function OnboardingForm() {
 
     startTransition(async () => {
       try {
+        const trimmedCity = city.trim();
+        if (!trimmedCity) {
+          setError("Enter your city.");
+          return;
+        }
+        const zip = normalizeUsZip(zipCode);
+        if (!isValidUsZip(zip)) {
+          setError("Enter a valid US ZIP code (12345 or 12345-6789).");
+          return;
+        }
         if (sex !== "male" && sex !== "female") {
           setError("Select male or female.");
           return;
@@ -76,6 +100,9 @@ export default function OnboardingForm() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            city: trimmedCity,
+            zip_code: zip,
+            region: region.trim() || null,
             sex,
             birthdate: birthdateFromAge(ageNum),
             height_in: totalInches,
@@ -111,6 +138,62 @@ export default function OnboardingForm() {
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-2xl space-y-8">
+      <section className="space-y-4 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
+        <h2 className="font-display text-xl text-brand-ink">Where you train</h2>
+        <p className="font-sans text-sm text-brand-muted">
+          City and ZIP help us connect you with local Vitality Sweat partners
+          and community offers.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="city" className={labelClass}>
+              City
+            </label>
+            <input
+              id="city"
+              type="text"
+              required
+              autoComplete="address-level2"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className={fieldClass}
+              placeholder="e.g. Lafayette"
+            />
+          </div>
+          <div>
+            <label htmlFor="zip" className={labelClass}>
+              ZIP code
+            </label>
+            <input
+              id="zip"
+              type="text"
+              required
+              inputMode="numeric"
+              autoComplete="postal-code"
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+              className={fieldClass}
+              placeholder="70501"
+              pattern="\d{5}(-\d{4})?"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="region" className={labelClass}>
+              Parish / region (optional)
+            </label>
+            <input
+              id="region"
+              type="text"
+              autoComplete="address-level1"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className={fieldClass}
+              placeholder="e.g. Lafayette Parish"
+            />
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-4 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
         <h2 className="font-display text-xl text-brand-ink">About you</h2>
         <div className="grid gap-4 sm:grid-cols-2">

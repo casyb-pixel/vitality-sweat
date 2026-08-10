@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { validateMemberGeoInput } from "@/lib/auth/member-profile";
 import type {
   FitnessProfile,
   FitnessProfileInput,
@@ -122,6 +123,11 @@ export function validateFitnessProfileInput(
     return { ok: false, error: "Target weight must be a positive number." };
   }
 
+  const geo = validateMemberGeoInput(row);
+  if (!geo.ok) {
+    return geo;
+  }
+
   return {
     ok: true,
     data: {
@@ -145,6 +151,9 @@ export function validateFitnessProfileInput(
         typeof row.activity_restrictions === "string"
           ? row.activity_restrictions.trim() || null
           : null,
+      city: geo.data.city,
+      zip_code: geo.data.zip_code,
+      region: geo.data.region ?? null,
     },
   };
 }

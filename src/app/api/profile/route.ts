@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  getFitnessProfile,
-  validateFitnessProfileInput,
-} from "@/lib/fitness/profile";
+  getMemberProfile,
+  validateMemberGeoInput,
+} from "@/lib/auth/member-profile";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -17,11 +17,11 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const profile = await getFitnessProfile(supabase, user.id);
+  const profile = await getMemberProfile(supabase, user.id);
   return NextResponse.json({ ok: true, profile });
 }
 
-export async function POST(request: Request) {
+export async function PATCH(request: Request) {
   try {
     const supabase = await createClient();
     const {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const validated = validateFitnessProfileInput(body);
+    const validated = validateMemberGeoInput(body);
     if (!validated.ok) {
       return NextResponse.json(
         { ok: false, error: validated.error },
@@ -53,41 +53,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const { city, zip_code, region, ...fitnessFields } = validated.data;
+    const row = body as Record<string, unknown>;
+    const displayName =
+      typeof row.display_name === "string" ? row.display_name.trim() : undefined;
 
-    const payload = {
-      id: user.id,
-      ...fitnessFields,
-      onboarding_completed_at: new Date().toISOString(),
+    const payload: Record<string, string | null> = {
+      city: validated.data.city,
+      zip_code: validated.data.zip_code,
+      region: validated.data.region ?? null,
     };
+    if (displayName !== undefined) {
+      payload.display_name = displayName || null;
+    }
 
     const { data, error } = await supabase
-      .from("fitness_profiles")
-      .upsert(payload, { onConflict: "id" })
-      .select("*")
+      .from("profiles")
+      .update(payload)
+      .eq("id", user.id)
+      .select(
+        "id, email, role, display_name, avatar_url, city, zip_code, region, created_at, updated_at",
+      )
       .single();
 
     if (error) {
-      console.error("[api/app/fitness-profile]", error.message);
+      console.error("[api/profile]", error.message);
       return NextResponse.json(
         { ok: false, error: error.message },
-        { status: 500 },
-      );
-    }
-
-    const { error: geoError } = await supabase
-      .from("profiles")
-      .update({
-        city,
-        zip_code,
-        region: region ?? null,
-      })
-      .eq("id", user.id);
-
-    if (geoError) {
-      console.error("[api/app/fitness-profile] geo", geoError.message);
-      return NextResponse.json(
-        { ok: false, error: geoError.message },
         { status: 500 },
       );
     }
