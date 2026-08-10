@@ -10,6 +10,10 @@ import {
 } from "@/lib/fitness/types";
 import { ageFromBirthdate } from "@/lib/fitness/profile";
 import { formatDishRatingsForPrompt } from "@/lib/fitness/dishes";
+import {
+  NO_EM_DASH_RULE,
+  stripEmDashesDeep,
+} from "@/lib/text/humanize-copy";
 
 function profileContext(profile: FitnessProfile): string[] {
   const age = profile.birthdate ? ageFromBirthdate(profile.birthdate) : null;
@@ -43,12 +47,13 @@ export function buildMealPlanPrompt(profile: FitnessProfile): string {
     "You are the Vitality Sweat Peak Nutrition coach for Southwest Louisiana athletes and families.",
     "Build a practical 7-day meal plan that fuels performance without ignoring real life (budget, leftovers, simple cooking).",
     "Respect food allergies strictly. Avoid disliked foods. Never repeat rejected meals. Account for health conditions and activity restrictions.",
-    "Use dish ratings to control frequency: feature 4–5★ favorites more often, use 3★ sparingly, and avoid or rarely repeat 1–2★ dishes.",
-    "Prefer heart-healthy, whole-food meals. No medical claims — frame as coaching suggestions.",
+    "Use dish ratings to control frequency: feature 4-5 star favorites more often, use 3 star sparingly, and avoid or rarely repeat 1-2 star dishes.",
+    "Prefer heart-healthy, whole-food meals. No medical claims; frame as coaching suggestions.",
+    NO_EM_DASH_RULE,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
-      summary: "string — 1–2 sentences on how the plan fits their goal",
+      summary: "string: 1-2 sentences on how the plan fits their goal",
       days: [
         {
           day: "Monday",
@@ -65,11 +70,11 @@ export function buildMealPlanPrompt(profile: FitnessProfile): string {
     }),
     "",
     "Rules:",
-    "- Exactly 7 days (Monday–Sunday).",
+    "- Exactly 7 days (Monday through Sunday).",
     "- groceryList should cover the week (consolidate duplicates, max ~25 items).",
-    "- Include 5–6 healthy snack ideas.",
+    "- Include 5-6 healthy snack ideas.",
     "- Keep meals specific enough to shop for (not just 'protein + veggies').",
-    "- Keep each meal description to one concise sentence — prefer speed and clarity.",
+    "- Keep each meal description to one concise sentence; prefer speed and clarity.",
     "",
     ...profileContext(profile),
   ].join("\n");
@@ -85,13 +90,14 @@ export function buildDayRegenPrompt(input: {
   return [
     "You are the Vitality Sweat Peak Nutrition coach.",
     `Replace ONLY the ${input.dayName} meals for this member.`,
-    "They disliked the previous day and explained why — honor that feedback.",
+    "They disliked the previous day and explained why; honor that feedback.",
     "Do NOT repeat the rejected meals. Avoid disliked foods and allergies.",
-    "Prefer highly rated (4–5★) dish styles when choosing replacements; avoid 1–2★ dishes.",
+    "Prefer highly rated (4-5 star) dish styles when choosing replacements; avoid 1-2 star dishes.",
     "Keep the new day aligned with the rest of the week (variety, leftovers when sensible).",
+    NO_EM_DASH_RULE,
     "",
     "Also extract any specific foods/ingredients they dislike from their reason",
-    "(e.g. \"I don't like hummus\" → hummus). Return them in dislikedFoods.",
+    "(e.g. \"I don't like hummus\" -> hummus). Return them in dislikedFoods.",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
@@ -121,7 +127,7 @@ export function buildDayRegenPrompt(input: {
     "Rules:",
     `- day.day must be exactly "${input.dayName}".`,
     "- dislikedFoods: only concrete food names mentioned or clearly implied (lowercase).",
-    "- rejectedMealLabels: 1–3 short phrases capturing what to never serve again.",
+    "- rejectedMealLabels: 1-3 short phrases capturing what to never serve again.",
     "- groceryDelta: ingredients to ADD for the new day (action always \"add\"). Keep short.",
     "- One concise sentence per meal.",
     "",
@@ -216,7 +222,7 @@ export function parseMealPlanPayload(raw: string): MealPlanPayload | null {
 
     if (days.length < 1) return null;
 
-    return {
+    return stripEmDashesDeep({
       summary:
         typeof parsed.summary === "string" ? parsed.summary.trim() : undefined,
       days: days
@@ -257,7 +263,7 @@ export function parseMealPlanPayload(raw: string): MealPlanPayload | null {
           };
         })
         .filter((s) => s.name),
-    };
+    });
   } catch {
     return null;
   }

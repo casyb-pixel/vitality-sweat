@@ -1,0 +1,14 @@
+---
+description: Never use em dashes in product copy, AI output, or posts
+alwaysApply: true
+---
+
+# No em dashes
+
+Never use em dashes (`—`) or en dashes (`–`) in anything we write or post (UI copy, emails, social captions, blog/video AI output, marketing templates, prompts that describe JSON field meanings for user-facing strings).
+
+They read as AI-generated. Use commas, periods, colons, or a plain hyphen (`-`) instead.
+
+Canonical helpers: `src/lib/text/humanize-copy.ts`
+- Include `NO_EM_DASH_RULE` in AI prompts
+- Run `stripEmDashes` / `stripEmDashesDeep` on model output before save or publish
