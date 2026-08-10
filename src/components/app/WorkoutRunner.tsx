@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { NestedProgramDay, NestedProgramExercise } from "@/components/app/WorkoutAgent";
 import {
   buildExercisePrescription,
@@ -19,12 +19,14 @@ import {
 } from "@/lib/fitness/workout-logging";
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
+import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
   WORKOUT_SET_STYLE_COACHING,
   WORKOUT_SET_STYLE_LABELS,
+  type Exercise,
   type PrimaryGoal,
   type WorkoutSession,
   type WorkoutSet,
@@ -33,10 +35,12 @@ import {
 
 type WorkoutRunnerProps = {
   day: NestedProgramDay;
+  catalog?: Exercise[];
   initialSession: WorkoutSession | null;
   onSessionChange: (session: WorkoutSession | null) => void;
   onExit: () => void;
   primaryGoal?: PrimaryGoal | null;
+  onDayChange?: (day: NestedProgramDay) => void;
   onBaselinesSaved?: (
     programExerciseId: string,
     baseline: { baseline_weight_lb: number; baseline_reps: number },
@@ -87,10 +91,12 @@ function targetReps(ex: NestedProgramExercise): number {
 
 export default function WorkoutRunner({
   day,
+  catalog = [],
   initialSession,
   onSessionChange,
   onExit,
   primaryGoal = null,
+  onDayChange,
   onBaselinesSaved,
 }: WorkoutRunnerProps) {
   const exercises = useMemo(
@@ -120,8 +126,20 @@ export default function WorkoutRunner({
   const [booting, setBooting] = useState(true);
   const [restTrigger, setRestTrigger] = useState(0);
   const [milestone, setMilestone] = useState<WorkoutMilestone | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const focusKeyRef = useRef<string>("");
+
+  // Keep local list in sync when plan edits land from the edit sheet / parent.
+  useEffect(() => {
+    setLocalExercises(exercises);
+    setExerciseIndex((idx) => {
+      if (exercises.length === 0) return 0;
+      return Math.min(idx, exercises.length - 1);
+    });
+  }, [exercises]);
 
   const current = localExercises[exerciseIndex] ?? null;
+  const nextExercise = localExercises[exerciseIndex + 1] ?? null;
   const currentSets = useMemo(() => {
     if (!current) return [];
     return loggedSets
@@ -198,6 +216,19 @@ export default function WorkoutRunner({
     },
     [applyPrefills, persistPrescription],
   );
+
+  // After swap/remove (identity change), reload coaching for the focused slot.
+  useEffect(() => {
+    if (booting || !current) return;
+    const key = `${current.id}:${current.exercise_id}`;
+    if (focusKeyRef.current === key) return;
+    const first = focusKeyRef.current === "";
+    focusKeyRef.current = key;
+    if (first) return;
+    startTransition(async () => {
+      await enterExercise(current);
+    });
+  }, [booting, current, enterExercise]);
 
   useEffect(() => {
     let cancelled = false;
@@ -539,9 +570,9 @@ export default function WorkoutRunner({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <p className="eyebrow text-brand-orange">{day.label}</p>
           <p className="font-sans text-xs text-brand-muted">
             Exercise {exerciseIndex + 1} of {localExercises.length}
@@ -555,7 +586,7 @@ export default function WorkoutRunner({
               disabled={pending}
               className={secondaryBtn}
             >
-              Finish workout
+              Finish
             </button>
           ) : null}
           <button
@@ -564,7 +595,7 @@ export default function WorkoutRunner({
             disabled={pending}
             className={secondaryBtn}
           >
-            Exit runner
+            Exit
           </button>
         </div>
       </div>
@@ -602,12 +633,26 @@ export default function WorkoutRunner({
       />
 
       <article className="space-y-3 border border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
-        <h3 className="font-display text-2xl text-brand-ink">
-          {current.exercise?.name ?? "Exercise"}
-        </h3>
-        <p className="font-sans text-sm font-semibold text-brand-ink">
-          {formatPrescription(current)}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-display text-2xl text-brand-ink">
+              {current.exercise?.name ?? "Exercise"}
+            </h3>
+            <p className="mt-1 font-sans text-sm font-semibold text-brand-ink">
+              {formatPrescription(current)}
+            </p>
+          </div>
+          {onDayChange ? (
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className={secondaryBtn}
+              disabled={pending}
+            >
+              Edit
+            </button>
+          ) : null}
+        </div>
         <p className="border border-brand-orange/25 bg-brand-orange/5 px-3 py-2 font-sans text-sm text-brand-ink">
           <span className="font-semibold">{styleLabel(current.set_style)}:</span>{" "}
           {styleCoaching(current.set_style)}
@@ -617,12 +662,27 @@ export default function WorkoutRunner({
             {current.coach_notes}
           </p>
         ) : null}
-        {current.rest_sec != null ? (
-          <p className="font-sans text-xs text-brand-muted">
-            Rest ~{current.rest_sec}s between sets
-          </p>
-        ) : null}
       </article>
+
+      {nextExercise ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border border-brand-ink/10 bg-white/60 px-3 py-2.5">
+          <p className="font-sans text-xs text-brand-muted">
+            Next up:{" "}
+            <span className="font-semibold text-brand-ink">
+              {nextExercise.exercise?.name ?? "Exercise"}
+            </span>
+          </p>
+          <button
+            type="button"
+            className={secondaryBtn}
+            disabled={pending}
+            onClick={skipCurrentExercise}
+            title="Skip if the machine is taken. You can come back later from your plan."
+          >
+            Skip forward
+          </button>
+        </div>
+      ) : null}
 
       {prescription && phase === "log" ? (
         <div className="border border-brand-orange/30 bg-brand-orange/5 p-3">
@@ -646,10 +706,25 @@ export default function WorkoutRunner({
                 ? " · from last session"
                 : prescription.source === "baseline"
                   ? " · from baseline"
-                  : ""}
+                  : prescription.source === "hold_stale"
+                    ? " · holding after time off"
+                    : ""}
             </p>
           )}
         </div>
+      ) : null}
+
+      {editOpen && current && onDayChange ? (
+        <RunnerExerciseEditSheet
+          day={{ ...day, exercises: localExercises }}
+          exercise={current}
+          catalog={catalog}
+          onClose={() => setEditOpen(false)}
+          onDayChange={(next) => {
+            onDayChange(next);
+            setEditOpen(false);
+          }}
+        />
       ) : null}
 
       {phase === "baseline" ? (

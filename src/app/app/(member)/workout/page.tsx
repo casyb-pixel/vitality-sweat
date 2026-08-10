@@ -84,17 +84,6 @@ export default async function WorkoutPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-3">
-        <p className="eyebrow text-brand-orange">Training</p>
-        <h1 className="font-display text-[clamp(1.85rem,5vw,2.75rem)] leading-[1.05] text-brand-ink">
-          Workout Agent
-        </h1>
-        <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-          Build a plan, start a programmed day, set baselines, and log sets with
-          coaching cues. Freeform logging is still available anytime.
-        </p>
-      </header>
-
       <WorkoutWorkspace
         initialProgram={(activeProgram as NestedWorkoutProgram | null) ?? null}
         initialPrefs={prefs}

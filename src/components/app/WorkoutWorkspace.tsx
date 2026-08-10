@@ -31,6 +31,32 @@ function findDayById(
   return program.days.find((d) => d.id === dayId) ?? null;
 }
 
+function enrichDay(
+  day: NestedProgramDay,
+  catalogById: Map<string, Exercise>,
+): NestedProgramDay {
+  return {
+    ...day,
+    exercises: [...(day.exercises ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((row) => ({
+        ...row,
+        exercise:
+          row.exercise ??
+          (catalogById.get(row.exercise_id)
+            ? {
+                id: catalogById.get(row.exercise_id)!.id,
+                name: catalogById.get(row.exercise_id)!.name,
+                category: catalogById.get(row.exercise_id)!.category,
+                primary_muscle:
+                  catalogById.get(row.exercise_id)!.primary_muscle,
+                equipment: catalogById.get(row.exercise_id)!.equipment,
+              }
+            : null),
+      })),
+  };
+}
+
 export default function WorkoutWorkspace({
   initialProgram,
   initialPrefs,
@@ -44,8 +70,8 @@ export default function WorkoutWorkspace({
     findDayById(initialProgram, initialSession?.program_day_id),
   );
 
-  const effectiveGoal =
-    program?.primary_goal ?? profileGoal ?? null;
+  const effectiveGoal = program?.primary_goal ?? profileGoal ?? null;
+  const focusMode = Boolean(runningDay);
 
   const catalogById = useMemo(() => {
     const map = new Map(exercises.map((ex) => [ex.id, ex]));
@@ -53,29 +79,7 @@ export default function WorkoutWorkspace({
   }, [exercises]);
 
   function handleStartDay(day: NestedProgramDay) {
-    // Ensure exercise names are present from catalog when nested join is thin.
-    const enriched: NestedProgramDay = {
-      ...day,
-      exercises: [...(day.exercises ?? [])]
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((row) => ({
-          ...row,
-          exercise:
-            row.exercise ??
-            (catalogById.get(row.exercise_id)
-              ? {
-                  id: catalogById.get(row.exercise_id)!.id,
-                  name: catalogById.get(row.exercise_id)!.name,
-                  category: catalogById.get(row.exercise_id)!.category,
-                  primary_muscle:
-                    catalogById.get(row.exercise_id)!.primary_muscle,
-                  equipment: catalogById.get(row.exercise_id)!.equipment,
-                }
-              : null),
-        })),
-    };
-    setRunningDay(enriched);
-    // Scroll into the runner.
+    setRunningDay(enrichDay(day, catalogById));
     window.requestAnimationFrame(() => {
       document.getElementById("log-workout")?.scrollIntoView({
         behavior: "smooth",
@@ -123,8 +127,33 @@ export default function WorkoutWorkspace({
     });
   }
 
+  function handleRunningDayChange(nextDay: NestedProgramDay) {
+    const enriched = enrichDay(nextDay, catalogById);
+    setRunningDay(enriched);
+    setProgram((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        days: prev.days.map((d) => (d.id === enriched.id ? enriched : d)),
+      };
+    });
+  }
+
   return (
-    <>
+    <div className="space-y-6">
+      {!focusMode ? (
+        <header className="space-y-3">
+          <p className="eyebrow text-brand-orange">Training</p>
+          <h1 className="font-display text-[clamp(1.85rem,5vw,2.75rem)] leading-[1.05] text-brand-ink">
+            Workout Agent
+          </h1>
+          <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
+            Build a plan, start a programmed day, set baselines, and log sets
+            with coaching cues. Freeform logging is still available anytime.
+          </p>
+        </header>
+      ) : null}
+
       <WorkoutAgent
         initialProgram={program}
         initialPrefs={initialPrefs}
@@ -135,53 +164,25 @@ export default function WorkoutWorkspace({
             if (!prev || !next) return prev;
             const updated = next.days.find((d) => d.id === prev.id);
             if (!updated) return prev;
-            return {
-              ...updated,
-              exercises: [...(updated.exercises ?? [])]
-                .sort((a, b) => a.sort_order - b.sort_order)
-                .map((row) => ({
-                  ...row,
-                  exercise:
-                    row.exercise ??
-                    (catalogById.get(row.exercise_id)
-                      ? {
-                          id: catalogById.get(row.exercise_id)!.id,
-                          name: catalogById.get(row.exercise_id)!.name,
-                          category: catalogById.get(row.exercise_id)!.category,
-                          primary_muscle:
-                            catalogById.get(row.exercise_id)!.primary_muscle,
-                          equipment: catalogById.get(row.exercise_id)!.equipment,
-                        }
-                      : null),
-                })),
-            };
+            return enrichDay(updated, catalogById);
           });
         }}
         onStartDay={handleStartDay}
         runningDayId={runningDay?.id ?? null}
       />
 
-      <section id="log-workout" className="space-y-6 scroll-mt-24">
+      <section id="log-workout" className="space-y-4 scroll-mt-24">
         {runningDay ? (
-          <>
-            <header className="space-y-2">
-              <h2 className="font-display text-xl text-brand-ink">
-                Running {runningDay.label}
-              </h2>
-              <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted">
-                Follow the prescription, set a baseline if needed, then log each
-                set with how hard it felt.
-              </p>
-            </header>
-            <WorkoutRunner
-              day={runningDay}
-              initialSession={session}
-              onSessionChange={setSession}
-              onBaselinesSaved={handleBaselinesSaved}
-              primaryGoal={effectiveGoal}
-              onExit={() => setRunningDay(null)}
-            />
-          </>
+          <WorkoutRunner
+            day={runningDay}
+            catalog={exercises}
+            initialSession={session}
+            onSessionChange={setSession}
+            onBaselinesSaved={handleBaselinesSaved}
+            onDayChange={handleRunningDayChange}
+            primaryGoal={effectiveGoal}
+            onExit={() => setRunningDay(null)}
+          />
         ) : (
           <>
             <header className="space-y-2">
@@ -202,6 +203,6 @@ export default function WorkoutWorkspace({
           </>
         )}
       </section>
-    </>
+    </div>
   );
 }

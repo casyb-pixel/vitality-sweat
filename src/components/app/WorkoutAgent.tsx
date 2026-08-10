@@ -602,39 +602,66 @@ export default function WorkoutAgent({
       ) : null}
 
       {mode === "view" && program ? (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {todayDay && onStartDay ? (
+        runningDayId ? (
+          <section className="border border-brand-ink/10 bg-surface-elevated px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  Plan minimized
+                </p>
+                <p className="font-sans text-sm text-brand-ink">
+                  Running{" "}
+                  <span className="font-semibold">
+                    {scheduledDays.find((d) => d.id === runningDayId)?.label ??
+                      bonusDays.find((d) => d.id === runningDayId)?.label ??
+                      "workout"}
+                  </span>
+                  . Other days are hidden so you can focus.
+                </p>
+              </div>
+              <a
+                href="#log-workout"
+                className="inline-flex min-h-10 items-center justify-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+              >
+                Jump to session
+              </a>
+            </div>
+          </section>
+        ) : (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {todayDay && onStartDay ? (
+                <button
+                  type="button"
+                  onClick={() => onStartDay(todayDay)}
+                  className={primaryBtn}
+                >
+                  Start today’s workout ({todayDay.label})
+                </button>
+              ) : (
+                <a href="#log-workout" className={primaryBtn}>
+                  Log freeform workout
+                </a>
+              )}
               <button
                 type="button"
-                onClick={() => onStartDay(todayDay)}
-                className={primaryBtn}
+                onClick={startNewPlan}
+                disabled={pending}
+                className={secondaryBtn}
               >
-                Start today’s workout ({todayDay.label})
+                Build new plan
               </button>
-            ) : (
-              <a href="#log-workout" className={primaryBtn}>
-                Log freeform workout
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={startNewPlan}
-              disabled={pending}
-              className={secondaryBtn}
-            >
-              Build new plan
-            </button>
-          </div>
-          <h2 className="font-display text-xl text-brand-ink">
-            Your active program
-          </h2>
-          <p className="font-sans text-sm text-brand-muted">
-            Customize any day, then tap Start to run it with baselines and
-            set-by-set coaching.
-          </p>
-          {renderPlanDays()}
-        </section>
+            </div>
+            <h2 className="font-display text-xl text-brand-ink">
+              Your active program
+            </h2>
+            <p className="font-sans text-sm text-brand-muted">
+              Customize any day, then tap Start to run it with baselines and
+              set-by-set coaching.
+            </p>
+            {renderPlanDays()}
+          </section>
+        )
       ) : null}
 
       {mode === "view" && !program ? (
