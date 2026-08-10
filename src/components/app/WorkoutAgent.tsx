@@ -302,6 +302,13 @@ export default function WorkoutAgent({
   }
 
   function generatePlan() {
+    const hasCustom = (program?.days ?? []).some((d) => Boolean(d.customized_at));
+    if (program && hasCustom) {
+      const ok = window.confirm(
+        "Replace your customizations? Building a new plan archives the current program and discards day edits.",
+      );
+      if (!ok) return;
+    }
     setError(null);
     setMessage(null);
     startTransition(async () => {
@@ -467,6 +474,7 @@ export default function WorkoutAgent({
               running={runningDayId === day.id}
               onStartDay={mode === "view" ? onStartDay : undefined}
               onDayChange={updateDay}
+              allowRegenerate
             />
           ))}
         </div>
@@ -567,6 +575,7 @@ export default function WorkoutAgent({
                       running={runningDayId === day.id}
                       onStartDay={onStartDay}
                       onDayChange={updateDay}
+                      allowRegenerate={false}
                     />
                   </div>
                 ))}

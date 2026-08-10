@@ -19,6 +19,8 @@ type ProgramDayEditorProps = {
   onStartDay?: (day: NestedProgramDay) => void;
   running?: boolean;
   onDayChange: (day: NestedProgramDay) => void;
+  /** Hide day-level regenerate (e.g. bonus extras). */
+  allowRegenerate?: boolean;
 };
 
 type EditMode = null | "edit" | "swap" | "add";
@@ -65,6 +67,7 @@ export default function ProgramDayEditor({
   onStartDay,
   running = false,
   onDayChange,
+  allowRegenerate = true,
 }: ProgramDayEditorProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -139,6 +142,63 @@ export default function ProgramDayEditor({
     setActiveId(null);
     setEditDraft(null);
     setSearch("");
+  }
+
+  function regenerateDay() {
+    if (day.day_kind === "bonus") {
+      setError(
+        "Bonus extras stay outside the mapped plan. Add a new extra instead of regenerating this one into the schedule.",
+      );
+      return;
+    }
+    const wipeNote = customized
+      ? "Regenerate this day with AI? Your customizations on this day will be replaced. Other days stay the same."
+      : "Regenerate this day's exercises with AI? Other days and your days-per-week stay the same.";
+    if (!window.confirm(wipeNote)) return;
+
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch(
+        `/api/app/workout/plan/days/${day.id}/regenerate`,
+        { method: "POST" },
+      );
+      const contentType = res.headers.get("content-type") ?? "";
+      const raw = await res.text();
+      if (
+        !contentType.includes("application/json") ||
+        raw.trimStart().startsWith("<!")
+      ) {
+        setError(
+          res.status === 503
+            ? "GEMINI_API_KEY is missing on the server. Add it and restart Next.js."
+            : "Day regenerate failed. Try again.",
+        );
+        return;
+      }
+      let json: {
+        ok?: boolean;
+        error?: string;
+        day?: NestedProgramDay;
+        summary?: string;
+      };
+      try {
+        json = JSON.parse(raw) as typeof json;
+      } catch {
+        setError("Day regenerate returned bad JSON.");
+        return;
+      }
+      if (!res.ok || !json.ok || !json.day) {
+        setError(json.error ?? "Could not regenerate this day.");
+        return;
+      }
+      onDayChange({
+        ...json.day,
+        exercises: [...(json.day.exercises ?? [])].sort(
+          (a, b) => a.sort_order - b.sort_order,
+        ),
+      });
+      closePanels();
+    });
   }
 
   function removeExercise(ex: NestedProgramExercise) {
@@ -417,15 +477,27 @@ export default function ProgramDayEditor({
             </p>
           ) : null}
         </div>
-        {onStartDay ? (
-          <button
-            type="button"
-            onClick={() => onStartDay(day)}
-            className="shrink-0 border border-brand-orange bg-brand-orange px-3 py-2 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
-          >
-            {running ? "Running" : "Start"}
-          </button>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {allowRegenerate && day.day_kind !== "bonus" ? (
+            <button
+              type="button"
+              onClick={regenerateDay}
+              disabled={pending}
+              className="border border-brand-ink/15 px-3 py-2 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+            >
+              {pending ? "Working…" : "Regenerate day"}
+            </button>
+          ) : null}
+          {onStartDay ? (
+            <button
+              type="button"
+              onClick={() => onStartDay(day)}
+              className="border border-brand-orange bg-brand-orange px-3 py-2 font-sans text-[0.65rem] font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+            >
+              {running ? "Running" : "Start"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <ul className="mt-3 space-y-3">

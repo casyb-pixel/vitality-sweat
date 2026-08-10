@@ -16,7 +16,9 @@ export type GaGrowthEvent =
   | "signup_complete"
   | "cta_click"
   | "grocery_share_view"
-  | "invite_landing_view";
+  | "invite_landing_view"
+  | "share_milestone_intent"
+  | "share_milestone_complete";
 
 type GaEventParams = Record<string, string | number | boolean | undefined>;
 
@@ -59,6 +61,22 @@ export function trackInviteLandingView(src?: string, gym?: string): void {
   trackGaEvent("invite_landing_view", {
     campaign_src: src,
     campaign_gym: gym,
+  });
+}
+
+export function trackShareMilestoneIntent(milestoneType: string): void {
+  trackGaEvent("share_milestone_intent", {
+    milestone_type: milestoneType,
+  });
+}
+
+export function trackShareMilestoneComplete(
+  milestoneType: string,
+  method: "web_share" | "download" | "copy_caption",
+): void {
+  trackGaEvent("share_milestone_complete", {
+    milestone_type: milestoneType,
+    share_method: method,
   });
 }
 

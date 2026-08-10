@@ -116,6 +116,36 @@ function positiveInt(value: unknown, fallback: number | null = null): number | n
   return Math.round(n);
 }
 
+/** Safer exercise selection when equipment is thin or member is a beginner. */
+function safetyTrainingGuards(
+  profile: FitnessProfile,
+  equipment: string[],
+): string[] {
+  const rules: string[] = [];
+  const eq = equipment.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const limited =
+    eq.length === 0 ||
+    eq.every((e) => e === "bodyweight" || e === "bands" || e === "home");
+
+  if (eq.length === 0) {
+    rules.push(
+      "- Equipment is unspecified: prefer versatile bodyweight, dumbbell, and machine patterns. Avoid barbell-only exotic lifts.",
+    );
+  } else if (limited) {
+    rules.push(
+      "- Equipment is limited: prefer bodyweight, bands, dumbbells, and simple machines. Avoid barbell-only or specialized exotic lifts.",
+    );
+  }
+
+  if (profile.fitness_level === "beginner") {
+    rules.push(
+      "- Beginner: use safe foundational compounds (squat pattern, hinge, push, pull, core). Avoid advanced variations (deficit, snatch-grip, kipping, extreme ROM tricks). Keep accessories simple and well-known.",
+    );
+  }
+
+  return rules;
+}
+
 /**
  * Build a concise Gemini prompt for a multi-day workout program.
  * Prefer exact catalog exercise names so resolve can match without creating duplicates.
@@ -144,6 +174,7 @@ export function buildWorkoutPlanPrompt(
   const splitLabel = split ? PREFERRED_SPLIT_LABELS[split] : "Let AI choose";
   const styleHint = goalTrainingCoaching(profile.primary_goal);
   const catalogBlock = catalogNames.slice(0, 120).join(" | ");
+  const safety = safetyTrainingGuards(profile, prefs.equipment);
 
   return [
     "You are the Vitality Sweat Peak Training coach.",
@@ -184,6 +215,7 @@ export function buildWorkoutPlanPrompt(
     `- ${styleHint}`,
     "- Prefer split: " + splitLabel + ".",
     "- Keep coachNotes to one short coaching cue when useful; otherwise null.",
+    ...safety,
     "",
     "MEMBER:",
     `- Sex: ${profile.sex ?? "unspecified"}`,
@@ -242,6 +274,7 @@ export function buildBonusDayPrompt(
       ? overlap.equipment
       : prefs.equipment;
   const catalogBlock = catalogNames.slice(0, 120).join(" | ");
+  const safety = safetyTrainingGuards(profile, equipment);
 
   return [
     "You are the Vitality Sweat Peak Training coach.",
@@ -293,6 +326,7 @@ export function buildBonusDayPrompt(
     overlap.focusHint?.trim()
       ? `- Member focus hint (honor if it does not clash with overlap rules): ${overlap.focusHint.trim()}`
       : "- No extra focus hint from the member.",
+    ...safety,
     "",
     "MEMBER:",
     `- Sex: ${profile.sex ?? "unspecified"}`,
@@ -484,4 +518,97 @@ export function parseWorkoutPlanPayload(
   } catch {
     return null;
   }
+}
+
+export type DayRegenContext = {
+  currentLabel: string;
+  currentFocus: string | null;
+  dayIndex: number | null;
+  minutes: number;
+  otherScheduled: Array<{ label: string; focus: string | null }>;
+};
+
+/**
+ * Regenerate ONE scheduled workout day without touching other days or days_per_week.
+ */
+export function buildWorkoutDayRegenPrompt(
+  profile: FitnessProfile,
+  prefs: TrainingPreferences,
+  catalogNames: string[],
+  ctx: DayRegenContext,
+): string {
+  const age = profile.birthdate ? ageFromBirthdate(profile.birthdate) : null;
+  const level = profile.fitness_level
+    ? FITNESS_LEVEL_LABELS[profile.fitness_level]
+    : "unspecified";
+  const goal = profile.primary_goal
+    ? PRIMARY_GOAL_LABELS[profile.primary_goal]
+    : "General fitness";
+  const minutes = ctx.minutes >= 5 ? ctx.minutes : 45;
+  const styleHint = goalTrainingCoaching(profile.primary_goal);
+  const catalogBlock = catalogNames.slice(0, 120).join(" | ");
+  const safety = safetyTrainingGuards(profile, prefs.equipment);
+
+  return [
+    "You are the Vitality Sweat Peak Training coach.",
+    "Regenerate ONE scheduled workout day for this member.",
+    "Do NOT redesign the whole week. Do NOT change how many days are in the program.",
+    "No medical claims. Coaching suggestions only.",
+    NO_EM_DASH_RULE,
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      summary: "string: 1-2 sentences on this day's role in the plan",
+      label: ctx.currentLabel || "Day",
+      focus: ctx.currentFocus || "full body",
+      estimatedMinutes: minutes,
+      exercises: [
+        {
+          name: "Goblet Squat",
+          sets: 3,
+          repMin: 8,
+          repMax: 12,
+          setStyle: "hypertrophy",
+          restSec: 90,
+          coachNotes: "string optional",
+        },
+      ],
+    }),
+    "",
+    "Rules:",
+    `- About ${minutes} minutes. 4-8 exercises.`,
+    "- Prefer EXACT names from CATALOG.",
+    "- setStyle must be one of: strength_heavy, hypertrophy, endurance_light, metabolic.",
+    `- ${styleHint}`,
+    `- Keep a clear day focus. Current day was: ${ctx.currentLabel} (${ctx.currentFocus ?? "unspecified"}).`,
+    "- Complement other scheduled days (do not duplicate their primary focus when avoidable):",
+    ctx.otherScheduled.length
+      ? ctx.otherScheduled
+          .map((d) => `  - ${d.label}: ${d.focus ?? "unspecified"}`)
+          .join("\n")
+      : "  - none listed",
+    "- Prefer compound lifts, then accessories.",
+    ...safety,
+    "",
+    "MEMBER:",
+    `- Sex: ${profile.sex ?? "unspecified"}`,
+    `- Age: ${age ?? "unspecified"}`,
+    `- Fitness level: ${level}`,
+    `- Primary goal: ${goal}`,
+    `- Equipment: ${prefs.equipment.join(", ") || "unspecified"}`,
+    `- Focus muscles: ${prefs.focus_muscles.join(", ") || "balanced"}`,
+    `- Avoidances: ${prefs.avoidances?.trim() || "none"}`,
+    `- Activity restrictions: ${profile.activity_restrictions?.trim() || "none"}`,
+    "",
+    "CATALOG (prefer these exact names):",
+    catalogBlock || "(empty)",
+  ].join("\n");
+}
+
+/** Day regen uses the same single-day JSON shape as bonus sessions. */
+export function parseWorkoutDayRegenPayload(
+  raw: string,
+  opts?: { fallbackStyle?: WorkoutSetStyle; minutes?: number },
+): BonusDayPayload | null {
+  return parseBonusDayPayload(raw, opts);
 }

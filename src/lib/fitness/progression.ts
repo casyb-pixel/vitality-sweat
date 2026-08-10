@@ -7,6 +7,20 @@ type PastSet = {
   set_number: number;
 };
 
+/** Hold loads when the last session for this exercise is older than this. */
+export const MISSED_WEEK_HOLD_DAYS = 10;
+
+export type SuggestProgressionOptions = {
+  /** ISO timestamp of the most recent session that included this exercise. */
+  lastSessionAt?: string | Date | null;
+  now?: Date;
+};
+
+function daysBetween(from: Date, to: Date): number {
+  const ms = to.getTime() - from.getTime();
+  return ms / (1000 * 60 * 60 * 24);
+}
+
 /**
  * Deterministic progressive-overload suggestion from the most recent
  * completed sets for an exercise.
@@ -15,10 +29,12 @@ type PastSet = {
  * - difficulty == 3 → hold weight, +1 rep target
  * - difficulty == 4 → hold weight
  * - difficulty == 5 → deload ~10%, rounded to nearest 5 lb
+ * - last session > 10 days ago → hold weight (missed-week guard)
  */
 export function suggestProgression(
   exerciseId: string,
   sets: PastSet[],
+  opts?: SuggestProgressionOptions,
 ): ProgressionSuggestion | null {
   if (!sets.length) return null;
 
@@ -32,14 +48,42 @@ export function suggestProgression(
     .map((s) => s.reps)
     .filter((r): r is number => typeof r === "number" && r >= 0);
 
-  const lastWeightLb = weights.length
-    ? Math.max(...weights)
-    : null;
+  const lastWeightLb = weights.length ? Math.max(...weights) : null;
   const lastReps = reps.length
     ? Math.round(reps.reduce((a, b) => a + b, 0) / reps.length)
     : null;
   const lastSets = sets.length;
   const roundedAvg = Math.round(avgDifficulty * 10) / 10;
+
+  const now = opts?.now ?? new Date();
+  const lastAtRaw = opts?.lastSessionAt;
+  const lastAt =
+    lastAtRaw == null
+      ? null
+      : lastAtRaw instanceof Date
+        ? lastAtRaw
+        : new Date(lastAtRaw);
+  const stale =
+    lastAt != null &&
+    Number.isFinite(lastAt.getTime()) &&
+    daysBetween(lastAt, now) > MISSED_WEEK_HOLD_DAYS;
+
+  if (stale) {
+    return {
+      exercise_id: exerciseId,
+      lastWeightLb,
+      lastReps,
+      lastSets,
+      lastAvgDifficulty: roundedAvg,
+      suggestedWeightLb: lastWeightLb,
+      suggestedReps: lastReps,
+      message:
+        lastWeightLb != null
+          ? `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold ${formatWeight(lastWeightLb)} and rebuild consistency before advancing.`
+          : `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold your last targets and rebuild consistency before advancing.`,
+      heldForMissedWeek: true,
+    };
+  }
 
   let suggestedWeightLb: number | null = lastWeightLb;
   let suggestedReps: number | null = lastReps;
@@ -48,7 +92,6 @@ export function suggestProgression(
   if (avgDifficulty <= 2) {
     if (lastWeightLb != null && lastWeightLb > 0) {
       suggestedWeightLb = roundToNearest5(lastWeightLb * 1.1);
-      // Guarantee at least a 5 lb bump when current weight is already a multiple of 5.
       if (suggestedWeightLb <= lastWeightLb) {
         suggestedWeightLb = lastWeightLb + 5;
       }
@@ -91,6 +134,7 @@ export function suggestProgression(
     suggestedWeightLb,
     suggestedReps,
     message,
+    heldForMissedWeek: false,
   };
 }
 

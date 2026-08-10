@@ -9,6 +9,7 @@ import WorkoutRunner from "@/components/app/WorkoutRunner";
 import WorkoutTracker from "@/components/app/WorkoutTracker";
 import type {
   Exercise,
+  PrimaryGoal,
   TrainingPreferences,
   WorkoutSession,
 } from "@/lib/fitness/types";
@@ -18,6 +19,8 @@ type WorkoutWorkspaceProps = {
   initialPrefs: TrainingPreferences;
   exercises: Exercise[];
   initialSession: WorkoutSession | null;
+  /** From fitness_profiles; used when program goal is missing (freeform). */
+  profileGoal?: PrimaryGoal | null;
 };
 
 function findDayById(
@@ -33,12 +36,16 @@ export default function WorkoutWorkspace({
   initialPrefs,
   exercises,
   initialSession,
+  profileGoal = null,
 }: WorkoutWorkspaceProps) {
   const [program, setProgram] = useState(initialProgram);
   const [session, setSession] = useState(initialSession);
   const [runningDay, setRunningDay] = useState<NestedProgramDay | null>(() =>
     findDayById(initialProgram, initialSession?.program_day_id),
   );
+
+  const effectiveGoal =
+    program?.primary_goal ?? profileGoal ?? null;
 
   const catalogById = useMemo(() => {
     const map = new Map(exercises.map((ex) => [ex.id, ex]));
@@ -171,6 +178,7 @@ export default function WorkoutWorkspace({
               initialSession={session}
               onSessionChange={setSession}
               onBaselinesSaved={handleBaselinesSaved}
+              primaryGoal={effectiveGoal}
               onExit={() => setRunningDay(null)}
             />
           </>
@@ -188,6 +196,7 @@ export default function WorkoutWorkspace({
             <WorkoutTracker
               exercises={exercises}
               initialSession={session}
+              primaryGoal={effectiveGoal}
               onSessionChange={setSession}
             />
           </>

@@ -19,26 +19,32 @@ import {
   logWorkoutSet,
   startWorkoutSession,
 } from "@/lib/fitness/workout-logging";
+import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
+import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
+import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
+import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
   type Exercise,
   type ExerciseCategory,
   type ExerciseEquipment,
+  type PrimaryGoal,
   type ProgressionSuggestion,
   type WorkoutSession,
   type WorkoutSet,
 } from "@/lib/fitness/types";
-import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 
 type WorkoutTrackerProps = {
   exercises: Exercise[];
   initialSession: WorkoutSession | null;
+  primaryGoal?: PrimaryGoal | null;
   onSessionChange?: (session: WorkoutSession | null) => void;
 };
 
 export default function WorkoutTracker({
   exercises: initialExercises,
   initialSession,
+  primaryGoal = null,
   onSessionChange,
 }: WorkoutTrackerProps) {
   const [catalog, setCatalog] = useState<Exercise[]>(initialExercises);
@@ -64,6 +70,8 @@ export default function WorkoutTracker({
   const [pending, startTransition] = useTransition();
   const [resolving, setResolving] = useState(false);
   const [resolveChoices, setResolveChoices] = useState<Exercise[]>([]);
+  const [restTrigger, setRestTrigger] = useState(0);
+  const [milestone, setMilestone] = useState<WorkoutMilestone | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   function setSession(next: WorkoutSession | null) {
@@ -149,6 +157,7 @@ export default function WorkoutTracker({
       setSession(result.data.session);
       setLoggedSets([]);
       setSetNumber(1);
+      setRestTrigger(0);
       setMessage(
         result.data.resumed
           ? "Resumed your active workout session."
@@ -203,6 +212,10 @@ export default function WorkoutTracker({
       }
       setLoggedSets((prev) => [...prev, result.data.set]);
       setSetNumber((n) => n + 1);
+      setRestTrigger((n) => n + 1);
+      if (result.data.milestone) {
+        setMilestone(result.data.milestone);
+      }
       setMessage(
         `Logged set ${result.data.set.set_number}. ${DIFFICULTY_LABELS[difficulty] ?? difficulty}.`,
       );
@@ -323,6 +336,22 @@ export default function WorkoutTracker({
           </>
         )}
       </div>
+
+      {session ? (
+        <WorkoutRestCoach
+          sessionId={session.id}
+          active={session.status === "active"}
+          restTrigger={restTrigger}
+          goal={primaryGoal}
+          exerciseId={exerciseId || null}
+          primaryMuscle={selected?.primary_muscle ?? null}
+        />
+      ) : null}
+
+      <MilestoneCelebrate
+        milestone={milestone}
+        onDismiss={() => setMilestone(null)}
+      />
 
       {showInvitePrompt ? (
         <InviteFriendsPrompt

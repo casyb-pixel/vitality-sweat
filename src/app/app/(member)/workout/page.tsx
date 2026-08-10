@@ -100,6 +100,7 @@ export default async function WorkoutPage() {
         initialPrefs={prefs}
         exercises={(exercises as Exercise[] | null) ?? []}
         initialSession={(activeSession as WorkoutSession | null) ?? null}
+        profileGoal={profile?.primary_goal ?? null}
       />
     </div>
   );

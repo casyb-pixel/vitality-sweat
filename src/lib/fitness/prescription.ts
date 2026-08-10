@@ -10,14 +10,14 @@ export type LastPrescription = {
   reps: number | null;
   set_style: WorkoutSetStyle | string;
   message: string;
-  source: "progression" | "baseline" | "plan" | "cache";
+  source: "progression" | "baseline" | "plan" | "cache" | "hold_stale";
   updated_at: string;
 };
 
 export type ExercisePrescription = {
   targetWeightLb: number | null;
   targetReps: number | null;
-  source: "progression" | "baseline" | "plan" | "cache";
+  source: "progression" | "baseline" | "plan" | "cache" | "hold_stale";
   message: string;
   suggestion: ProgressionSuggestion | null;
 };
@@ -68,8 +68,14 @@ export function buildExercisePrescription(input: {
   repMax: number | null;
   recentSets: PastSet[];
   lastPrescription?: LastPrescription | null;
+  /** ISO timestamp of last session that logged this exercise. */
+  lastSessionAt?: string | null;
+  now?: Date;
 }): ExercisePrescription {
-  const suggestion = suggestProgression(input.exerciseId, input.recentSets);
+  const suggestion = suggestProgression(input.exerciseId, input.recentSets, {
+    lastSessionAt: input.lastSessionAt,
+    now: input.now,
+  });
   const scheme = styleSchemeLabel(input.setStyle);
   const name = input.exerciseName.trim() || "This lift";
 
@@ -83,6 +89,16 @@ export function buildExercisePrescription(input: {
       suggestion.lastReps ??
       input.baselineReps ??
       midRepTarget(input.repMin, input.repMax);
+
+    if (suggestion.heldForMissedWeek) {
+      return {
+        targetWeightLb: weight,
+        targetReps: reps,
+        source: "hold_stale",
+        message: `${suggestion.message} Keep the ${scheme} scheme.`,
+        suggestion,
+      };
+    }
 
     let message: string;
     if (

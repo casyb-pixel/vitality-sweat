@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { detectGoalWeight } from "@/lib/fitness/milestones";
 import {
   getFitnessProfile,
   validateFitnessProfileInput,
   validateTrainingPreferencesInput,
 } from "@/lib/fitness/profile";
+import type { PrimaryGoal } from "@/lib/fitness/types";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -101,7 +103,7 @@ export async function POST(request: Request) {
   }
 }
 
-/** Partial update for training preferences (and future settings). */
+/** Partial update for training preferences and weigh-ins. */
 export async function PATCH(request: Request) {
   try {
     const supabase = await createClient();
@@ -116,27 +118,12 @@ export async function PATCH(request: Request) {
       );
     }
 
-    let body: unknown;
+    let body: Record<string, unknown>;
     try {
-      body = await request.json();
+      body = (await request.json()) as Record<string, unknown>;
     } catch {
       return NextResponse.json(
         { ok: false, error: "Invalid JSON body." },
-        { status: 400 },
-      );
-    }
-
-    const validated = validateTrainingPreferencesInput(body);
-    if (!validated.ok) {
-      return NextResponse.json(
-        { ok: false, error: validated.error },
-        { status: 400 },
-      );
-    }
-
-    if (Object.keys(validated.data).length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "No training preference fields to update." },
         { status: 400 },
       );
     }
@@ -146,15 +133,46 @@ export async function PATCH(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Complete onboarding before saving training preferences.",
+          error: "Complete onboarding before updating your fitness profile.",
         },
         { status: 404 },
       );
     }
 
+    const patch: Record<string, unknown> = {};
+
+    if ("weight_lb" in body) {
+      const weight = Number(body.weight_lb);
+      if (!Number.isFinite(weight) || weight <= 0) {
+        return NextResponse.json(
+          { ok: false, error: "weight_lb must be a positive number." },
+          { status: 400 },
+        );
+      }
+      patch.weight_lb = weight;
+    }
+
+    const prefsValidated = validateTrainingPreferencesInput(body);
+    if (!prefsValidated.ok) {
+      return NextResponse.json(
+        { ok: false, error: prefsValidated.error },
+        { status: 400 },
+      );
+    }
+    Object.assign(patch, prefsValidated.data);
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "No profile fields to update." },
+        { status: 400 },
+      );
+    }
+
+    const previousWeight = existing.weight_lb;
+
     const { data, error } = await supabase
       .from("fitness_profiles")
-      .update(validated.data)
+      .update(patch)
       .eq("id", user.id)
       .select("*")
       .single();
@@ -167,7 +185,17 @@ export async function PATCH(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, profile: data });
+    let milestone = null;
+    if (typeof patch.weight_lb === "number") {
+      milestone = detectGoalWeight({
+        previousWeightLb: previousWeight,
+        currentWeightLb: patch.weight_lb,
+        targetWeightLb: existing.target_weight_lb,
+        primaryGoal: existing.primary_goal as PrimaryGoal | null,
+      });
+    }
+
+    return NextResponse.json({ ok: true, profile: data, milestone });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";

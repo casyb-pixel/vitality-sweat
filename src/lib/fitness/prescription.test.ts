@@ -15,6 +15,25 @@ describe("suggestProgression", () => {
     assert.equal(tip.lastWeightLb, 135);
     assert.equal(tip.lastReps, 8);
   });
+
+  it("holds weight when last session is over 10 days ago", () => {
+    const tip = suggestProgression(
+      "ex-1",
+      [
+        { weight_lb: 135, reps: 8, difficulty: 1, set_number: 1 },
+        { weight_lb: 135, reps: 8, difficulty: 1, set_number: 2 },
+      ],
+      {
+        lastSessionAt: "2026-01-01T12:00:00.000Z",
+        now: new Date("2026-01-20T12:00:00.000Z"),
+      },
+    );
+    assert.ok(tip);
+    assert.equal(tip.heldForMissedWeek, true);
+    assert.equal(tip.suggestedWeightLb, 135);
+    assert.equal(tip.suggestedReps, 8);
+    assert.match(tip.message, /10 days/i);
+  });
 });
 
 describe("buildExercisePrescription", () => {
@@ -80,5 +99,25 @@ describe("buildExercisePrescription", () => {
 
     assert.ok(tip);
     assert.equal(rx.targetWeightLb, tip.suggestedWeightLb);
+  });
+
+  it("holds load with hold_stale when last session is over 10 days ago", () => {
+    const rx = buildExercisePrescription({
+      exerciseId: "ex-stale",
+      exerciseName: "Bench Press",
+      setStyle: "hypertrophy",
+      baselineWeightLb: 115,
+      baselineReps: 10,
+      repMin: 8,
+      repMax: 12,
+      recentSets: [
+        { weight_lb: 135, reps: 8, difficulty: 1, set_number: 1 },
+      ],
+      lastSessionAt: "2026-01-01T12:00:00.000Z",
+      now: new Date("2026-01-20T12:00:00.000Z"),
+    });
+    assert.equal(rx.source, "hold_stale");
+    assert.equal(rx.targetWeightLb, 135);
+    assert.equal(rx.suggestion?.heldForMissedWeek, true);
   });
 });

@@ -92,7 +92,12 @@ export async function logWorkoutSet(input: {
   weightLb: number | null;
   reps: number | null;
   difficulty: number;
-}): Promise<ApiResult<{ set: WorkoutSet }>> {
+}): Promise<
+  ApiResult<{
+    set: WorkoutSet;
+    milestone: import("@/lib/fitness/milestones").WorkoutMilestone | null;
+  }>
+> {
   const res = await fetch("/api/app/workout/sets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -108,18 +113,26 @@ export async function logWorkoutSet(input: {
   const json = (await res.json()) as {
     ok?: boolean;
     set?: WorkoutSet;
+    milestone?: import("@/lib/fitness/milestones").WorkoutMilestone | null;
     error?: string;
   };
   if (!res.ok || !json.ok || !json.set) {
     return { ok: false, error: json.error ?? "Could not log set." };
   }
-  return { ok: true, data: { set: json.set } };
+  return {
+    ok: true,
+    data: { set: json.set, milestone: json.milestone ?? null },
+  };
 }
 
 export async function fetchExerciseSuggestion(
   exerciseId: string,
 ): Promise<
-  ApiResult<{ suggestion: ProgressionSuggestion | null; sets: WorkoutSet[] }>
+  ApiResult<{
+    suggestion: ProgressionSuggestion | null;
+    sets: WorkoutSet[];
+    lastSessionAt: string | null;
+  }>
 > {
   const res = await fetch(
     `/api/app/workout/sets?exercise_id=${encodeURIComponent(exerciseId)}`,
@@ -128,6 +141,7 @@ export async function fetchExerciseSuggestion(
     ok?: boolean;
     suggestion?: ProgressionSuggestion | null;
     sets?: WorkoutSet[];
+    last_session_at?: string | null;
     error?: string;
   };
   if (!res.ok || !json.ok) {
@@ -138,6 +152,7 @@ export async function fetchExerciseSuggestion(
     data: {
       suggestion: json.suggestion ?? null,
       sets: json.sets ?? [],
+      lastSessionAt: json.last_session_at ?? null,
     },
   };
 }

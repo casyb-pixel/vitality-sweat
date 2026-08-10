@@ -17,21 +17,26 @@ import {
   saveProgramExercisePrescription,
   startWorkoutSession,
 } from "@/lib/fitness/workout-logging";
+import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
+import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
+import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
+import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
   WORKOUT_SET_STYLE_COACHING,
   WORKOUT_SET_STYLE_LABELS,
+  type PrimaryGoal,
   type WorkoutSession,
   type WorkoutSet,
   type WorkoutSetStyle,
 } from "@/lib/fitness/types";
-import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 
 type WorkoutRunnerProps = {
   day: NestedProgramDay;
   initialSession: WorkoutSession | null;
   onSessionChange: (session: WorkoutSession | null) => void;
   onExit: () => void;
+  primaryGoal?: PrimaryGoal | null;
   onBaselinesSaved?: (
     programExerciseId: string,
     baseline: { baseline_weight_lb: number; baseline_reps: number },
@@ -58,7 +63,7 @@ function styleLabel(style: WorkoutSetStyle | string): string {
   return String(style);
 }
 
-function prescription(ex: NestedProgramExercise): string {
+function formatPrescription(ex: NestedProgramExercise): string {
   const reps =
     ex.rep_min != null && ex.rep_max != null
       ? ex.rep_min === ex.rep_max
@@ -85,6 +90,7 @@ export default function WorkoutRunner({
   initialSession,
   onSessionChange,
   onExit,
+  primaryGoal = null,
   onBaselinesSaved,
 }: WorkoutRunnerProps) {
   const exercises = useMemo(
@@ -112,6 +118,8 @@ export default function WorkoutRunner({
   const [pending, startTransition] = useTransition();
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [booting, setBooting] = useState(true);
+  const [restTrigger, setRestTrigger] = useState(0);
+  const [milestone, setMilestone] = useState<WorkoutMilestone | null>(null);
 
   const current = localExercises[exerciseIndex] ?? null;
   const currentSets = useMemo(() => {
@@ -180,6 +188,7 @@ export default function WorkoutRunner({
         repMax: ex.rep_max,
         recentSets,
         lastPrescription: (ex.last_prescription as LastPrescription | null) ?? null,
+        lastSessionAt: history.ok ? history.data.lastSessionAt : null,
       });
       setPrescription(rx);
       applyPrefills(rx);
@@ -286,6 +295,7 @@ export default function WorkoutRunner({
         recentSets,
         lastPrescription:
           (updated.last_prescription as LastPrescription | null) ?? null,
+        lastSessionAt: history.ok ? history.data.lastSessionAt : null,
       });
       setPrescription(rx);
       setPhase("log");
@@ -323,6 +333,10 @@ export default function WorkoutRunner({
         return;
       }
       setLoggedSets((prev) => [...prev, result.data.set]);
+      setRestTrigger((n) => n + 1);
+      if (result.data.milestone) {
+        setMilestone(result.data.milestone);
+      }
       setMessage(
         `Logged set ${result.data.set.set_number} · ${DIFFICULTY_LABELS[difficulty] ?? difficulty}.`,
       );
@@ -348,6 +362,17 @@ export default function WorkoutRunner({
         s.exercise_id === ex.exercise_id &&
         (s.reps == null || s.difficulty == null),
     );
+  }
+
+  function skipCurrentExercise() {
+    if (!current) return;
+    const ok = window.confirm(
+      `Skip ${current.exercise?.name ?? "this exercise"} for today? It stays on your plan.`,
+    );
+    if (!ok) return;
+    setError(null);
+    setMessage(`Skipped ${current.exercise?.name ?? "exercise"} for today.`);
+    advanceToNext();
   }
 
   function tryAdvance() {
@@ -417,6 +442,7 @@ export default function WorkoutRunner({
             : Number(weightLb);
 
       const created: WorkoutSet[] = [];
+      let caughtMilestone: WorkoutMilestone | null = null;
       for (const row of catchUp) {
         const result = await logWorkoutSet({
           sessionId: session.id,
@@ -434,8 +460,12 @@ export default function WorkoutRunner({
           return;
         }
         created.push(result.data.set);
+        if (result.data.milestone && !caughtMilestone) {
+          caughtMilestone = result.data.milestone;
+        }
       }
       setLoggedSets((prev) => [...prev, ...created]);
+      if (caughtMilestone) setMilestone(caughtMilestone);
       advanceToNext();
     });
   }
@@ -554,12 +584,29 @@ export default function WorkoutRunner({
         ))}
       </div>
 
+      {session ? (
+        <WorkoutRestCoach
+          sessionId={session.id}
+          active={session.status === "active"}
+          restTrigger={restTrigger}
+          programRestSec={current.rest_sec}
+          goal={primaryGoal}
+          exerciseId={current.exercise_id}
+          primaryMuscle={current.exercise?.primary_muscle ?? null}
+        />
+      ) : null}
+
+      <MilestoneCelebrate
+        milestone={milestone}
+        onDismiss={() => setMilestone(null)}
+      />
+
       <article className="space-y-3 border border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
         <h3 className="font-display text-2xl text-brand-ink">
           {current.exercise?.name ?? "Exercise"}
         </h3>
         <p className="font-sans text-sm font-semibold text-brand-ink">
-          {prescription(current)}
+          {formatPrescription(current)}
         </p>
         <p className="border border-brand-orange/25 bg-brand-orange/5 px-3 py-2 font-sans text-sm text-brand-ink">
           <span className="font-semibold">{styleLabel(current.set_style)}:</span>{" "}
@@ -728,6 +775,14 @@ export default function WorkoutRunner({
               {exerciseIndex >= localExercises.length - 1
                 ? "Complete exercise & finish"
                 : "Done with exercise"}
+            </button>
+            <button
+              type="button"
+              onClick={skipCurrentExercise}
+              disabled={pending}
+              className={secondaryBtn}
+            >
+              Skip exercise
             </button>
           </div>
         </div>

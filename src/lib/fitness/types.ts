@@ -317,6 +317,8 @@ export type ProgressionSuggestion = {
   suggestedWeightLb: number | null;
   suggestedReps: number | null;
   message: string;
+  /** True when load was held because last session was >10 days ago. */
+  heldForMissedWeek?: boolean;
 };
 
 export type MealDay = {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { detectPersonalBest } from "@/lib/fitness/milestones";
 import { suggestProgression } from "@/lib/fitness/progression";
 import { createClient } from "@/utils/supabase/server";
 
@@ -96,6 +97,43 @@ export async function POST(request: Request) {
       );
     }
 
+    // Prior sets for PR detection (other sessions + earlier sets today).
+    const { data: priorSessions } = await supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .in("status", ["completed", "active"])
+      .limit(40);
+
+    const priorSessionIds = (priorSessions ?? [])
+      .map((s) => s.id)
+      .filter((id) => id !== sessionId);
+
+    let priorSets: { weight_lb: number | null; reps: number | null }[] = [];
+    if (priorSessionIds.length > 0) {
+      const { data: priorRows } = await supabase
+        .from("workout_sets")
+        .select("weight_lb, reps")
+        .eq("exercise_id", exerciseId)
+        .in("session_id", priorSessionIds)
+        .limit(120);
+      priorSets = priorRows ?? [];
+    }
+
+    const { data: sessionPrior } = await supabase
+      .from("workout_sets")
+      .select("weight_lb, reps")
+      .eq("session_id", sessionId)
+      .eq("exercise_id", exerciseId)
+      .limit(40);
+    priorSets = [...priorSets, ...(sessionPrior ?? [])];
+
+    const { data: exercise } = await supabase
+      .from("exercises")
+      .select("name")
+      .eq("id", exerciseId)
+      .maybeSingle();
+
     const { data, error } = await supabase
       .from("workout_sets")
       .insert({
@@ -116,7 +154,16 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, set: data });
+    const milestone = detectPersonalBest({
+      exerciseId,
+      exerciseName:
+        typeof exercise?.name === "string" ? exercise.name : null,
+      weightLb: weight,
+      reps,
+      priorSets,
+    });
+
+    return NextResponse.json({ ok: true, set: data, milestone });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
@@ -223,6 +270,11 @@ export async function GET(request: Request) {
 
     // Use the most recent session that has this exercise.
     const latestSessionId = rows[0]!.session_id;
+    const latestSession = sessions.find((s) => s.id === latestSessionId);
+    const lastSessionAt =
+      typeof latestSession?.started_at === "string"
+        ? latestSession.started_at
+        : null;
     const latestSets = rows
       .filter((s) => s.session_id === latestSessionId)
       .sort((a, b) => a.set_number - b.set_number);
@@ -235,12 +287,14 @@ export async function GET(request: Request) {
         difficulty: s.difficulty,
         set_number: s.set_number,
       })),
+      { lastSessionAt },
     );
 
     return NextResponse.json({
       ok: true,
       sets: latestSets,
       suggestion,
+      last_session_at: lastSessionAt,
     });
   } catch (error) {
     const message =
