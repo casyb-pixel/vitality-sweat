@@ -38,6 +38,7 @@ export default function CreatorStudio({
   const [articleType, setArticleType] = useState<BlogArticleType>("standard");
   const [videoScriptPreset, setVideoScriptPreset] =
     useState<VideoScriptPreset>("standard");
+  const [seedVideoPostId, setSeedVideoPostId] = useState<string | null>(null);
 
   const handlePublished = useCallback((slug: string) => {
     setHighlightSlug(slug);
@@ -74,6 +75,14 @@ export default function CreatorStudio({
     setVideoScriptPreset("app_invite");
     setTab("video");
   }, []);
+
+  const handleTagVideo = useCallback(
+    (post: { id: string; slug: string; title: string }) => {
+      setSeedVideoPostId(post.id);
+      setTab("video");
+    },
+    [],
+  );
 
   const headline =
     tab === "video"
@@ -155,6 +164,7 @@ export default function CreatorStudio({
           <MarketingProjectsPanel
             highlightSlug={highlightSlug}
             onPromosReady={clearHighlight}
+            onTagVideo={handleTagVideo}
           />
         </div>
       ) : null}
@@ -169,6 +179,8 @@ export default function CreatorStudio({
         <VideoWizard
           scriptPreset={videoScriptPreset}
           onScriptPresetConsumed={() => setVideoScriptPreset("standard")}
+          seedPostId={seedVideoPostId}
+          onSeedPostConsumed={() => setSeedVideoPostId(null)}
         />
       </div>
 

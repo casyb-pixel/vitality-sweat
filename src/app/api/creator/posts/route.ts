@@ -9,7 +9,7 @@ export const runtime = "nodejs";
  * Lists Hunter's most recently published Chronicles from Supabase `posts`
  * for the Video Studio SELECT_BLOG_CONTEXT step.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const {
@@ -23,6 +23,9 @@ export async function GET() {
       );
     }
 
+    const url = new URL(request.url);
+    const includeId = url.searchParams.get("id")?.trim() || null;
+
     const { data, error } = await supabase
       .from("posts")
       .select(
@@ -30,7 +33,7 @@ export async function GET() {
       )
       .eq("status", "published")
       .order("published_at", { ascending: false })
-      .limit(12);
+      .limit(40);
 
     if (error) {
       return NextResponse.json(
@@ -51,23 +54,41 @@ export async function GET() {
       body_markdown: string | null;
     };
 
-    const posts: CreatorPublishedPost[] = ((data ?? []) as PostRow[]).map(
-      (row) => {
-        const bodyMarkdown = row.body_markdown ?? "";
-        return {
-          id: row.id,
-          slug: row.slug,
-          title: row.title,
-          excerpt: row.excerpt || row.description || row.title,
-          description: row.description,
-          keywords: row.keywords ?? [],
-          coverImage: row.cover_image,
-          publishedAt: row.published_at,
-          bodyPreview: bodyMarkdown.slice(0, 1200),
-          bodyMarkdown: bodyMarkdown.slice(0, 12000),
-        };
-      },
-    );
+    const rows = (data ?? []) as PostRow[];
+
+    if (includeId && !rows.some((row) => row.id === includeId)) {
+      const { data: extra, error: extraError } = await supabase
+        .from("posts")
+        .select(
+          "id, slug, title, excerpt, description, keywords, cover_image, published_at, body_markdown, status",
+        )
+        .eq("id", includeId)
+        .eq("status", "published")
+        .maybeSingle();
+      if (extraError) {
+        return NextResponse.json(
+          { ok: false, error: extraError.message },
+          { status: 502 },
+        );
+      }
+      if (extra) rows.unshift(extra as PostRow);
+    }
+
+    const posts: CreatorPublishedPost[] = rows.map((row) => {
+      const bodyMarkdown = row.body_markdown ?? "";
+      return {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        excerpt: row.excerpt || row.description || row.title,
+        description: row.description,
+        keywords: row.keywords ?? [],
+        coverImage: row.cover_image,
+        publishedAt: row.published_at,
+        bodyPreview: bodyMarkdown.slice(0, 1200),
+        bodyMarkdown: bodyMarkdown.slice(0, 12000),
+      };
+    });
 
     return NextResponse.json({ ok: true, posts });
   } catch (error) {

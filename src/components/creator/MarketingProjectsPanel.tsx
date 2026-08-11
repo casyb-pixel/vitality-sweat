@@ -18,11 +18,14 @@ type MarketingProjectsPanelProps = {
   /** After Blog Wizard publishes, jump focus + generate promos for this slug. */
   highlightSlug?: string | null;
   onPromosReady?: () => void;
+  /** Open Video Studio pre-seeded to tag a video for this published post. */
+  onTagVideo?: (post: { id: string; slug: string; title: string }) => void;
 };
 
 export default function MarketingProjectsPanel({
   highlightSlug = null,
   onPromosReady,
+  onTagVideo,
 }: MarketingProjectsPanelProps) {
   const [projects, setProjects] = useState<MarketingProject[]>([]);
   const [videoQueue, setVideoQueue] = useState<
@@ -38,16 +41,20 @@ export default function MarketingProjectsPanel({
       signupUrl: string | null;
     }[]
   >([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [promoLoadingId, setPromoLoadingId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (archived = false) => {
     setError(null);
+    setLoading(true);
     try {
-      const res = await fetch("/api/creator/marketing-projects");
+      const res = await fetch(
+        `/api/creator/marketing-projects${archived ? "?archived=1" : ""}`,
+      );
       const data = (await res.json()) as {
         ok: boolean;
         error?: string;
@@ -70,12 +77,12 @@ export default function MarketingProjectsPanel({
   }, []);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    void loadProjects(showArchived);
+  }, [loadProjects, showArchived]);
 
   // After publish: ensure the new project is listed and promo copy is generated.
   useEffect(() => {
-    if (!highlightSlug) return;
+    if (!highlightSlug || showArchived) return;
 
     let cancelled = false;
 
@@ -148,7 +155,7 @@ export default function MarketingProjectsPanel({
     return () => {
       cancelled = true;
     };
-  }, [highlightSlug, onPromosReady]);
+  }, [highlightSlug, onPromosReady, showArchived]);
 
   async function toggleChecklist(
     project: MarketingProject,
@@ -220,24 +227,33 @@ export default function MarketingProjectsPanel({
     }
   }
 
-  async function archiveProject(project: MarketingProject) {
+  async function setArchivedState(project: MarketingProject, archive: boolean) {
     setBusyId(project.id);
     setError(null);
     try {
       const res = await fetch("/api/creator/marketing-projects/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId: project.id, archive: true }),
+        body: JSON.stringify({ postId: project.id, archive }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Could not archive project.");
+        setError(
+          data.error ??
+            (archive
+              ? "Could not archive project."
+              : "Could not restore project."),
+        );
         return;
       }
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Network error archiving project.",
+        err instanceof Error
+          ? err.message
+          : archive
+            ? "Network error archiving project."
+            : "Network error restoring project.",
       );
     } finally {
       setBusyId(null);
@@ -340,7 +356,7 @@ export default function MarketingProjectsPanel({
       <section className="space-y-3 border-2 border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
         <p className="eyebrow text-brand-orange">7-Day Marketing Projects</p>
         <p className="font-sans text-sm text-brand-muted">
-          Loading active projects…
+          {showArchived ? "Loading archives…" : "Loading active projects…"}
         </p>
       </section>
     );
@@ -348,15 +364,29 @@ export default function MarketingProjectsPanel({
 
   return (
     <section className="space-y-4">
-      <div className="space-y-1">
-        <p className="eyebrow text-brand-orange">7-Day Marketing Projects</p>
-        <h2 className="font-display text-[clamp(1.45rem,4vw,1.85rem)] leading-[1.1] text-brand-ink">
-          Keep the Chronicle circulating
-        </h2>
-        <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted">
-          Each published post becomes a 7-day push: 3 social captions + 3 short
-          videos. Check items off as you post — archive when the loop is done.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <p className="eyebrow text-brand-orange">
+            {showArchived ? "Archived projects" : "7-Day Marketing Projects"}
+          </p>
+          <h2 className="font-display text-[clamp(1.45rem,4vw,1.85rem)] leading-[1.1] text-brand-ink">
+            {showArchived
+              ? "Reopen old Chronicles"
+              : "Keep the Chronicle circulating"}
+          </h2>
+          <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted">
+            {showArchived
+              ? "Archived projects stay published on the site. Restore one to the active board, or jump to Video Studio to tag a clip on an older post."
+              : "Each published post becomes a 7-day push: 3 social captions + 3 short videos. Archive anytime to clear your board; reopen archives when you want to finish later."}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={secondaryBtn}
+          onClick={() => setShowArchived((value) => !value)}
+        >
+          {showArchived ? "Back to active" : "View archives"}
+        </button>
       </div>
 
       {error ? (
@@ -368,7 +398,7 @@ export default function MarketingProjectsPanel({
         </p>
       ) : null}
 
-      {videoQueue.length > 0 ? (
+      {videoQueue.length > 0 && !showArchived ? (
         <div className="border-2 border-brand-orange/30 bg-brand-orange/5 p-4 sm:p-5">
           <p className="eyebrow text-brand-orange">Video promo queue</p>
           <p className="mt-1 font-sans text-sm text-brand-muted">
@@ -426,8 +456,9 @@ export default function MarketingProjectsPanel({
       {projects.length === 0 ? (
         <div className="border-2 border-dashed border-brand-ink/15 bg-surface p-5">
           <p className="font-sans text-sm text-brand-muted">
-            No active marketing projects yet. Publish a Chronicle from the Blog
-            Wizard and it will land here with swipe-ready promo copy.
+            {showArchived
+              ? "No archived projects yet. Archive an active project to clear your board without deleting the Chronicle."
+              : "No active marketing projects yet. Publish a Chronicle from the Blog Wizard, or restore one from archives."}
           </p>
         </div>
       ) : (
@@ -606,22 +637,57 @@ export default function MarketingProjectsPanel({
                   </div>
                 </div>
 
-                {progress.complete ? (
-                  <div className="mt-5 border-t border-brand-ink/10 pt-4">
-                    <button
-                      type="button"
-                      className={primaryBtn}
-                      disabled={rowBusy}
-                      onClick={() => archiveProject(project)}
-                    >
-                      {rowBusy ? "Archiving…" : "Archive Project"}
-                    </button>
-                    <p className="mt-2 font-sans text-xs text-brand-muted">
-                      All 6 deliverables checked — archive clears it from the
-                      active board.
-                    </p>
-                  </div>
-                ) : null}
+                <div className="mt-5 space-y-2 border-t border-brand-ink/10 pt-4">
+                  {showArchived ? (
+                    <>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          className={primaryBtn}
+                          disabled={rowBusy}
+                          onClick={() => setArchivedState(project, false)}
+                        >
+                          {rowBusy ? "Restoring…" : "Restore to active"}
+                        </button>
+                        {onTagVideo ? (
+                          <button
+                            type="button"
+                            className={`${secondaryBtn} w-full sm:w-auto`}
+                            onClick={() =>
+                              onTagVideo({
+                                id: project.id,
+                                slug: project.slug,
+                                title: project.title,
+                              })
+                            }
+                          >
+                            Tag video in Video Studio
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="font-sans text-xs text-brand-muted">
+                        Restore puts this Chronicle back on your active board.
+                        Tag video opens Video Studio with this post selected.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={primaryBtn}
+                        disabled={rowBusy}
+                        onClick={() => setArchivedState(project, true)}
+                      >
+                        {rowBusy ? "Archiving…" : "Archive project"}
+                      </button>
+                      <p className="font-sans text-xs text-brand-muted">
+                        {progress.complete
+                          ? "Checklist complete. Archive clears it from the active board."
+                          : "Archive anytime to clear your board. You can reopen it from View archives later."}
+                      </p>
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

@@ -25,7 +25,7 @@ type PatchBody = {
 };
 
 /**
- * Updates a marketing checklist flag, archives a completed project,
+ * Updates a marketing checklist flag, archives / unarchives a project,
  * or sets Target Blog Section for a video deliverable.
  */
 export async function PATCH(request: Request) {
@@ -120,24 +120,9 @@ export async function PATCH(request: Request) {
     };
 
     if (body.archive === true) {
-      const row = existing as BlogPostRecord & Record<string, boolean>;
-      const allDone =
-        Boolean(row.fb_post_done) &&
-        Boolean(row.ig_post_done) &&
-        Boolean(row.x_post_done) &&
-        Boolean(row.video_1_done) &&
-        Boolean(row.video_2_done) &&
-        Boolean(row.video_3_done);
-      if (!allDone) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Finish all 6 checklist items before archiving.",
-          },
-          { status: 400 },
-        );
-      }
       updates.is_archived = true;
+    } else if (body.archive === false) {
+      updates.is_archived = false;
     } else if (body.checklistKey) {
       if (!isChecklistKey(body.checklistKey)) {
         return NextResponse.json(
@@ -158,7 +143,7 @@ export async function PATCH(request: Request) {
         {
           ok: false,
           error:
-            "Send `checklistKey` + `done`, `targetSectionAnchor`, or `archive: true`.",
+            "Send `checklistKey` + `done`, `targetSectionAnchor`, or `archive: true|false`.",
         },
         { status: 400 },
       );

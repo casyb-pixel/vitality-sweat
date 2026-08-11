@@ -105,9 +105,14 @@ function downloadBlob(blob: Blob, filename: string) {
 export default function VideoWizard({
   scriptPreset: scriptPresetProp = "standard",
   onScriptPresetConsumed,
+  seedPostId = null,
+  onSeedPostConsumed,
 }: {
   scriptPreset?: VideoScriptPreset;
   onScriptPresetConsumed?: () => void;
+  /** Pre-select this published post (e.g. from archived marketing project). */
+  seedPostId?: string | null;
+  onSeedPostConsumed?: () => void;
 } = {}) {
   const videoInputId = useId();
   const videoCameraInputId = useId();
@@ -208,7 +213,10 @@ export default function VideoWizard({
     setPostsLoading(true);
     setPostsError(null);
     try {
-      const res = await fetch("/api/creator/posts");
+      const query = seedPostId
+        ? `/api/creator/posts?id=${encodeURIComponent(seedPostId)}`
+        : "/api/creator/posts";
+      const res = await fetch(query);
       const data = (await res.json()) as {
         ok: boolean;
         error?: string;
@@ -227,7 +235,7 @@ export default function VideoWizard({
     } finally {
       setPostsLoading(false);
     }
-  }, []);
+  }, [seedPostId]);
 
   const loadResumeProjects = useCallback(async () => {
     setResumeLoading(true);
@@ -268,6 +276,25 @@ export default function VideoWizard({
     void loadPosts();
     void loadResumeProjects();
   }, [loadPosts, loadResumeProjects]);
+
+  useEffect(() => {
+    if (!seedPostId || postsLoading || !posts.length) return;
+    const match = posts.find((post) => post.id === seedPostId);
+    if (!match) {
+      onSeedPostConsumed?.();
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      await selectBlog(match);
+      if (!cancelled) onSeedPostConsumed?.();
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Seed handoff only: selectBlog is defined later in the component body.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedPostId, postsLoading, posts, onSeedPostConsumed]);
 
   useEffect(() => {
     return () => {
