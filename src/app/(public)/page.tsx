@@ -5,7 +5,7 @@ import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
 import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
-import { getFeaturedBlogPostAsync } from "@/lib/blog/posts";
+import { getLatestBlogPostAsync } from "@/lib/blog/posts";
 import {
   getMetro,
   marketSignupCopy,
@@ -70,8 +70,10 @@ type HomePageProps = {
   searchParams?: Promise<{ market?: string }>;
 };
 
+export const revalidate = 60;
+
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const featuredPost = await getFeaturedBlogPostAsync();
+  const latestPost = await getLatestBlogPostAsync();
   const params = searchParams ? await searchParams : {};
   const market = normalizeMarketParam(params.market ?? null);
   const metro = market ? getMetro(market) : null;
@@ -84,6 +86,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         utmCampaign: `market_${market}`,
       }
     : undefined;
+  const latestPublished = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(latestPost.datePublished));
 
   return (
     <>
@@ -117,7 +124,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <p className="animate-fade-up-delay-2 mt-5 max-w-xl font-sans text-lg leading-relaxed text-white/88 sm:text-xl">
             {market
               ? copy.heroSupport
-              : "Train with purpose. Eat for performance. Build the next generation of athletes - one sweat-honest session at a time."}
+              : "Vitality Sweat is Hunter Broussard's Southwest Louisiana coaching brand for fitness training, peak nutrition, and youth baseball. Train. Fuel. Compete."}
           </p>
           <div className="animate-fade-up-delay-2 mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
             <SignupCtaLink
@@ -165,16 +172,23 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Built from grit, coached with heart.
             </h2>
             <p className="mt-5 max-w-2xl font-sans text-lg leading-relaxed text-brand-muted">
-              Vitality Sweat is Hunter Broussard&apos;s platform for athletes and
-              families who want more than generic programs — real coaching,
-              nutrition that fits your kitchen, and youth baseball development
-              rooted in Southwest Louisiana.
+              Vitality Sweat is Hunter Broussard&apos;s Southwest Louisiana
+              training and coaching brand for athletes and families. We deliver
+              real coaching, nutrition that fits your kitchen, and youth baseball
+              development rooted in Acadiana, not generic one-size programs.
             </p>
             <p className="mt-4 max-w-2xl font-sans text-lg leading-relaxed text-brand-muted">
-              From the first workout plan to the Sweatlife Chronicles, every
-              piece is designed to help you show up stronger — in the gym, on
-              the field, and in everyday life.
+              From the first workout plan in the Vitality Engine to Sweatlife
+              Chronicles coaching notes, every piece is designed to help you show
+              up stronger in the gym, on the field, and in everyday life.
             </p>
+            <Link
+              href="/about"
+              className="mt-8 mr-6 inline-flex items-center gap-2 font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange transition-colors hover:text-brand-orange-deep"
+            >
+              About Vitality Sweat
+              <span aria-hidden>→</span>
+            </Link>
             <Link
               href="/chronicles"
               className="mt-8 inline-flex items-center gap-2 font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange transition-colors hover:text-brand-orange-deep"
@@ -267,42 +281,42 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      {/* Featured Chronicles */}
+      {/* Latest Chronicles */}
       <section className="section-y">
         <div className="site-shell">
           <p className="eyebrow text-brand-orange">Sweatlife Chronicles</p>
           <h2 className="mt-3 max-w-2xl font-display text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-brand-ink text-balance">
-            Featured from The Sweatlife Chronicles
+            Latest from The Sweatlife Chronicles
           </h2>
-          <p className="mt-3 max-w-xl font-sans text-lg text-brand-muted">
-            {featuredPost.excerpt}
-          </p>
 
           <div className="mt-10 grid items-stretch gap-8 lg:grid-cols-12 lg:gap-12">
-            <div className="relative min-h-[18rem] overflow-hidden bg-brand-ink/5 lg:col-span-7 lg:min-h-[24rem]">
+            <Link
+              href={`/blog/${latestPost.slug}`}
+              className="group relative min-h-[18rem] overflow-hidden bg-brand-ink/5 lg:col-span-7 lg:min-h-[24rem]"
+            >
               <Image
-                src={featuredPost.coverImage}
-                alt={featuredPost.coverAlt}
+                src={latestPost.coverImage}
+                alt={latestPost.coverAlt}
                 fill
                 sizes="(max-width: 1024px) 100vw, 58vw"
-                className="object-cover"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
-            </div>
+            </Link>
             <div className="flex flex-col justify-center lg:col-span-5">
-              <p className="eyebrow">Weight loss · Nutrition</p>
+              <p className="eyebrow">{latestPublished}</p>
               <h3 className="mt-3 font-display text-[clamp(1.75rem,3vw,2.5rem)] leading-[1.1] text-brand-ink text-balance">
-                {featuredPost.title}
+                {latestPost.title}
               </h3>
-              {featuredPost.subtitle ? (
+              {latestPost.subtitle ? (
                 <p className="mt-3 font-display text-lg text-brand-orange">
-                  {featuredPost.subtitle}
+                  {latestPost.subtitle}
                 </p>
               ) : null}
               <p className="mt-4 font-sans leading-relaxed text-brand-muted">
-                {featuredPost.description}
+                {latestPost.excerpt}
               </p>
               <Link
-                href={`/blog/${featuredPost.slug}`}
+                href={`/blog/${latestPost.slug}`}
                 className="mt-8 inline-flex w-fit items-center justify-center bg-brand-orange px-7 py-3.5 font-sans text-sm font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
               >
                 Read Article

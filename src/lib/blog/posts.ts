@@ -6,10 +6,14 @@ import {
 import {
   absoluteUrl,
   BRAND_ALTERNATE_NAMES,
+  BRAND_DISAMBIGUATING_DESCRIPTION,
+  BRAND_ENTITY_DEFINITION,
+  BRAND_KNOWS_ABOUT,
   DEFAULT_DESCRIPTION,
   DEFAULT_OG_IMAGE,
   FOUNDING_PERSON_NAME,
   SITE_NAME,
+  SITE_TAGLINE,
   SITE_URL,
   SOCIAL_PROFILE_URLS,
 } from "@/lib/seo/site";
@@ -169,6 +173,16 @@ export async function getFeaturedBlogPostAsync(): Promise<MigratedPost> {
   return all.find((post) => post.featured) ?? all[0] ?? getFeaturedBlogPost();
 }
 
+/** Newest published post (static archive + Supabase catalog). */
+export function getLatestBlogPost(): MigratedPost {
+  return BLOG_POSTS[0] ?? getFeaturedBlogPost();
+}
+
+export async function getLatestBlogPostAsync(): Promise<MigratedPost> {
+  const all = await getAllBlogPostsAsync();
+  return all[0] ?? getLatestBlogPost();
+}
+
 export function buildArticleJsonLd(post: MigratedPost) {
   const url = absoluteUrl(`/blog/${post.slug}`);
   const cover = absoluteUrl(
@@ -211,18 +225,23 @@ export function buildArticleJsonLd(post: MigratedPost) {
 export function buildOrganizationJsonLd() {
   return {
     "@context": "https://schema.org",
+    // Coaching / media brand. Not ClothingStore, OnlineStore, or esports org.
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
     name: SITE_NAME,
+    legalName: SITE_NAME,
     alternateName: [...BRAND_ALTERNATE_NAMES],
     url: SITE_URL,
     logo: absoluteUrl("/branding/logo-original-transparent.svg"),
-    description:
-      "Vitality Sweat offers fitness training, nutrition coaching, and youth baseball development with Hunter Broussard in Southwest Louisiana.",
+    slogan: SITE_TAGLINE,
+    description: BRAND_ENTITY_DEFINITION,
+    disambiguatingDescription: BRAND_DISAMBIGUATING_DESCRIPTION,
+    knowsAbout: [...BRAND_KNOWS_ABOUT],
     sameAs: SOCIAL_PROFILE_URLS,
     founder: {
       "@type": "Person",
       name: FOUNDING_PERSON_NAME,
+      jobTitle: "Founder and coach",
       url: absoluteUrl("/about"),
     },
     areaServed: {
