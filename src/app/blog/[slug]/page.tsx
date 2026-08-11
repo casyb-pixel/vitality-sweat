@@ -16,7 +16,7 @@ import {
 import { fetchPublishedVideoEmbedsForPost } from "@/lib/blog/video-embeds";
 import { blogMidAdSlotId } from "@/lib/marketing/growth-packaging";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
-import { getFeaturedGear } from "@/lib/store/products";
+import { getLiveFeaturedGear } from "@/lib/store/catalog";
 
 /**
  * Always render on request so newly published Creator Studio posts
@@ -93,7 +93,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
         year: "numeric",
       }).format(publishedDate);
 
-  const featuredGear = getFeaturedGear(4);
+  const featuredGear = await getLiveFeaturedGear(4);
   const coverSrc =
     post.coverImage?.trim() || "/images/hero-strength-stamina-collage.png";
   const ogSrc = post.ogImage?.trim() || coverSrc;

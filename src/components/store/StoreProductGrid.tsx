@@ -15,22 +15,37 @@ type FeedResponse = {
 
 type StoreProductGridProps = {
   initialProducts: StoreProduct[];
+  initialSource?: "printful" | "fallback";
+  initialNote?: string | null;
 };
 
 export default function StoreProductGrid({
   initialProducts,
+  initialSource = "fallback",
+  initialNote = null,
 }: StoreProductGridProps) {
   const [products, setProducts] = useState<StoreProduct[]>(initialProducts);
   const [source, setSource] = useState<"printful" | "fallback" | "loading">(
-    "loading",
+    initialSource,
   );
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(initialNote);
 
   useEffect(() => {
+    setProducts(initialProducts);
+    setSource(initialSource);
+    setNote(initialNote);
+  }, [initialProducts, initialSource, initialNote]);
+
+  useEffect(() => {
+    // Live catalog already rendered on the server. Only refresh when we started
+    // from placeholders so Printful can replace them without a flash of stubs.
+    if (initialSource === "printful") return;
+
     let cancelled = false;
     const controller = new AbortController();
 
     async function load() {
+      setSource("loading");
       try {
         const res = await fetch("/api/products/feed", {
           signal: controller.signal,
@@ -46,15 +61,13 @@ export default function StoreProductGrid({
         } else {
           setProducts(initialProducts);
           setSource("fallback");
-          setNote("Empty Printful feed — showing local catalog.");
+          setNote("Empty Printful feed — showing local fallback catalog.");
         }
       } catch {
         if (cancelled) return;
         setProducts(initialProducts);
         setSource("fallback");
-        setNote(
-          "Could not reach the product feed — showing local catalog.",
-        );
+        setNote("Could not reach the product feed — showing local catalog.");
       }
     }
 
@@ -63,7 +76,7 @@ export default function StoreProductGrid({
       cancelled = true;
       controller.abort();
     };
-  }, [initialProducts]);
+  }, [initialProducts, initialSource]);
 
   const statusLabel = useMemo(() => {
     if (source === "loading") return "Syncing Printful catalog…";

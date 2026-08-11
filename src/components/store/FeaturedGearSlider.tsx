@@ -45,6 +45,7 @@ export default function FeaturedGearSlider({ products }: FeaturedGearSliderProps
                   fill
                   sizes="288px"
                   className="object-cover"
+                  unoptimized={product.image.startsWith("http")}
                 />
               </div>
               <p className="font-display text-lg text-brand-ink">{product.name}</p>

@@ -11,7 +11,7 @@ import { createClient } from "@/utils/supabase/client";
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
-  { href: "/chronicles", label: "The Sweatlife Chronicles" },
+  { href: "/chronicles", label: "Chronicles", title: "The Sweatlife Chronicles" },
   { href: "/store", label: "Store" },
 ] as const;
 
@@ -121,13 +121,14 @@ export default function Navbar() {
 
         <nav
           aria-label="Primary"
-          className="hidden items-center gap-8 md:flex"
+          className="hidden items-center gap-6 md:flex"
         >
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="font-sans text-[0.95rem] font-semibold tracking-wide text-brand-ink transition-colors hover:text-brand-orange"
+              title={"title" in link ? link.title : undefined}
+              className="whitespace-nowrap font-sans text-[0.95rem] font-semibold tracking-wide text-brand-ink transition-colors hover:text-brand-orange"
             >
               {link.label}
             </Link>
@@ -197,7 +198,7 @@ export default function Navbar() {
               onClick={() => setOpen(false)}
               className="border-b border-brand-ink/10 py-4 font-display text-2xl text-brand-ink"
             >
-              {link.label}
+              {"title" in link ? link.title : link.label}
             </Link>
           ))}
           <div className="mt-4 space-y-1 border-b border-brand-ink/10 pb-4">

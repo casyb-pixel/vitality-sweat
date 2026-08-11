@@ -12,11 +12,14 @@ import {
 } from "@/lib/seo/site";
 import {
   buildStoreCollectionJsonLd,
-  STORE_PRODUCTS,
 } from "@/lib/store/products";
+import { getStorefrontCatalog } from "@/lib/store/catalog";
 
 const STORE_DESCRIPTION =
-  "Official Vitality Sweat training gear for the coaching community. Printful-synced hoodies and variants under the Vitality Sweat brand.";
+  "Secondary training gear from Vitality Sweat, Hunter Broussard's Southwest Louisiana coaching brand. Official hoodies and variants for the Sweatlife community.";
+
+/** Refresh live Printful merch about every 5 minutes. */
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Store",
@@ -35,7 +38,7 @@ export const metadata: Metadata = {
         url: absoluteUrl("/images/stock/fitness/gear-wakeup-flatlay.jpg"),
         width: 1200,
         height: 630,
-        alt: "Official Vitality Sweat training gear",
+        alt: "Official Vitality Sweat training gear for the coaching community",
       },
     ],
   },
@@ -47,11 +50,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function StorePage() {
+export default async function StorePage() {
+  const catalog = await getStorefrontCatalog();
+
   return (
     <>
       <Navbar />
-      <JsonLd data={buildStoreCollectionJsonLd(STORE_PRODUCTS)} />
+      <JsonLd data={buildStoreCollectionJsonLd(catalog.products)} />
       <div className="bg-surface">
         <section className="relative isolate min-h-[42vh] overflow-hidden bg-surface-dark text-white">
           <Image
@@ -66,14 +71,14 @@ export default function StorePage() {
           <div className="site-shell relative flex min-h-[42vh] flex-col justify-end pb-12 pt-24">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="eyebrow text-brand-orange">Official brand gear</p>
+                <p className="eyebrow text-brand-orange">Coaching community gear</p>
                 <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.5rem,6vw,4rem)] leading-[0.95]">
                   Vitality Sweat Store
                 </h1>
                 <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
-                  Official Vitality Sweat gear for the coaching community. Live
-                  Printful catalog with hoodie colors, sizes, and mockups for the
-                  Sweatlife.
+                  Secondary merch for the Vitality Sweat coaching community.
+                  Training gear sits behind fitness, nutrition, and youth baseball.
+                  Live Printful catalog for the Sweatlife.
                 </p>
               </div>
               <Link
@@ -87,7 +92,11 @@ export default function StorePage() {
         </section>
 
         <section className="section-y site-shell">
-          <StoreProductGrid initialProducts={STORE_PRODUCTS} />
+          <StoreProductGrid
+            initialProducts={catalog.products}
+            initialSource={catalog.source}
+            initialNote={catalog.message}
+          />
         </section>
       </div>
       <SiteFooter />
