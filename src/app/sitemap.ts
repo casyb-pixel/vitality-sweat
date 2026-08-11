@@ -1,6 +1,17 @@
 import type { MetadataRoute } from "next";
-import { getAllBlogPostsAsync } from "@/lib/blog/posts";
+import { getAllBlogPosts, getAllBlogPostsAsync } from "@/lib/blog/posts";
 import { SITE_URL } from "@/lib/seo/site";
+
+function blogSitemapEntries(
+  posts: { slug: string; dateModified?: string; datePublished: string; featured?: boolean }[],
+): MetadataRoute.Sitemap {
+  return posts.map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.dateModified || post.datePublished),
+    changeFrequency: "monthly" as const,
+    priority: post.featured ? 0.9 : 0.7,
+  }));
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -24,6 +35,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${SITE_URL}/advertise`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: `${SITE_URL}/privacy`,
       lastModified: now,
       changeFrequency: "yearly",
@@ -43,13 +60,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const posts = await getAllBlogPostsAsync();
-  const blogRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
-    url: `${SITE_URL}/blog/${post.slug}`,
-    lastModified: new Date(post.dateModified || post.datePublished),
-    changeFrequency: "monthly" as const,
-    priority: post.featured ? 0.9 : 0.7,
-  }));
+  let blogRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const posts = await getAllBlogPostsAsync();
+    blogRoutes = blogSitemapEntries(posts);
+  } catch (error) {
+    console.error(
+      "[sitemap] Remote blog catalog failed; falling back to local archive.",
+      error,
+    );
+    try {
+      blogRoutes = blogSitemapEntries(getAllBlogPosts());
+    } catch (fallbackError) {
+      console.error(
+        "[sitemap] Local blog archive also failed; static routes only.",
+        fallbackError,
+      );
+    }
+  }
 
   return [...staticRoutes, ...blogRoutes];
 }

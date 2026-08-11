@@ -88,18 +88,18 @@ export default function InviteLandingClient({
         {isGym && gymLabel
           ? `${gymLabel} · Partner invite`
           : market
-            ? `${copy.shortLabel} · Vitality Engine`
-            : "Vitality Engine"}
+            ? `${copy.shortLabel} · Vitality Sweat`
+            : "Vitality Sweat"}
       </p>
       <h1 className="mt-3 font-display text-[clamp(2.2rem,6vw,3.4rem)] leading-[1.05] text-brand-ink">
         Train. Fuel. Compete. - free.
       </h1>
       <p className="mt-4 font-sans text-base leading-relaxed text-brand-muted sm:text-lg">
         {isGym && gymLabel
-          ? `You're one scan away from the free Vitality Engine - workouts, meal plans, and grocery lists built for how Southwest Louisiana trains. Thanks for training with ${gymLabel}.`
+          ? `You're one scan away from Vitality Sweat - free workouts, meal plans, and grocery lists in the Vitality Engine, built for how Southwest Louisiana trains. Thanks for training with ${gymLabel}.`
           : market
             ? `${copy.heroSupport} ${copy.trainWithUs}.`
-            : "Create a free Vitality Engine account for workouts, meal plans, and shareable grocery lists - built for Acadiana / SWLA."}
+            : "Create a free Vitality Sweat account for workouts, meal plans, and shareable grocery lists in the Vitality Engine - built for Acadiana / SWLA."}
       </p>
 
       <ul className="mt-8 space-y-3 font-sans text-sm text-brand-ink">

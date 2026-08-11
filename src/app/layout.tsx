@@ -4,7 +4,7 @@ import AuthGate from "@/components/auth/AuthGate";
 import ReferralCapture from "@/components/auth/ReferralCapture";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import JsonLd from "@/components/seo/JsonLd";
-import { buildOrganizationJsonLd } from "@/lib/blog/posts";
+import { buildOrganizationJsonLd, buildWebSiteJsonLd } from "@/lib/blog/posts";
 import {
   DEFAULT_DESCRIPTION,
   DEFAULT_OG_IMAGE,
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
         url: DEFAULT_OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: "Vitality Sweat — strength, stamina, and youth baseball",
+        alt: "Vitality Sweat: strength, stamina, and youth baseball",
       },
     ],
   },
@@ -106,7 +106,7 @@ export default function RootLayout({
         <GoogleAnalytics />
         <ReferralCapture />
         <AuthGate />
-        <JsonLd data={buildOrganizationJsonLd()} />
+        <JsonLd data={[buildOrganizationJsonLd(), buildWebSiteJsonLd()]} />
         <main className="flex-1">{children}</main>
       </body>
     </html>

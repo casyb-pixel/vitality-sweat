@@ -53,7 +53,7 @@ export const METROS: readonly MetroDefinition[] = [
     shortLabel: "Lake Charles",
     trainWithUs: "Train with us in Lake Charles",
     heroSupport:
-      "Bring Vitality Engine to Lake Charles: log sessions, plan meals, share the grocery list.",
+      "Bring Vitality Sweat to Lake Charles: log sessions, plan meals, and share the grocery list in the Vitality Engine.",
     zips: ["70601", "70602", "70605", "70606", "70607", "70611", "70615"],
   },
   {
@@ -62,7 +62,7 @@ export const METROS: readonly MetroDefinition[] = [
     shortLabel: "New Iberia",
     trainWithUs: "Train with us in New Iberia",
     heroSupport:
-      "Free Vitality Engine for New Iberia and Iberia Parish: workouts + meal plans close to home.",
+      "Free Vitality Sweat for New Iberia and Iberia Parish: workouts and meal plans in the Vitality Engine, close to home.",
     zips: ["70560", "70562", "70563"],
   },
   {
@@ -80,7 +80,7 @@ export const METROS: readonly MetroDefinition[] = [
     shortLabel: "Crowley",
     trainWithUs: "Train with us in Crowley",
     heroSupport:
-      "Vitality Engine for Crowley and Acadia Parish: train, fuel, compete.",
+      "Vitality Sweat for Crowley and Acadia Parish: train, fuel, compete in the Vitality Engine.",
     zips: ["70526", "70527"],
   },
   {
@@ -89,7 +89,7 @@ export const METROS: readonly MetroDefinition[] = [
     shortLabel: "SWLA",
     trainWithUs: "Train with us across Southwest Louisiana",
     heroSupport:
-      "Free Vitality Engine account: workouts, meal plans, and grocery lists for SWLA.",
+      "Free Vitality Sweat account: workouts, meal plans, and grocery lists for SWLA in the Vitality Engine.",
     zips: ["70510", "70528", "70533", "70542", "70546", "70548", "70555"],
   },
 ] as const;

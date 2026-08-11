@@ -3,8 +3,17 @@
  */
 export const SITE_NAME = "Vitality Sweat";
 export const SITE_TAGLINE = "Train. Fuel. Compete.";
+/** Product / editorial names under the Vitality Sweat brand (not alternate orgs). */
+export const APP_PRODUCT_NAME = "Vitality Engine";
+export const EDITORIAL_NAME = "The Sweatlife Chronicles";
+export const BRAND_ALTERNATE_NAMES = [
+  "vitalitysweat",
+  "Vitality Engine",
+  "Sweatlife Chronicles",
+] as const;
+export const FOUNDING_PERSON_NAME = "Hunter Broussard";
 export const DEFAULT_DESCRIPTION =
-  "On-demand fitness training, peak-performance nutrition, and youth baseball lessons from Hunter Broussard in Southwest Louisiana. Read The Sweatlife Chronicles.";
+  "Vitality Sweat: on-demand fitness training, peak-performance nutrition, and youth baseball lessons from Hunter Broussard in Southwest Louisiana. Read The Sweatlife Chronicles.";
 
 /** Production canonical origin — override with NEXT_PUBLIC_SITE_URL in env. */
 export const SITE_URL = (

@@ -11,7 +11,7 @@ import {
   marketSignupCopy,
   normalizeMarketParam,
 } from "@/lib/markets/metros";
-import { buildCanonical, DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+import { buildCanonical, DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, SITE_NAME } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
   title: {
@@ -22,9 +22,26 @@ export const metadata: Metadata = {
     canonical: buildCanonical("/"),
   },
   openGraph: {
+    type: "website",
+    locale: "en_US",
     url: buildCanonical("/"),
+    siteName: SITE_NAME,
     title: `${SITE_NAME} | Train. Fuel. Compete.`,
     description: DEFAULT_DESCRIPTION,
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "Vitality Sweat: strength, stamina, and youth baseball",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} | Train. Fuel. Compete.`,
+    description: DEFAULT_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
   },
 };
 
@@ -311,11 +328,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className="site-shell relative max-w-3xl text-center">
           <p className="eyebrow text-brand-orange">Ready when you are</p>
           <h2 className="mt-3 font-display text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.05] text-balance">
-            Create your free Vitality Engine account.
+            Create your free Vitality Sweat account.
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-sans text-lg leading-relaxed text-white/85">
-            Training videos, meal plans, and grocery lists — built for how you
-            train and eat in Southwest Louisiana. Train. Fuel. Compete.
+            Open the Vitality Engine for training videos, meal plans, and grocery
+            lists built for how you train and eat in Southwest Louisiana. Train.
+            Fuel. Compete.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <SignupCtaLink

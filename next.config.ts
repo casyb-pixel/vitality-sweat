@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+/** Known WordPress permalinks that now live under /blog/{slug}. */
+const WORDPRESS_LEGACY_SLUGS = [
+  "calorie-deficit-weight-loss-golden-rule",
+] as const;
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -27,6 +32,22 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+  },
+  async redirects() {
+    return [
+      // Prefer apex host with a permanent 301 (not the platform default 307).
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.vitalitysweat.com" }],
+        destination: "https://vitalitysweat.com/:path*",
+        statusCode: 301,
+      },
+      ...WORDPRESS_LEGACY_SLUGS.map((slug) => ({
+        source: `/${slug}`,
+        destination: `/blog/${slug}`,
+        permanent: true,
+      })),
+    ];
   },
 };
 

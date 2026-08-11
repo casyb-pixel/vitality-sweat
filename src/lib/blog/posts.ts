@@ -3,7 +3,16 @@ import {
   type BlogBlock,
   type MigratedPost,
 } from "@/data/posts";
-import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, SOCIAL_PROFILE_URLS } from "@/lib/seo/site";
+import {
+  absoluteUrl,
+  BRAND_ALTERNATE_NAMES,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  FOUNDING_PERSON_NAME,
+  SITE_NAME,
+  SITE_URL,
+  SOCIAL_PROFILE_URLS,
+} from "@/lib/seo/site";
 
 export type { BlogBlock, MigratedPost as BlogFrontmatter };
 
@@ -37,7 +46,7 @@ const WORDPRESS_BASELINE: MigratedPost = {
     "Burn more than you eat — then protect muscle, balance macros, and plan meals so the deficit actually sticks.",
   featured: true,
   sourceUrl:
-    "https://vitalitysweat.com/calorie-deficit-weight-loss-golden-rule/",
+    "https://vitalitysweat.com/blog/calorie-deficit-weight-loss-golden-rule",
   body: [
     {
       type: "h2",
@@ -203,11 +212,35 @@ export function buildOrganizationJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": `${SITE_URL}/#organization`,
     name: SITE_NAME,
+    alternateName: [...BRAND_ALTERNATE_NAMES],
     url: SITE_URL,
     logo: absoluteUrl("/branding/logo-original-transparent.svg"),
     description:
-      "Fitness training, nutrition coaching, and youth baseball development with Hunter Broussard.",
+      "Vitality Sweat offers fitness training, nutrition coaching, and youth baseball development with Hunter Broussard in Southwest Louisiana.",
     sameAs: SOCIAL_PROFILE_URLS,
+    founder: {
+      "@type": "Person",
+      name: FOUNDING_PERSON_NAME,
+      url: SITE_URL,
+    },
+  };
+}
+
+/** Sitewide WebSite node. No SearchAction: there is no public on-site search URL. */
+export function buildWebSiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${SITE_URL}/#website`,
+    name: SITE_NAME,
+    alternateName: [...BRAND_ALTERNATE_NAMES],
+    url: SITE_URL,
+    description: DEFAULT_DESCRIPTION,
+    publisher: {
+      "@id": `${SITE_URL}/#organization`,
+    },
+    inLanguage: "en-US",
   };
 }

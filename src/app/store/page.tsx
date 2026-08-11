@@ -15,7 +15,7 @@ import {
 } from "@/lib/store/products";
 
 const STORE_DESCRIPTION =
-  "Shop Vitality Sweat branded merchandise — Printful-synced hoodies and training gear with live variants.";
+  "Official Vitality Sweat training gear for the coaching community. Printful-synced hoodies and variants under the Vitality Sweat brand.";
 
 export const metadata: Metadata = {
   title: "Store",
@@ -26,6 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: buildCanonical("/store"),
+    siteName: SITE_NAME,
     title: `Store | ${SITE_NAME}`,
     description: STORE_DESCRIPTION,
     images: [
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
         url: absoluteUrl("/images/stock/fitness/gear-wakeup-flatlay.jpg"),
         width: 1200,
         height: 630,
-        alt: "Vitality Sweat training gear",
+        alt: "Official Vitality Sweat training gear",
       },
     ],
   },
@@ -62,13 +63,14 @@ export default function StorePage() {
           />
           <div aria-hidden className="absolute inset-0 bg-brand-ink/70" />
           <div className="site-shell relative flex min-h-[42vh] flex-col justify-end pb-12 pt-24">
-            <p className="eyebrow text-brand-orange">Branded merchandise</p>
+            <p className="eyebrow text-brand-orange">Official brand gear</p>
             <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.5rem,6vw,4rem)] leading-[0.95]">
               Vitality Sweat Store
             </h1>
             <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
-              Live Printful catalog — hoodie colors, sizes, and mockups synced
-              for the Sweatlife.
+              Official Vitality Sweat gear for the coaching community. Live
+              Printful catalog with hoodie colors, sizes, and mockups for the
+              Sweatlife.
             </p>
           </div>
         </section>

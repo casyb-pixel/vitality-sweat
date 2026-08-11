@@ -1,7 +1,7 @@
 {
   "updatedAt": "2026-07-20",
   "sources": [
-    "https://vitalitysweat.com/calorie-deficit-weight-loss-golden-rule/",
+    "https://vitalitysweat.com/blog/calorie-deficit-weight-loss-golden-rule",
     "https://vitalitysweat.blogspot.com/"
   ],
   "notes": "Full Blogger archive catalog lives in blogger-migration.json. Runtime posts are served from src/data/posts.ts + src/lib/blog/posts.ts.",

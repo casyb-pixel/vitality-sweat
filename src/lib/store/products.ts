@@ -115,7 +115,7 @@ export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
     "@type": "CollectionPage",
     name: `${SITE_NAME} Store`,
     description:
-      "Official Vitality Sweat branded merchandise — performance hoodies, gym tees, bottles, and training packs.",
+      "Official Vitality Sweat training gear for the coaching community: performance hoodies, gym tees, bottles, and training packs.",
     url: absoluteUrl("/store"),
     isPartOf: {
       "@type": "WebSite",

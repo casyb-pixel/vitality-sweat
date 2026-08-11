@@ -42,7 +42,7 @@ export default function JoinEngineCTA({
       <p
         className={`eyebrow ${isStrip || isMid ? "text-brand-orange" : "text-brand-orange"}`}
       >
-        Vitality Engine · Free
+        Vitality Sweat · Free app
       </p>
       <h2
         className={`mt-3 font-display leading-[1.1] text-balance ${
@@ -60,7 +60,7 @@ export default function JoinEngineCTA({
       >
         {isMid
           ? copy.heroSupport
-          : `${copy.heroSupport} Join free - log sessions, plan meals, and share a grocery list with whoever shops.`}
+          : `${copy.heroSupport} Join free in the Vitality Engine - log sessions, plan meals, and share a grocery list with whoever shops.`}
       </p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <SignupCtaLink

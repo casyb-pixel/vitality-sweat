@@ -5,10 +5,10 @@ import SiteFooter from "@/components/SiteFooter";
 import InviteLandingClient from "@/components/marketing/InviteLandingClient";
 
 export const metadata: Metadata = {
-  title: "Join Vitality Engine",
+  title: "Join Vitality Sweat",
   description:
-    "Create a free Vitality Engine account — workouts, meal plans, and grocery lists for Southwest Louisiana.",
-  robots: { index: true, follow: true },
+    "Create a free Vitality Sweat account and open the Vitality Engine for workouts, meal plans, and grocery lists in Southwest Louisiana.",
+  robots: { index: false, follow: false },
 };
 
 type InvitePageProps = {
