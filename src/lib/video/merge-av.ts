@@ -85,6 +85,10 @@ function loadAudioElement(url: string): Promise<HTMLAudioElement> {
 export async function mergeVideoWithVoiceover(input: {
   videoSource: Blob | string;
   voiceoverSource: Blob | string;
+  /** Optional clip start (seconds). */
+  trimStartSec?: number;
+  /** Optional clip end (seconds). Defaults to full video duration. */
+  trimEndSec?: number;
   onProgress?: (progress: MergeProgress) => void;
 }): Promise<{ blob: Blob; fileName: string }> {
   if (typeof MediaRecorder === "undefined") {
@@ -177,7 +181,30 @@ export async function mergeVideoWithVoiceover(input: {
       await audioCtx.resume().catch(() => undefined);
     }
 
-    video.currentTime = 0;
+    const fullDuration = Number.isFinite(video.duration) ? video.duration : 0;
+    const trimStart = Math.max(0, Number(input.trimStartSec) || 0);
+    const trimEndRaw = Number(input.trimEndSec);
+    const trimEnd =
+      Number.isFinite(trimEndRaw) && trimEndRaw > trimStart
+        ? Math.min(fullDuration || trimEndRaw, trimEndRaw)
+        : fullDuration;
+    const clipDuration =
+      trimEnd > trimStart
+        ? trimEnd - trimStart
+        : fullDuration > 0
+          ? fullDuration
+          : 0;
+
+    video.currentTime = trimStart;
+    await new Promise<void>((resolve) => {
+      const onSeeked = () => {
+        video!.removeEventListener("seeked", onSeeked);
+        resolve();
+      };
+      video!.addEventListener("seeked", onSeeked);
+      // Some browsers fire seeked synchronously; don't hang.
+      window.setTimeout(() => resolve(), 400);
+    });
     audio.currentTime = 0;
     recorder.start(250);
 
@@ -186,23 +213,26 @@ export async function mergeVideoWithVoiceover(input: {
       audio.play().catch(() => undefined),
     ]);
 
-    const duration = Number.isFinite(video.duration) ? video.duration : 0;
-
     await new Promise<void>((resolve, reject) => {
       const draw = () => {
         if (!video) {
           resolve();
           return;
         }
-        if (video.ended || video.paused) {
+        if (
+          video.ended ||
+          video.paused ||
+          (trimEnd > trimStart && video.currentTime >= trimEnd)
+        ) {
           resolve();
           return;
         }
         ctx.drawImage(video, 0, 0, width, height);
-        if (duration > 0) {
+        if (clipDuration > 0) {
+          const elapsed = Math.max(0, video.currentTime - trimStart);
           input.onProgress?.({
             phase: "encoding",
-            ratio: Math.min(0.99, video.currentTime / duration),
+            ratio: Math.min(0.99, elapsed / clipDuration),
           });
         }
         requestAnimationFrame(draw);
@@ -213,6 +243,10 @@ export async function mergeVideoWithVoiceover(input: {
         reject(new Error("Playback failed while syncing the clip."));
       requestAnimationFrame(draw);
     });
+
+    if (trimEnd > trimStart && !video.ended) {
+      video.pause();
+    }
 
     ctx.drawImage(video, 0, 0, width, height);
     audio.pause();

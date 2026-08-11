@@ -662,6 +662,16 @@ export default function WorkoutRunner({
             {current.coach_notes}
           </p>
         ) : null}
+        {current.exercise?.youtube_url ? (
+          <a
+            href={current.exercise.youtube_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center justify-center border-2 border-brand-orange/40 bg-brand-orange/5 px-3 py-2 font-sans text-sm font-bold text-brand-orange hover:bg-brand-orange/10"
+          >
+            How to: watch form video
+          </a>
+        ) : null}
       </article>
 
       {nextExercise ? (

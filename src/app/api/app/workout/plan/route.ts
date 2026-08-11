@@ -86,7 +86,7 @@ export async function GET() {
         exercises:workout_program_exercises (
           *,
           exercise:exercises (
-            id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active
+            id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active, youtube_url
           )
         )
       )
@@ -383,7 +383,7 @@ export async function POST() {
           exercises:workout_program_exercises (
             *,
             exercise:exercises (
-              id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active
+              id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active, youtube_url
             )
           )
         )

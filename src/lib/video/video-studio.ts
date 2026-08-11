@@ -21,8 +21,12 @@ export type CreatorPublishedPost = {
   bodyMarkdown: string;
 };
 
+/** Blog-tied short, or a strength-exercise how-to Short. */
+export type ShortFormVideoIdeaKind = "blog" | "exercise_howto";
+
 /**
  * One short-form concept from `generate_video_ideas`.
+ * Batches are 5 ideas: 3 blog-related + 2 exercise how-tos.
  */
 export type ShortFormVideoIdea = {
   title: string;
@@ -30,6 +34,15 @@ export type ShortFormVideoIdea = {
   videoHook: string;
   /** What Hunter should visually capture in the gym. */
   shootingConcept: string;
+  /** Defaults to blog when omitted (legacy locked sets). */
+  kind?: ShortFormVideoIdeaKind;
+  /** Strength exercise to demo (exercise_howto only). */
+  exerciseId?: string | null;
+  exerciseName?: string | null;
+  /** Form cues Hunter must nail on camera (exercise_howto). */
+  formTips?: string[] | null;
+  /** Full voice-over script Hunter can read aloud. */
+  voiceoverScript?: string | null;
   /** Optional App invite beat sheet (hook → tip → CTA). */
   scriptBeats?: {
     hook: string;
@@ -88,6 +101,8 @@ export type VideoProjectState = {
   videoPath: string | null;
   voiceoverPath: string | null;
   mergedPath: string | null;
+  /** Linked strength exercise when this shoot is an exercise how-to. */
+  exerciseId?: string | null;
   targetSectionAnchor?: string | null;
   checklistKey?: string | null;
   thumbnailUrl?: string | null;

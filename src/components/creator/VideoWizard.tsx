@@ -38,6 +38,7 @@ import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/cl
 import type { VideoScriptPreset } from "@/lib/marketing/campaign-templates";
 import { APP_INVITE_SCRIPT_GUIDANCE } from "@/lib/marketing/campaign-templates";
 import { METROS, type MetroId } from "@/lib/markets/metros";
+import { SOCIAL_LINKS } from "@/lib/seo/site";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
   "SELECT_BLOG_CONTEXT",
@@ -199,6 +200,18 @@ export default function VideoWizard({
   const [targetSectionAnchor, setTargetSectionAnchor] = useState("");
   const [embedSaving, setEmbedSaving] = useState(false);
   const [embedMessage, setEmbedMessage] = useState<string | null>(null);
+  const [trimStartSec, setTrimStartSec] = useState(0);
+  const [trimEndSec, setTrimEndSec] = useState(0);
+  const [clipDurationSec, setClipDurationSec] = useState(0);
+  const [youtubePostedUrl, setYoutubePostedUrl] = useState("");
+  const [confirmPostedLoading, setConfirmPostedLoading] = useState(false);
+  const [confirmPostedMessage, setConfirmPostedMessage] = useState<
+    string | null
+  >(null);
+
+  const youtubeChannelUrl =
+    SOCIAL_LINKS.find((link) => link.id === "youtube")?.href ??
+    "https://www.youtube.com/@vitalitysweat";
 
   const stepIndex = PHASE_ORDER.indexOf(phase);
 
@@ -481,10 +494,16 @@ export default function VideoWizard({
         lockedJson.ideas &&
         lockedJson.ideas.length > 0
       ) {
-        setIdeas(lockedJson.ideas);
-        setIdeasLocked(true);
-        setIdeasLockedAt(lockedJson.lockedAt ?? null);
-        return;
+        const howtoCount = lockedJson.ideas.filter(
+          (idea) => idea.kind === "exercise_howto",
+        ).length;
+        if (howtoCount >= 2) {
+          setIdeas(lockedJson.ideas);
+          setIdeasLocked(true);
+          setIdeasLockedAt(lockedJson.lockedAt ?? null);
+          return;
+        }
+        // Legacy 5-blog locks: fall through and mint a fresh 3+2 batch.
       }
 
       const res = await fetch("/api/creator/video-assist", {
@@ -781,17 +800,19 @@ export default function VideoWizard({
     if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
     if (mergedUrl?.startsWith("blob:")) URL.revokeObjectURL(mergedUrl);
     setVideoFile(file);
-    setVideoUrl(URL.createObjectURL(file));
+    const preview = URL.createObjectURL(file);
+    setVideoUrl(preview);
     setVideoAsset(null);
     setMergedAsset(null);
     setMergedBlob(null);
     setMergedUrl(null);
     setPendingVideoFile(null);
     setCompressProgress(null);
+    void probeClipDuration(preview);
 
     if (file.size > FREE_PLAN_MAX_UPLOAD_BYTES) {
       setAssetError(
-        `This clip is ${formatUploadBytes(file.size)}. Free-plan uploads max out around ${formatUploadBytes(FREE_PLAN_MAX_UPLOAD_BYTES)} — compress to 720p or trim under ~45s first.`,
+        `This clip is ${formatUploadBytes(file.size)}. Free-plan uploads max out around ${formatUploadBytes(FREE_PLAN_MAX_UPLOAD_BYTES)} - compress to 720p or trim under ~45s first.`,
       );
       return;
     }
@@ -800,7 +821,20 @@ export default function VideoWizard({
     if (asset) {
       setVideoAsset(asset);
       setVideoUrl(asset.signedUrl);
+      void probeClipDuration(asset.signedUrl);
     }
+  }
+
+  function probeClipDuration(src: string) {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.src = src;
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      setClipDurationSec(duration);
+      setTrimStartSec(0);
+      setTrimEndSec(duration > 0 ? Math.min(duration, 45) : 0);
+    };
   }
 
   async function compressPendingThenUpload() {
@@ -921,6 +955,10 @@ export default function VideoWizard({
             title: selectedIdea.title,
             videoHook: selectedIdea.videoHook,
             shootingConcept: selectedIdea.shootingConcept,
+            kind: selectedIdea.kind ?? "blog",
+            exerciseName: selectedIdea.exerciseName ?? null,
+            formTips: selectedIdea.formTips ?? null,
+            voiceoverScript: selectedIdea.voiceoverScript ?? null,
           },
           assetsReady: Boolean(videoAsset || voiceoverAsset || mergedAsset),
           hasVideo: Boolean(videoAsset || mergedAsset),
@@ -1003,6 +1041,13 @@ export default function VideoWizard({
       const { blob, fileName } = await mergeVideoWithVoiceover({
         videoSource,
         voiceoverSource: voiceSource,
+        trimStartSec,
+        trimEndSec:
+          trimEndSec > trimStartSec
+            ? trimEndSec
+            : clipDurationSec > 0
+              ? clipDurationSec
+              : undefined,
         onProgress: setMergeProgress,
       });
 
@@ -1083,14 +1128,28 @@ export default function VideoWizard({
   function exportProductionPack() {
     if (!selectedPost || !selectedIdea || !pack) return;
 
+    const isHowTo = selectedIdea.kind === "exercise_howto";
     const lines = [
       `# Vitality Sweat Production Pack`,
       ``,
       `Blog: ${selectedPost.title}`,
       `URL: /blog/${selectedPost.slug}`,
       `Video idea: ${selectedIdea.title}`,
+      `Kind: ${isHowTo ? "Exercise how-to" : "Blog short"}`,
+      isHowTo && selectedIdea.exerciseName
+        ? `Exercise: ${selectedIdea.exerciseName}`
+        : null,
       `Hook: ${selectedIdea.videoHook}`,
       `Shoot: ${selectedIdea.shootingConcept}`,
+      selectedIdea.formTips?.length
+        ? `Form tips:\n${selectedIdea.formTips.map((t) => `- ${t}`).join("\n")}`
+        : null,
+      selectedIdea.voiceoverScript
+        ? `## Voice-over script\n${selectedIdea.voiceoverScript}`
+        : null,
+      ``,
+      `## YouTube channel`,
+      youtubeChannelUrl,
       ``,
       `## Caption`,
       pack.caption,
@@ -1103,9 +1162,9 @@ export default function VideoWizard({
       ``,
       `## Distribution SEO`,
       pack.seoMetadata.description,
-      `TikTok: ${pack.seoMetadata.tiktok.join(", ") || "—"}`,
-      `YouTube Shorts: ${pack.seoMetadata.youtubeShorts.join(", ") || "—"}`,
-      `Instagram Reels: ${pack.seoMetadata.instagramReels.join(", ") || "—"}`,
+      `TikTok: ${pack.seoMetadata.tiktok.join(", ") || "-"}`,
+      `YouTube Shorts: ${pack.seoMetadata.youtubeShorts.join(", ") || "-"}`,
+      `Instagram Reels: ${pack.seoMetadata.instagramReels.join(", ") || "-"}`,
       ``,
       `## Assets`,
       `Project ID: ${project?.id ?? "not synced"}`,
@@ -1113,35 +1172,87 @@ export default function VideoWizard({
       `Voice over: ${voiceoverAsset?.path ?? "not attached"}`,
       `Synced clip: ${mergedAsset?.path ?? "not synced yet"}`,
       ``,
-      `— Generated in Creator Studio Video Wizard`,
-    ].join("\n");
+      `- Generated in Creator Studio Video Wizard`,
+    ]
+      .filter((line) => line != null)
+      .join("\n");
 
     downloadBlob(
       new Blob([lines], { type: "text/markdown;charset=utf-8" }),
       `vitality-sweat-${selectedPost.slug}-production-pack.md`,
     );
 
+    downloadSyncedVideoForPhone();
+  }
+
+  function downloadSyncedVideoForPhone() {
+    const slug = selectedPost?.slug ?? "clip";
     if (mergedBlob) {
       const ext = mergedBlob.type.includes("mp4") ? "mp4" : "webm";
-      downloadBlob(mergedBlob, `synced-${selectedPost.slug}.${ext}`);
-    } else if (mergedAsset?.signedUrl) {
+      downloadBlob(mergedBlob, `synced-${slug}.${ext}`);
+      return;
+    }
+    if (mergedAsset?.signedUrl) {
       void fetch(mergedAsset.signedUrl)
         .then((r) => r.blob())
         .then((blob) =>
           downloadBlob(
             blob,
-            mergedAsset.fileName || `synced-${selectedPost.slug}.mp4`,
+            mergedAsset.fileName || `synced-${slug}.mp4`,
           ),
         )
         .catch(() => undefined);
-    } else {
-      if (videoFile) {
-        downloadBlob(videoFile, videoFile.name);
+      return;
+    }
+    if (videoFile) {
+      downloadBlob(videoFile, videoFile.name);
+    }
+    if (audioBlob) {
+      const ext = audioBlob.type.includes("mp4") ? "m4a" : "webm";
+      downloadBlob(audioBlob, `voiceover-${slug}.${ext}`);
+    }
+  }
+
+  async function confirmYoutubePosted() {
+    if (!project) return;
+    setConfirmPostedLoading(true);
+    setConfirmPostedMessage(null);
+    try {
+      const res = await fetch("/api/creator/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "confirm_youtube_posted",
+          projectId: project.id,
+          youtubeUrl: youtubePostedUrl,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        project?: VideoProjectState;
+        exerciseLinked?: boolean;
+      };
+      if (!res.ok || !data.ok || !data.project) {
+        setConfirmPostedMessage(
+          data.error ?? "Could not confirm the YouTube post.",
+        );
+        return;
       }
-      if (audioBlob) {
-        const ext = audioBlob.type.includes("mp4") ? "m4a" : "webm";
-        downloadBlob(audioBlob, `voiceover-${selectedPost.slug}.${ext}`);
-      }
+      setProject(data.project);
+      setConfirmPostedMessage(
+        data.exerciseLinked
+          ? "Posted and linked. Members can open this how-to from their workout when they need form help."
+          : "YouTube URL saved on this project.",
+      );
+    } catch (error) {
+      setConfirmPostedMessage(
+        error instanceof Error
+          ? error.message
+          : "Network error confirming the post.",
+      );
+    } finally {
+      setConfirmPostedLoading(false);
     }
   }
 
@@ -1172,6 +1283,11 @@ export default function VideoWizard({
     setAssetError(null);
     setRecording(false);
     setRecordSeconds(0);
+    setTrimStartSec(0);
+    setTrimEndSec(0);
+    setClipDurationSec(0);
+    setYoutubePostedUrl("");
+    setConfirmPostedMessage(null);
     void loadPosts();
     void loadResumeProjects();
   }
@@ -1186,7 +1302,9 @@ export default function VideoWizard({
             Pick a Chronicle to film
           </h2>
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
-            Pulls your latest published posts. Tap one and we&apos;ll spin up 5
+            Pulls your latest published posts. Tap one and we&apos;ll spin up 3
+            blog Shorts plus 2 strength exercise how-tos (exercises that still
+            need a video).
             short-form video angles.
           </p>
 
@@ -1368,8 +1486,8 @@ export default function VideoWizard({
               Locked in
               {ideasLockedAt
                 ? ` · ${formatDate(ideasLockedAt)}`
-                : ""}. These five stay put when you leave — reject one to swap
-              just that slot.
+                : ""}. Three blog angles + two exercise how-tos stay put when
+              you leave. Reject one slot to swap just that idea.
             </p>
           ) : null}
 
@@ -1400,12 +1518,19 @@ export default function VideoWizard({
           ) : null}
 
           <div className="space-y-3">
-            {ideas.map((idea, index) => (
+            {ideas.map((idea, index) => {
+              const isHowTo = idea.kind === "exercise_howto";
+              return (
               <article
                 key={`${index}-${idea.title}`}
                 className="border-2 border-brand-ink/15 bg-surface-elevated p-4"
               >
-                <p className="font-display text-lg leading-snug text-brand-ink">
+                <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  {isHowTo
+                    ? `Exercise how-to${idea.exerciseName ? ` · ${idea.exerciseName}` : ""}`
+                    : `Blog short ${Math.min(index + 1, 3)}`}
+                </p>
+                <p className="mt-1 font-display text-lg leading-snug text-brand-ink">
                   {idea.title}
                 </p>
                 {idea.videoHook ? (
@@ -1418,6 +1543,28 @@ export default function VideoWizard({
                     <span className="font-bold text-brand-orange">Shoot: </span>
                     {idea.shootingConcept}
                   </p>
+                ) : null}
+                {isHowTo && idea.formTips?.length ? (
+                  <div className="mt-3 border border-brand-ink/10 bg-surface px-3 py-2">
+                    <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                      Form tips to nail on camera
+                    </p>
+                    <ul className="mt-1.5 list-disc space-y-1 pl-4 font-sans text-sm text-brand-ink">
+                      {idea.formTips.map((tip) => (
+                        <li key={tip}>{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {idea.voiceoverScript ? (
+                  <div className="mt-3 border border-brand-ink/10 bg-surface px-3 py-2">
+                    <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                      Voice-over script
+                    </p>
+                    <p className="mt-1.5 whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
+                      {idea.voiceoverScript}
+                    </p>
+                  </div>
                 ) : null}
                 {idea.scriptBeats ? (
                   <ol className="mt-3 space-y-1 border border-brand-ink/10 bg-surface px-3 py-2 font-sans text-xs leading-relaxed text-brand-ink">
@@ -1454,13 +1601,16 @@ export default function VideoWizard({
                       <span className="flex items-center gap-2">
                         <Spinner dark /> Regenerating…
                       </span>
+                    ) : isHowTo ? (
+                      "Reject · new exercise"
                     ) : (
                       "Reject & regenerate"
                     )}
                   </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <button
@@ -1481,9 +1631,32 @@ export default function VideoWizard({
           <p className="border-l-4 border-brand-orange bg-brand-orange/5 px-3 py-2 font-display text-base leading-snug text-brand-ink">
             {selectedIdea.title}
           </p>
+          {selectedIdea.kind === "exercise_howto" &&
+          selectedIdea.formTips?.length ? (
+            <div className="border border-brand-ink/10 bg-surface-elevated px-3 py-3">
+              <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                Form tips
+              </p>
+              <ul className="mt-1.5 list-disc space-y-1 pl-4 font-sans text-sm text-brand-ink">
+                {selectedIdea.formTips.map((tip) => (
+                  <li key={tip}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {selectedIdea.voiceoverScript ? (
+            <div className="border border-brand-ink/10 bg-surface-elevated px-3 py-3">
+              <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                Read this for voice-over
+              </p>
+              <p className="mt-1.5 whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
+                {selectedIdea.voiceoverScript}
+              </p>
+            </div>
+          ) : null}
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
-            Upload a gym clip and drop a quick voice-over. Then we&apos;ll build
-            the caption pack.
+            Upload a gym clip and drop a quick voice-over. Then we&apos;ll sync,
+            trim, and build the YouTube posting pack.
           </p>
 
           <div className="space-y-3">
@@ -1741,9 +1914,77 @@ export default function VideoWizard({
             Sync clip + voiceover
           </h2>
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
-            We mute the gym mic and lay your narration under the picture — no
-            CapCut required. Keep the phone awake while it encodes.
+            We mute the gym mic and lay your narration under the picture. Trim
+            the clip to Shorts length first, then sync. Keep the phone awake
+            while it encodes.
           </p>
+
+          {videoUrl ? (
+            <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4 space-y-3">
+              <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                Trim clip length
+              </p>
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                className="aspect-[9/16] max-h-[36vh] w-full bg-surface-dark object-contain"
+                onLoadedMetadata={(e) => {
+                  const duration = e.currentTarget.duration;
+                  if (!Number.isFinite(duration) || duration <= 0) return;
+                  setClipDurationSec(duration);
+                  setTrimStartSec((start) =>
+                    Math.min(start, Math.max(0, duration - 0.5)),
+                  );
+                  setTrimEndSec((end) =>
+                    end > 0 ? Math.min(end, duration) : Math.min(duration, 45),
+                  );
+                }}
+              />
+              <label className="block font-sans text-xs text-brand-muted">
+                Start ({trimStartSec.toFixed(1)}s)
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(clipDurationSec, 0.1)}
+                  step={0.1}
+                  value={trimStartSec}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setTrimStartSec(next);
+                    if (trimEndSec <= next) {
+                      setTrimEndSec(
+                        Math.min(clipDurationSec || next + 1, next + 1),
+                      );
+                    }
+                  }}
+                  className="mt-1 w-full"
+                />
+              </label>
+              <label className="block font-sans text-xs text-brand-muted">
+                End ({trimEndSec.toFixed(1)}s)
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(clipDurationSec, 0.1)}
+                  step={0.1}
+                  value={trimEndSec}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setTrimEndSec(next);
+                    if (next <= trimStartSec) {
+                      setTrimStartSec(Math.max(0, next - 1));
+                    }
+                  }}
+                  className="mt-1 w-full"
+                />
+              </label>
+              <p className="font-sans text-xs text-brand-muted">
+                Keep about {Math.max(0, trimEndSec - trimStartSec).toFixed(1)}s
+                for YouTube Shorts.
+              </p>
+            </div>
+          ) : null}
 
           <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4">
             <ul className="space-y-2 font-sans text-sm text-brand-ink">
@@ -1993,7 +2234,7 @@ export default function VideoWizard({
           <div className="border-2 border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">
             <p className="eyebrow text-brand-orange">Thumbnail overlay</p>
             <p className="mt-3 font-display text-2xl leading-tight text-brand-ink">
-              {pack.thumbnailTitle || "—"}
+              {pack.thumbnailTitle || "-"}
             </p>
           </div>
 
@@ -2010,7 +2251,7 @@ export default function VideoWizard({
                   TikTok
                 </dt>
                 <dd className="mt-0.5 font-sans text-sm text-brand-ink">
-                  {pack.seoMetadata.tiktok.join(", ") || "—"}
+                  {pack.seoMetadata.tiktok.join(", ") || "-"}
                 </dd>
               </div>
               <div>
@@ -2018,7 +2259,7 @@ export default function VideoWizard({
                   YouTube Shorts
                 </dt>
                 <dd className="mt-0.5 font-sans text-sm text-brand-ink">
-                  {pack.seoMetadata.youtubeShorts.join(", ") || "—"}
+                  {pack.seoMetadata.youtubeShorts.join(", ") || "-"}
                 </dd>
               </div>
               <div>
@@ -2026,7 +2267,7 @@ export default function VideoWizard({
                   Instagram Reels
                 </dt>
                 <dd className="mt-0.5 font-sans text-sm text-brand-ink">
-                  {pack.seoMetadata.instagramReels.join(", ") || "—"}
+                  {pack.seoMetadata.instagramReels.join(", ") || "-"}
                 </dd>
               </div>
             </dl>
@@ -2089,12 +2330,88 @@ export default function VideoWizard({
             onClick={exportProductionPack}
             className={bigButtonClass}
           >
-            Download / Export Production Pack
+            Download video + posting pack
+          </button>
+          <button
+            type="button"
+            onClick={downloadSyncedVideoForPhone}
+            disabled={!mergedBlob && !mergedAsset?.signedUrl && !videoFile}
+            className={secondaryButtonClass}
+          >
+            Download synced video to phone
           </button>
           <p className="text-center font-sans text-xs text-brand-muted">
-            Downloads a caption brief plus your synced clip (or separate assets)
-            for manual posting.
+            Save the synced clip to Photos, then upload it to{" "}
+            <a
+              href={youtubeChannelUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand-orange underline"
+            >
+              Vitality Sweat on YouTube
+            </a>{" "}
+            as a Short. Use the caption, hashtags, and SEO fields above.
           </p>
+
+          <div className="border-2 border-brand-orange/40 bg-brand-orange/5 p-4 sm:p-5">
+            <p className="eyebrow text-brand-orange">After you post</p>
+            <p className="mt-2 font-sans text-sm text-brand-muted">
+              Paste the YouTube Short URL so we can link it
+              {selectedIdea.kind === "exercise_howto" && selectedIdea.exerciseName
+                ? ` to ${selectedIdea.exerciseName} in Vitality Engine`
+                : " on this project"}
+              .
+            </p>
+            <label
+              htmlFor="youtube-posted-url"
+              className="mt-4 block font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-muted"
+            >
+              YouTube Short URL
+            </label>
+            <input
+              id="youtube-posted-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://youtube.com/shorts/…"
+              value={youtubePostedUrl}
+              onChange={(e) => setYoutubePostedUrl(e.target.value)}
+              className="mt-1.5 min-h-12 w-full border border-brand-ink/15 bg-surface px-3 font-sans text-sm text-brand-ink"
+            />
+            <button
+              type="button"
+              className={`${bigButtonClass} mt-3`}
+              disabled={
+                confirmPostedLoading || !project || !youtubePostedUrl.trim()
+              }
+              onClick={() => void confirmYoutubePosted()}
+            >
+              {confirmPostedLoading ? (
+                <>
+                  <Spinner /> Confirming…
+                </>
+              ) : (
+                "Confirm posted · link for members"
+              )}
+            </button>
+            {confirmPostedMessage ? (
+              <p className="mt-2 font-sans text-sm text-brand-ink">
+                {confirmPostedMessage}
+              </p>
+            ) : null}
+            {project?.publicVideoUrl ? (
+              <p className="mt-2 font-sans text-xs text-brand-muted">
+                Linked:{" "}
+                <a
+                  href={project.publicVideoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-orange underline"
+                >
+                  {project.publicVideoUrl}
+                </a>
+              </p>
+            ) : null}
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <button

@@ -28,7 +28,12 @@ import ProgramDayEditor from "@/components/app/ProgramDayEditor";
 export type NestedProgramExercise = WorkoutProgramExercise & {
   exercise?: Pick<
     Exercise,
-    "id" | "name" | "category" | "primary_muscle" | "equipment"
+    | "id"
+    | "name"
+    | "category"
+    | "primary_muscle"
+    | "equipment"
+    | "youtube_url"
   > | null;
 };
 

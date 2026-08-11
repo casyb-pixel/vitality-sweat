@@ -9,7 +9,9 @@ import type {
   VideoProjectSummary,
   VideoSocialPackage,
 } from "@/lib/video/video-studio";
+import { normalizeVideoIdea, serializeVideoIdea } from "@/lib/video/normalize-idea";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceRoleClient } from "@/utils/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,7 +28,8 @@ type VideoAssetsAction =
   | "create_upload"
   | "confirm_upload"
   | "save_social_package"
-  | "update_embed";
+  | "update_embed"
+  | "confirm_youtube_posted";
 
 type RequestBody = {
   action?: VideoAssetsAction;
@@ -44,6 +47,7 @@ type RequestBody = {
   checklistKey?: string | null;
   targetSectionAnchor?: string | null;
   publicVideoUrl?: string | null;
+  youtubeUrl?: string | null;
   thumbnailUrl?: string | null;
   embedPublished?: boolean;
   limit?: number;
@@ -84,9 +88,11 @@ export async function POST(request: Request) {
         return saveSocialPackage(supabase, user.id, body);
       case "update_embed":
         return updateEmbed(supabase, user.id, body);
+      case "confirm_youtube_posted":
+        return confirmYoutubePosted(supabase, user.id, body);
       default:
         return jsonError(
-          "Unknown action. Use list_projects, get_project, create_project, create_upload, confirm_upload, save_social_package, or update_embed.",
+          "Unknown action. Use list_projects, get_project, create_project, create_upload, confirm_upload, save_social_package, update_embed, or confirm_youtube_posted.",
           400,
         );
     }
@@ -180,6 +186,10 @@ async function createProject(
   const postSlug = body.postSlug?.trim() || null;
   const checklistKey =
     typeof body.checklistKey === "string" ? body.checklistKey.trim() : null;
+  const exerciseId =
+    concept.kind === "exercise_howto" && concept.exerciseId
+      ? concept.exerciseId
+      : null;
 
   if (
     checklistKey &&
@@ -217,6 +227,7 @@ async function createProject(
           blog_title: blogTitle,
           post_slug: postSlug ?? stub.post_slug,
           concept,
+          exercise_id: exerciseId,
           status: "collecting_assets",
           ...(checklistKey ? { checklist_key: checklistKey } : {}),
         })
@@ -239,6 +250,7 @@ async function createProject(
       post_slug: postSlug,
       blog_title: blogTitle,
       concept,
+      exercise_id: exerciseId,
       status: "collecting_assets",
       checklist_key: checklistKey,
       target_section_anchor:
@@ -516,6 +528,99 @@ async function updateEmbed(
   });
 }
 
+async function confirmYoutubePosted(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  body: RequestBody,
+) {
+  const projectId = body.projectId?.trim() ?? "";
+  const youtubeUrl = (
+    body.youtubeUrl ??
+    body.publicVideoUrl ??
+    ""
+  ).trim();
+  if (!projectId) return jsonError("projectId is required.", 400);
+  if (!youtubeUrl) {
+    return jsonError("Paste the YouTube Short URL after you post it.", 400);
+  }
+  if (!/youtube\.com|youtu\.be/i.test(youtubeUrl)) {
+    return jsonError("That does not look like a YouTube URL.", 400);
+  }
+  if (!toYouTubeWatchUrl(youtubeUrl)) {
+    return jsonError("Could not read a YouTube video id from that URL.", 400);
+  }
+
+  const project = await getOwnedProject(supabase, userId, projectId);
+  if (!project) return jsonError("Video project not found.", 404);
+
+  const concept = normalizeConcept(project.concept);
+  const exerciseId =
+    project.exercise_id?.trim() ||
+    (concept.kind === "exercise_howto" ? concept.exerciseId : null) ||
+    null;
+
+  const { data, error } = await supabase
+    .from("video_projects")
+    .update({
+      public_video_url: youtubeUrl,
+      exercise_id: exerciseId,
+      status: "exported",
+      checklist_key: project.checklist_key ?? "video_3_done",
+    })
+    .eq("id", projectId)
+    .eq("creator_id", userId)
+    .select("*")
+    .single();
+
+  if (error) return jsonError(error.message, 502);
+
+  let exerciseLinked = false;
+  if (exerciseId) {
+    const admin = createServiceRoleClient();
+    const writer = admin ?? supabase;
+    const { error: exerciseError } = await writer
+      .from("exercises")
+      .update({
+        youtube_url: youtubeUrl,
+        youtube_posted_at: new Date().toISOString(),
+      })
+      .eq("id", exerciseId);
+    if (exerciseError) {
+      return jsonError(
+        `Saved the YouTube URL on the project, but could not link the exercise: ${exerciseError.message}`,
+        502,
+      );
+    }
+    exerciseLinked = true;
+  }
+
+  return NextResponse.json({
+    ok: true,
+    project: mapProject(data as ProjectRow),
+    exerciseLinked,
+    exerciseId,
+    youtubeUrl,
+  });
+}
+
+function toYouTubeWatchUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) {
+      const id = u.pathname.replace(/^\//, "").split("/")[0];
+      return id ? `https://www.youtube.com/watch?v=${id}` : null;
+    }
+    if (u.pathname.startsWith("/shorts/")) {
+      const id = u.pathname.split("/")[2];
+      return id ? `https://www.youtube.com/watch?v=${id}` : null;
+    }
+    const id = u.searchParams.get("v");
+    return id ? `https://www.youtube.com/watch?v=${id}` : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getOwnedProject(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -599,11 +704,20 @@ function safeExtension(fileName: string, contentType: string): string {
 function normalizeConcept(
   value: Partial<ShortFormVideoIdea> | undefined,
 ): ShortFormVideoIdea {
-  return {
-    title: value?.title?.trim() ?? "",
-    videoHook: value?.videoHook?.trim() ?? "",
-    shootingConcept: value?.shootingConcept?.trim() ?? "",
-  };
+  return (
+    normalizeVideoIdea(value) ??
+    serializeVideoIdea({
+      title: value?.title?.trim() ?? "",
+      videoHook: value?.videoHook?.trim() ?? "",
+      shootingConcept: value?.shootingConcept?.trim() ?? "",
+      kind: value?.kind === "exercise_howto" ? "exercise_howto" : "blog",
+      exerciseId: value?.exerciseId ?? null,
+      exerciseName: value?.exerciseName ?? null,
+      formTips: value?.formTips ?? null,
+      voiceoverScript: value?.voiceoverScript ?? null,
+      scriptBeats: value?.scriptBeats ?? null,
+    })
+  );
 }
 
 type ProjectRow = {
@@ -617,6 +731,7 @@ type ProjectRow = {
   video_path: string | null;
   voiceover_path: string | null;
   merged_path?: string | null;
+  exercise_id?: string | null;
   social_package?: VideoSocialPackage | null;
   growth_promo_pack?: import("@/lib/marketing/growth-packaging").VideoGrowthPromoPack | null;
   target_section_anchor?: string | null;
@@ -639,6 +754,7 @@ function mapProject(row: ProjectRow): VideoProjectState {
     videoPath: row.video_path,
     voiceoverPath: row.voiceover_path,
     mergedPath: row.merged_path ?? null,
+    exerciseId: row.exercise_id?.trim() || null,
     socialPackage: row.social_package ?? null,
     growthPromoPack: row.growth_promo_pack ?? null,
     targetSectionAnchor: row.target_section_anchor?.trim() || null,

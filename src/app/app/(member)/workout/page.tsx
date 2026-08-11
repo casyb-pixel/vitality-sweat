@@ -58,7 +58,7 @@ export default async function WorkoutPage() {
           exercises:workout_program_exercises (
             *,
             exercise:exercises (
-              id, name, category, primary_muscle, equipment
+              id, name, category, primary_muscle, equipment, youtube_url
             )
           )
         )

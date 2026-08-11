@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import {
   createGeminiClient,
   formatGeminiError,
@@ -11,6 +11,11 @@ import type {
   ShortFormVideoIdea,
   VideoSocialPackage,
 } from "@/lib/video/video-studio";
+import { normalizeVideoIdea } from "@/lib/video/normalize-idea";
+import {
+  pickStrengthExercisesNeedingVideo,
+  type StrengthExerciseCandidate,
+} from "@/lib/video/pick-exercises-for-howto";
 import { createClient } from "@/utils/supabase/server";
 import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 
@@ -41,29 +46,37 @@ type VideoAssistBody = {
     title?: string;
     videoHook?: string;
     shootingConcept?: string;
+    kind?: string;
+    exerciseName?: string | null;
+    formTips?: string[] | null;
+    voiceoverScript?: string | null;
   };
   idea?: {
     title?: string;
     videoHook?: string;
     hook?: string;
     shootingConcept?: string;
+    kind?: string;
+    exerciseName?: string | null;
+    formTips?: string[] | null;
+    voiceoverScript?: string | null;
   };
-  /** Existing locked ideas — used when regenerating one slot. */
+  /** Existing locked ideas â€” used when regenerating one slot. */
   existingIdeas?: ShortFormVideoIdea[];
-  /** Index (0–4) of the idea to replace. */
+  /** Index (0â€“4) of the idea to replace. */
   replaceIndex?: number;
   /** Confirmation that gym clip and/or voice-over were attached. */
   assetsReady?: boolean;
   hasVideo?: boolean;
   hasVoiceOver?: boolean;
-  /** Phase 1b — App invite script structure. */
+  /** Phase 1b â€” App invite script structure. */
   scriptPreset?: "standard" | "app_invite";
 };
 
 /**
  * Video Studio AI (Edge):
- * - generate_video_ideas → 5 TikTok/Reels/Shorts concepts from blog markdown
- * - generate_social_package → caption, hashtags, thumbnail overlay, SEO metadata
+ * - generate_video_ideas â†’ 3 blog-related + 2 strength exercise how-to Shorts
+ * - generate_social_package â†’ caption, hashtags, thumbnail overlay, SEO metadata
  */
 export async function POST(request: Request) {
   try {
@@ -73,7 +86,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user || !getCreatorRole(user)) {
-      return jsonError("Unauthorized — creator privileges required.", 401);
+      return jsonError("Unauthorized â€” creator privileges required.", 401);
     }
 
     let body: VideoAssistBody;
@@ -110,6 +123,7 @@ export async function POST(request: Request) {
         );
       }
       return handleGenerateVideoIdeas({
+        supabase,
         apiKey,
         blogTitle,
         markdown,
@@ -136,6 +150,7 @@ export async function POST(request: Request) {
         ? body.existingIdeas
         : [];
       return handleRegenerateVideoIdea({
+        supabase,
         apiKey,
         blogTitle,
         markdown,
@@ -159,6 +174,11 @@ export async function POST(request: Request) {
       return jsonError("Provide the blog `title` / `blogTitle`.", 400);
     }
 
+    const conceptKind =
+      body.concept?.kind === "exercise_howto" ||
+      body.idea?.kind === "exercise_howto"
+        ? "exercise_howto"
+        : "blog";
     return handleGenerateSocialPackage({
       apiKey,
       blogTitle,
@@ -175,6 +195,18 @@ export async function POST(request: Request) {
           body.idea?.shootingConcept ??
           ""
         ).trim(),
+        kind: conceptKind,
+        exerciseName: (
+          body.concept?.exerciseName ??
+          body.idea?.exerciseName ??
+          ""
+        ).trim() || null,
+        formTips: body.concept?.formTips ?? body.idea?.formTips ?? null,
+        voiceoverScript: (
+          body.concept?.voiceoverScript ??
+          body.idea?.voiceoverScript ??
+          ""
+        ).trim() || null,
       },
       assetsReady: Boolean(
         body.assetsReady || body.hasVideo || body.hasVoiceOver,
@@ -211,63 +243,98 @@ function resolveBlogMarkdown(body: VideoAssistBody): string {
 }
 
 async function handleGenerateVideoIdeas(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
   apiKey: string;
   blogTitle: string;
   markdown: string;
   scriptPreset: "standard" | "app_invite";
 }) {
   const model = getGeminiModel();
+  const exercises = await pickStrengthExercisesNeedingVideo(input.supabase, {
+    limit: 2,
+  });
+
+  if (exercises.length < 2) {
+    return jsonError(
+      "Need at least 2 active strength exercises without a YouTube how-to video. Add exercises or clear stale youtube_url values.",
+      409,
+    );
+  }
+
   const appInvite =
     input.scriptPreset === "app_invite"
       ? [
-          "SCRIPT PRESET: APP INVITE (required)",
-          "Every idea must follow: hook (0–2s) → one tip (middle) → free Vitality Engine CTA (last 5s).",
-          "Include scriptBeats { hook, tip, cta } for each idea.",
-          "CTA must invite a free account for workouts + meal plans — SWLA / Acadiana framing.",
-          "At least 3 of 5 ideas should explicitly mention the free app invite.",
+          "SCRIPT PRESET: APP INVITE (required for the 3 blog ideas)",
+          "Blog ideas must follow: hook (0â€“2s) â†’ one tip (middle) â†’ free Vitality Engine CTA (last 5s).",
+          "Include scriptBeats { hook, tip, cta } on each blog idea.",
+          "CTA must invite a free account for workouts + meal plans â€” SWLA / Acadiana framing.",
         ].join("\n")
-      : "SCRIPT PRESET: standard short-form concepts.";
+      : "SCRIPT PRESET: standard short-form concepts for the 3 blog ideas.";
 
-  const shape =
-    input.scriptPreset === "app_invite"
-      ? {
-          ideas: [
-            {
-              title: "string — punchy short-form video title",
-              videoHook:
-                "string — exactly 1 sentence hook for the first 1–2 seconds",
-              shootingConcept:
-                "string — brief note of what Hunter should visually capture in the gym",
+  const exerciseLines = exercises
+    .map(
+      (ex, i) =>
+        `${i + 1}. id=${ex.id} | name=${ex.name} | muscle=${ex.primaryMuscle ?? "n/a"} | equipment=${ex.equipment ?? "n/a"}`,
+    )
+    .join("\n");
+
+  const shape = {
+    blogIdeas: [
+      {
+        kind: "blog",
+        title: "string â€” punchy short-form video title tied to the blog",
+        videoHook:
+          "string â€” exactly 1 sentence hook for the first 1â€“2 seconds",
+        shootingConcept:
+          "string â€” brief note of what Hunter should visually capture in the gym",
+        voiceoverScript:
+          "string â€” 20â€“40 second spoken script Hunter can read for voice-over",
+        ...(input.scriptPreset === "app_invite"
+          ? {
               scriptBeats: {
-                hook: "string — spoken/on-screen hook",
-                tip: "string — one actionable tip",
-                cta: "string — free Vitality Engine invite line",
+                hook: "string â€” spoken/on-screen hook",
+                tip: "string â€” one actionable tip",
+                cta: "string â€” free Vitality Engine invite line",
               },
-            },
-          ],
-        }
-      : {
-          ideas: [
-            {
-              title: "string — punchy short-form video title",
-              videoHook:
-                "string — exactly 1 sentence hook for the first 1–2 seconds",
-              shootingConcept:
-                "string — brief note of what Hunter should visually capture in the gym",
-            },
-          ],
-        };
+            }
+          : {}),
+      },
+    ],
+    exerciseHowTos: [
+      {
+        kind: "exercise_howto",
+        exerciseId: "uuid â€” must match one of the provided exercise ids",
+        exerciseName: "string â€” exact exercise name",
+        title: "string â€” How to: Exercise Name (or punchy Shorts title)",
+        videoHook: "string â€” 1 sentence hook for the first 1â€“2 seconds",
+        shootingConcept:
+          "string â€” camera angles / setup so form is clearly visible",
+        formTips: [
+          "string â€” concrete form cue Hunter must demonstrate correctly",
+        ],
+        voiceoverScript:
+          "string â€” full voice-over script naming the exercise, walking through setup + reps, calling out form tips, ending with a soft Vitality Engine CTA",
+      },
+    ],
+  };
 
   const prompt = [
     "You are the Vitality Sweat AI Director for short-form social video.",
     "Hunter is a 17-year-old athlete filming on his phone at the gym.",
-    "Read the full published blog post below and generate EXACTLY 5 DISTINCT short-form video concepts.",
-    "Optimize each concept for algorithmic engagement on TikTok, Instagram Reels, and YouTube Shorts.",
-    "Prioritize pattern interrupts, curiosity gaps, and gym-native visuals he can capture in under 45 seconds.",
-    "Voice: direct, sweaty, encouraging — never corporate.",
+    "Build ONE batch of EXACTLY 5 video concepts:",
+    "- EXACTLY 3 blogIdeas related to the published blog post (TikTok / Reels / YouTube Shorts).",
+    "- EXACTLY 2 exerciseHowTos for the strength exercises listed below (YouTube Shorts how-to demos).",
+    "Optimize for algorithmic engagement. Gym-native visuals under 45 seconds.",
+    "Voice: direct, sweaty, encouraging - never corporate.",
+    NO_EM_DASH_RULE,
     "Do not invent facts that contradict the article.",
+    "For exercise how-tos: formTips must be specific coaching cues (brace, bar path, knee tracking, etc.).",
+    "voiceoverScript must be readable aloud as continuous narration (not bullet points).",
     "",
     appInvite,
+    "",
+    "STRENGTH EXERCISES NEEDING A HOW-TO VIDEO (use BOTH, one how-to each):",
+    exerciseLines,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify(shape),
@@ -294,9 +361,9 @@ async function handleGenerateVideoIdeas(input: {
       });
     }
 
-    const ideas = parseVideoIdeas(raw);
-    if (ideas.length < 1) {
-      return jsonError("Gemini did not return usable video ideas.", 502, {
+    const ideas = parseMixedVideoIdeas(raw, exercises);
+    if (ideas.length < 5) {
+      return jsonError("Gemini did not return a full 3+2 idea set.", 502, {
         provider: "gemini",
         model,
         action: "generate_video_ideas",
@@ -317,6 +384,7 @@ async function handleGenerateVideoIdeas(input: {
 }
 
 async function handleRegenerateVideoIdea(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
   apiKey: string;
   blogTitle: string;
   markdown: string;
@@ -325,6 +393,34 @@ async function handleRegenerateVideoIdea(input: {
   scriptPreset: "standard" | "app_invite";
 }) {
   const model = getGeminiModel();
+  const rejected = input.existingIdeas[input.replaceIndex];
+  const isExercise =
+    rejected?.kind === "exercise_howto" || input.replaceIndex >= 3;
+
+  if (isExercise) {
+    const excludeIds = input.existingIdeas
+      .map((idea) => idea.exerciseId)
+      .filter((id): id is string => Boolean(id));
+    const [nextExercise] = await pickStrengthExercisesNeedingVideo(
+      input.supabase,
+      { limit: 1, excludeIds },
+    );
+    if (!nextExercise) {
+      return jsonError(
+        "No other strength exercises without a how-to video are available.",
+        409,
+      );
+    }
+    return regenerateExerciseHowTo({
+      apiKey: input.apiKey,
+      model,
+      blogTitle: input.blogTitle,
+      exercise: nextExercise,
+      replaceIndex: input.replaceIndex,
+      rejected,
+    });
+  }
+
   const avoid = input.existingIdeas
     .map((idea, i) =>
       i === input.replaceIndex
@@ -334,17 +430,18 @@ async function handleRegenerateVideoIdea(input: {
     .filter(Boolean)
     .join("\n");
 
-  const rejected = input.existingIdeas[input.replaceIndex];
   const appInvite =
     input.scriptPreset === "app_invite"
-      ? "Use APP INVITE structure: hook → tip → free Vitality Engine CTA. Include scriptBeats."
+      ? "Use APP INVITE structure: hook â†’ tip â†’ free Vitality Engine CTA. Include scriptBeats."
       : "";
   const prompt = [
     "You are the Vitality Sweat AI Director for short-form social video.",
-    "Hunter rejected ONE idea from a locked set of five. Generate exactly ONE replacement concept.",
+    "Hunter rejected ONE blog-related idea from a locked set of five (3 blog + 2 exercise how-tos).",
+    "Generate exactly ONE replacement BLOG concept (kind: blog).",
     "It must be distinct from the other kept ideas and different from the rejected one.",
     "Optimize for TikTok / Reels / YouTube Shorts. Gym-native, under 45 seconds.",
-    "Voice: direct, sweaty, encouraging — never corporate.",
+    "Voice: direct, sweaty, encouraging - never corporate.",
+    NO_EM_DASH_RULE,
     appInvite,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
@@ -352,21 +449,25 @@ async function handleRegenerateVideoIdea(input: {
       input.scriptPreset === "app_invite"
         ? {
             idea: {
-              title: "string — punchy short-form video title",
+              kind: "blog",
+              title: "string â€” punchy short-form video title",
               videoHook:
-                "string — exactly 1 sentence hook for the first 1–2 seconds",
+                "string â€” exactly 1 sentence hook for the first 1â€“2 seconds",
               shootingConcept:
-                "string — brief note of what Hunter should visually capture in the gym",
+                "string â€” brief note of what Hunter should visually capture in the gym",
+              voiceoverScript: "string â€” spoken voice-over script",
               scriptBeats: { hook: "string", tip: "string", cta: "string" },
             },
           }
         : {
             idea: {
-              title: "string — punchy short-form video title",
+              kind: "blog",
+              title: "string â€” punchy short-form video title",
               videoHook:
-                "string — exactly 1 sentence hook for the first 1–2 seconds",
+                "string â€” exactly 1 sentence hook for the first 1â€“2 seconds",
               shootingConcept:
-                "string — brief note of what Hunter should visually capture in the gym",
+                "string â€” brief note of what Hunter should visually capture in the gym",
+              voiceoverScript: "string â€” spoken voice-over script",
             },
           },
     ),
@@ -374,7 +475,7 @@ async function handleRegenerateVideoIdea(input: {
     `BLOG TITLE:\n${input.blogTitle}`,
     "",
     rejected
-      ? `REJECTED IDEA (do not repeat):\n${rejected.title} — ${rejected.videoHook} — ${rejected.shootingConcept}`
+      ? `REJECTED IDEA (do not repeat):\n${rejected.title} - ${rejected.videoHook} - ${rejected.shootingConcept}`
       : null,
     avoid ? `KEEP THESE (do not duplicate):\n${avoid}` : null,
     "",
@@ -415,11 +516,87 @@ async function handleRegenerateVideoIdea(input: {
       action: "regenerate_video_idea" as const,
       provider: "gemini",
       model,
-      idea,
+      idea: { ...idea, kind: "blog" as const, exerciseId: null, exerciseName: null },
       replaceIndex: input.replaceIndex,
     });
   } catch (error) {
     return geminiError(error, model, "regenerate_video_idea");
+  }
+}
+
+async function regenerateExerciseHowTo(input: {
+  apiKey: string;
+  model: string;
+  blogTitle: string;
+  exercise: StrengthExerciseCandidate;
+  replaceIndex: number;
+  rejected?: ShortFormVideoIdea;
+}) {
+  const prompt = [
+    "You are the Vitality Sweat AI Director for YouTube Shorts exercise how-tos.",
+    "Hunter films on his phone at the gym. Generate ONE exercise how-to concept.",
+    "Include formTips Hunter must demonstrate correctly and a full voiceoverScript to read aloud.",
+    "Voice: direct, sweaty, encouraging - never corporate.",
+    NO_EM_DASH_RULE,
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      idea: {
+        kind: "exercise_howto",
+        exerciseId: input.exercise.id,
+        exerciseName: input.exercise.name,
+        title: `How to: ${input.exercise.name}`,
+        videoHook: "string â€” 1 sentence hook",
+        shootingConcept: "string â€” camera / setup notes",
+        formTips: ["string â€” form cue"],
+        voiceoverScript: "string â€” full spoken script",
+      },
+    }),
+    "",
+    `EXERCISE:\nid=${input.exercise.id}\nname=${input.exercise.name}\nmuscle=${input.exercise.primaryMuscle ?? "n/a"}\nequipment=${input.exercise.equipment ?? "n/a"}`,
+    input.rejected
+      ? `REJECTED (do not repeat):\n${input.rejected.title} - ${input.rejected.exerciseName ?? ""}`
+      : null,
+    `BLOG CONTEXT TITLE (for soft brand CTA only):\n${input.blogTitle}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const ai = createGeminiClient(input.apiKey);
+    const response = await ai.models.generateContent({
+      model: input.model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    });
+    const raw = (response.text ?? "").trim();
+    if (!raw) {
+      return jsonError("Gemini returned an empty response.", 502, {
+        provider: "gemini",
+        model: input.model,
+        action: "regenerate_video_idea",
+      });
+    }
+    const parsed = parseSingleVideoIdea(raw);
+    if (!parsed) {
+      return jsonError("Gemini did not return a usable exercise how-to.", 502, {
+        provider: "gemini",
+        model: input.model,
+        action: "regenerate_video_idea",
+        raw: raw.slice(0, 1500),
+      });
+    }
+    const idea = bindExerciseIdea(parsed, input.exercise);
+    return NextResponse.json({
+      ok: true,
+      action: "regenerate_video_idea" as const,
+      provider: "gemini",
+      model: input.model,
+      idea,
+      replaceIndex: input.replaceIndex,
+    });
+  } catch (error) {
+    return geminiError(error, input.model, "regenerate_video_idea");
   }
 }
 
@@ -430,6 +607,10 @@ async function handleGenerateSocialPackage(input: {
     title: string;
     videoHook: string;
     shootingConcept: string;
+    kind: "blog" | "exercise_howto";
+    exerciseName: string | null;
+    formTips: string[] | null;
+    voiceoverScript: string | null;
   };
   assetsReady: boolean;
   hasVideo: boolean;
@@ -437,8 +618,23 @@ async function handleGenerateSocialPackage(input: {
 }) {
   const model = getGeminiModel();
   const assetLine = input.assetsReady
-    ? `Assets confirmed — video clip: ${input.hasVideo ? "yes" : "no"}, voice-over: ${input.hasVoiceOver ? "yes" : "no"}.`
-    : "Assets pending — still write the full package as if he will post with gym footage + VO.";
+    ? `Assets confirmed â€” video clip: ${input.hasVideo ? "yes" : "no"}, voice-over: ${input.hasVoiceOver ? "yes" : "no"}.`
+    : "Assets pending â€” still write the full package as if he will post with gym footage + VO.";
+
+  const howToLine =
+    input.concept.kind === "exercise_howto"
+      ? [
+          "This is an EXERCISE HOW-TO YouTube Short for the Vitality Sweat channel.",
+          `Exercise: ${input.concept.exerciseName ?? input.concept.title}`,
+          input.concept.formTips?.length
+            ? `Form tips covered: ${input.concept.formTips.join("; ")}`
+            : null,
+          "Title/description should make the exercise searchable (How to + exercise name).",
+          "End caption with a soft CTA to open Vitality Engine for free workouts + meal plans.",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "This is a blog-related short promoting Sweatlife Chronicles + free Vitality Engine signup.";
 
   const prompt = [
     "You are an expert social media growth manager for Vitality Sweat / Sweatlife Chronicles.",
@@ -446,12 +642,15 @@ async function handleGenerateSocialPackage(input: {
     "Brand voice: direct, sweaty, encouraging. Never corporate or fluffy.",
     NO_EM_DASH_RULE,
     "",
+    howToLine,
+    "",
     "Requirements:",
     "- caption: engaging, hook-first, line-broken, ready to paste; end with a soft CTA to create a FREE Vitality Engine account (workouts + meal plans)",
     "- Include a light Southwest Louisiana / Acadiana / SWLA angle when natural",
-    "- hashtags: 5 to 8 hyper-targeted tags (include #VitalitySweat and #Sweatlife)",
+    "- hashtags: 5 to 8 hyper-targeted tags (include #VitalitySweat and #Sweatlife; for how-tos also include exercise/muscle tags)",
     "- thumbnailTitle: short text overlay suggestion (max 6 words) for the first frame / thumbnail",
     "- seoMetadata: platform keyword tags plus a 1-2 sentence SEO description that mentions free signup",
+    "- For YouTube: description should include the exercise name (how-tos) and invite viewers to the free Vitality Engine app",
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
@@ -473,6 +672,9 @@ async function handleGenerateSocialPackage(input: {
       : null,
     input.concept.shootingConcept
       ? `SHOOTING CONCEPT:\n${input.concept.shootingConcept}`
+      : null,
+    input.concept.voiceoverScript
+      ? `VOICEOVER SCRIPT:\n${input.concept.voiceoverScript}`
       : null,
     `ASSET STATUS:\n${assetLine}`,
   ]
@@ -520,27 +722,119 @@ async function handleGenerateSocialPackage(input: {
   }
 }
 
-function parseVideoIdeas(raw: string): ShortFormVideoIdea[] {
+function parseMixedVideoIdeas(
+  raw: string,
+  exercises: StrengthExerciseCandidate[],
+): ShortFormVideoIdea[] {
   const cleaned = stripFences(raw);
   try {
-    const parsed = JSON.parse(cleaned) as { ideas?: unknown } | unknown[];
-    const list = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as { ideas?: unknown }).ideas)
-        ? ((parsed as { ideas: unknown[] }).ideas)
+    const parsed = JSON.parse(cleaned) as {
+      ideas?: unknown[];
+      blogIdeas?: unknown[];
+      exerciseHowTos?: unknown[];
+    };
+
+    const blogRaw = Array.isArray(parsed.blogIdeas)
+      ? parsed.blogIdeas
+      : Array.isArray(parsed.ideas)
+        ? parsed.ideas.filter(
+            (item) =>
+              !item ||
+              typeof item !== "object" ||
+              (item as { kind?: string }).kind !== "exercise_howto",
+          )
+        : [];
+    const howtoRaw = Array.isArray(parsed.exerciseHowTos)
+      ? parsed.exerciseHowTos
+      : Array.isArray(parsed.ideas)
+        ? parsed.ideas.filter(
+            (item) =>
+              item &&
+              typeof item === "object" &&
+              (item as { kind?: string }).kind === "exercise_howto",
+          )
         : [];
 
-    const ideas: ShortFormVideoIdea[] = [];
-    for (const item of list) {
+    const blogIdeas: ShortFormVideoIdea[] = [];
+    for (const item of blogRaw) {
       const idea = coerceIdea(item);
       if (!idea) continue;
-      ideas.push(idea);
-      if (ideas.length === 5) break;
+      blogIdeas.push({
+        ...idea,
+        kind: "blog",
+        exerciseId: null,
+        exerciseName: null,
+      });
+      if (blogIdeas.length === 3) break;
     }
-    return ideas;
+
+    const howtoIdeas: ShortFormVideoIdea[] = [];
+    for (let i = 0; i < exercises.length && howtoIdeas.length < 2; i++) {
+      const exercise = exercises[i]!;
+      const rawIdea = howtoRaw[i] ?? howtoRaw.find((item) => {
+        if (!item || typeof item !== "object") return false;
+        const row = item as Record<string, unknown>;
+        const id =
+          typeof row.exerciseId === "string"
+            ? row.exerciseId
+            : typeof row.exercise_id === "string"
+              ? row.exercise_id
+              : "";
+        const name =
+          typeof row.exerciseName === "string"
+            ? row.exerciseName
+            : typeof row.exercise_name === "string"
+              ? row.exercise_name
+              : "";
+        return id === exercise.id || name === exercise.name;
+      });
+      const parsedIdea = coerceIdea(rawIdea) ?? {
+        title: `How to: ${exercise.name}`,
+        videoHook: `Stop messing up your ${exercise.name}.`,
+        shootingConcept: `Film ${exercise.name} from a 45Â° angle so form is clear.`,
+        kind: "exercise_howto" as const,
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        formTips: [
+          "Set your base before every rep",
+          "Control the eccentric - no bouncing",
+          "Lock in a full range you can own",
+        ],
+        voiceoverScript: `This is how you do ${exercise.name} the right way. Set up tall, brace hard, and own every rep. Save this, then build your free Vitality Engine plan so you know exactly when this lift hits your week.`,
+        scriptBeats: null,
+      };
+      howtoIdeas.push(bindExerciseIdea(parsedIdea, exercise));
+    }
+
+    return [...blogIdeas, ...howtoIdeas].slice(0, 5);
   } catch {
     return [];
   }
+}
+
+function bindExerciseIdea(
+  idea: ShortFormVideoIdea,
+  exercise: StrengthExerciseCandidate,
+): ShortFormVideoIdea {
+  const formTips =
+    idea.formTips?.map((t) => t.trim()).filter(Boolean).slice(0, 6) ?? [];
+  return {
+    ...idea,
+    kind: "exercise_howto",
+    exerciseId: exercise.id,
+    exerciseName: exercise.name,
+    title: idea.title.trim() || `How to: ${exercise.name}`,
+    formTips: formTips.length
+      ? formTips
+      : [
+          "Brace before the first rep",
+          "Keep joints stacked through the path of motion",
+          "Control the return - no bounce",
+        ],
+    voiceoverScript:
+      (idea.voiceoverScript ?? "").trim() ||
+      `Here's how to nail ${exercise.name}. Watch my setup, hit these form cues, and keep every rep honest. Grab a free Vitality Engine account for workouts that put this lift where it belongs.`,
+  };
 }
 
 function parseSingleVideoIdea(raw: string): ShortFormVideoIdea | null {
@@ -561,38 +855,7 @@ function parseSingleVideoIdea(raw: string): ShortFormVideoIdea | null {
 }
 
 function coerceIdea(item: unknown): ShortFormVideoIdea | null {
-  if (!item || typeof item !== "object") return null;
-  const row = item as Record<string, unknown>;
-  const title = typeof row.title === "string" ? row.title.trim() : "";
-  if (!title) return null;
-
-  const videoHook =
-    (typeof row.videoHook === "string" && row.videoHook.trim()) ||
-    (typeof row.hook === "string" && row.hook.trim()) ||
-    "";
-
-  const shootingConcept =
-    (typeof row.shootingConcept === "string" && row.shootingConcept.trim()) ||
-    (Array.isArray(row.shotList)
-      ? asStringArray(row.shotList).join(" · ")
-      : "") ||
-    (typeof row.whyItWorks === "string" ? row.whyItWorks.trim() : "");
-
-  const scriptBeats = coerceScriptBeats(row.scriptBeats);
-
-  return { title, videoHook, shootingConcept, scriptBeats };
-}
-
-function coerceScriptBeats(
-  value: unknown,
-): ShortFormVideoIdea["scriptBeats"] | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as Record<string, unknown>;
-  const hook = typeof row.hook === "string" ? row.hook.trim() : "";
-  const tip = typeof row.tip === "string" ? row.tip.trim() : "";
-  const cta = typeof row.cta === "string" ? row.cta.trim() : "";
-  if (!hook && !tip && !cta) return null;
-  return { hook, tip, cta };
+  return normalizeVideoIdea(item);
 }
 
 function parseSocialPackage(raw: string): VideoSocialPackage {
@@ -694,3 +957,4 @@ function geminiError(
     { status: connection ? 504 : 502 },
   );
 }
+

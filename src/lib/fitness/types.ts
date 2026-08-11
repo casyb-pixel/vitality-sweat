@@ -184,6 +184,9 @@ export type Exercise = {
   aliases?: string[];
   tracking_type: ExerciseTrackingType;
   is_active: boolean;
+  /** Public YouTube how-to Short URL once Hunter confirms it is posted. */
+  youtube_url?: string | null;
+  youtube_posted_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

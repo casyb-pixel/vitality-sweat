@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCreatorRole } from "@/lib/auth/creator";
 import type { ShortFormVideoIdea } from "@/lib/video/video-studio";
+import {
+  normalizeVideoIdeas,
+  serializeVideoIdea,
+} from "@/lib/video/normalize-idea";
+import { getCreatorRole } from "@/lib/auth/creator";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -26,32 +30,12 @@ type SaveBody = {
 };
 
 function normalizeIdeas(value: unknown): ShortFormVideoIdea[] {
-  if (!Array.isArray(value)) return [];
-  const out: ShortFormVideoIdea[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object") continue;
-    const row = item as Record<string, unknown>;
-    const title = typeof row.title === "string" ? row.title.trim() : "";
-    if (!title) continue;
-    out.push({
-      title,
-      videoHook:
-        typeof row.videoHook === "string"
-          ? row.videoHook.trim()
-          : typeof row.hook === "string"
-            ? row.hook.trim()
-            : "",
-      shootingConcept:
-        typeof row.shootingConcept === "string"
-          ? row.shootingConcept.trim()
-          : "",
-    });
-  }
-  return out.slice(0, 5);
+  return normalizeVideoIdeas(value, 5).map(serializeVideoIdea);
 }
 
 /**
  * Persist / load locked Video Studio idea batches so gym trips don't wipe them.
+ * Batches are 5 ideas: 3 blog-related + 2 strength exercise how-tos.
  */
 export async function GET(request: Request) {
   try {
@@ -62,7 +46,7 @@ export async function GET(request: Request) {
 
     if (!user || !getCreatorRole(user)) {
       return NextResponse.json(
-        { ok: false, error: "Unauthorized — creator privileges required." },
+        { ok: false, error: "Unauthorized - creator privileges required." },
         { status: 401 },
       );
     }
@@ -118,7 +102,7 @@ export async function POST(request: Request) {
 
     if (!user || !getCreatorRole(user)) {
       return NextResponse.json(
-        { ok: false, error: "Unauthorized — creator privileges required." },
+        { ok: false, error: "Unauthorized - creator privileges required." },
         { status: 401 },
       );
     }
@@ -209,17 +193,16 @@ export async function POST(request: Request) {
 
       const ideas = normalizeIdeas(existing.ideas);
       while (ideas.length < 5) {
-        ideas.push({
-          title: `Idea ${ideas.length + 1}`,
-          videoHook: "",
-          shootingConcept: "",
-        });
+        ideas.push(
+          serializeVideoIdea({
+            title: `Idea ${ideas.length + 1}`,
+            videoHook: "",
+            shootingConcept: "",
+            kind: ideas.length >= 3 ? "exercise_howto" : "blog",
+          }),
+        );
       }
-      ideas[index] = {
-        title: replacement.title.trim(),
-        videoHook: (replacement.videoHook ?? "").trim(),
-        shootingConcept: (replacement.shootingConcept ?? "").trim(),
-      };
+      ideas[index] = serializeVideoIdea(replacement);
 
       const { data: updated, error: updateError } = await supabase
         .from("video_idea_sets")
