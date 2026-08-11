@@ -15,11 +15,30 @@ export const FOUNDING_PERSON_NAME = "Hunter Broussard";
 export const DEFAULT_DESCRIPTION =
   "Vitality Sweat: on-demand fitness training, peak-performance nutrition, and youth baseball lessons from Hunter Broussard in Southwest Louisiana. Read The Sweatlife Chronicles.";
 
-/** Production canonical origin — override with NEXT_PUBLIC_SITE_URL in env. */
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-  "https://vitalitysweat.com"
-) as string;
+/** Apex production origin used for canonicals, sitemap, robots, and metadataBase. */
+export const PRODUCTION_SITE_URL = "https://vitalitysweat.com";
+
+function resolveSiteUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  // Production deploys must always emit the brand apex, even if env is a
+  // preview/www/vercel.app value (that would poison canonicals + sitemap).
+  if (process.env.VERCEL_ENV === "production") {
+    return PRODUCTION_SITE_URL;
+  }
+  if (!fromEnv) return PRODUCTION_SITE_URL;
+  try {
+    const parsed = new URL(fromEnv);
+    if (parsed.hostname === "www.vitalitysweat.com") {
+      return PRODUCTION_SITE_URL;
+    }
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return PRODUCTION_SITE_URL;
+  }
+}
+
+/** Canonical site origin — production always apex; local/preview may override. */
+export const SITE_URL = resolveSiteUrl();
 
 export const DEFAULT_OG_IMAGE = "/images/hero-strength-stamina-collage.png";
 export const TWITTER_HANDLE = "@vitalitysweat";
