@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
@@ -63,15 +64,25 @@ export default function StorePage() {
           />
           <div aria-hidden className="absolute inset-0 bg-brand-ink/70" />
           <div className="site-shell relative flex min-h-[42vh] flex-col justify-end pb-12 pt-24">
-            <p className="eyebrow text-brand-orange">Official brand gear</p>
-            <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.5rem,6vw,4rem)] leading-[0.95]">
-              Vitality Sweat Store
-            </h1>
-            <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
-              Official Vitality Sweat gear for the coaching community. Live
-              Printful catalog with hoodie colors, sizes, and mockups for the
-              Sweatlife.
-            </p>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow text-brand-orange">Official brand gear</p>
+                <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.5rem,6vw,4rem)] leading-[0.95]">
+                  Vitality Sweat Store
+                </h1>
+                <p className="mt-4 max-w-xl font-sans text-lg text-white/85">
+                  Official Vitality Sweat gear for the coaching community. Live
+                  Printful catalog with hoodie colors, sizes, and mockups for the
+                  Sweatlife.
+                </p>
+              </div>
+              <Link
+                href="/store/cart"
+                className="inline-flex border border-white/35 bg-white/10 px-5 py-3 font-sans text-xs font-bold uppercase tracking-[0.1em] text-white backdrop-blur-sm hover:bg-white/20"
+              >
+                View cart
+              </Link>
+            </div>
           </div>
         </section>
 

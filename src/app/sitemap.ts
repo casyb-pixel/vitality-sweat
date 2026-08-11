@@ -5,7 +5,6 @@ import { buildCanonical, SITE_URL } from "@/lib/seo/site";
 /**
  * Brand-first public sitemap. Homepage stays priority 1 so Google prefers
  * https://vitalitysweat.com for exact-brand discovery.
- * No /about or /contact routes exist yet; add them here when shipped.
  * Transactional paths (cart/checkout/order) and /invite are intentionally omitted.
  */
 function blogSitemapEntries(
@@ -34,6 +33,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 1,
+    },
+    {
+      url: buildCanonical("/about"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
     },
     {
       url: buildCanonical("/chronicles"),

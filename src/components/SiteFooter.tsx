@@ -1,6 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { SOCIAL_LINKS } from "@/lib/seo/site";
+import { SITE_NAME, SOCIAL_LINKS } from "@/lib/seo/site";
+
+const SITE_LINKS = [
+  { href: "/about", label: "About" },
+  { href: "/chronicles", label: "The Sweatlife Chronicles" },
+  { href: "/store", label: "Store" },
+  { href: "/advertise", label: "Advertise" },
+] as const;
 
 const LEGAL_LINKS = [
   { href: "/privacy", label: "Privacy Policy" },
@@ -13,19 +20,27 @@ export default function SiteFooter() {
     <footer className="border-t border-brand-ink/10 bg-surface-elevated py-10">
       <div className="site-shell flex flex-col gap-8">
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-          <Image
-            src="/branding/logo-black-transparent.svg"
-            alt="Vitality Sweat"
-            width={220}
-            height={54}
-            sizes="220px"
-            className="h-12 w-auto sm:h-14"
-          />
+          <Link
+            href="/"
+            className="group flex flex-col gap-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-orange"
+          >
+            <Image
+              src="/branding/logo-black-transparent.svg"
+              alt=""
+              width={220}
+              height={54}
+              sizes="220px"
+              className="h-12 w-auto sm:h-14"
+            />
+            <span className="font-display text-xl text-brand-ink transition-colors group-hover:text-brand-orange">
+              {SITE_NAME}
+            </span>
+          </Link>
           <nav
-            aria-label="Legal"
+            aria-label="Site"
             className="flex flex-wrap items-center gap-x-6 gap-y-2"
           >
-            {LEGAL_LINKS.map((link) => (
+            {SITE_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -36,6 +51,27 @@ export default function SiteFooter() {
             ))}
           </nav>
         </div>
+
+        <nav
+          aria-label="Legal"
+          className="flex flex-wrap items-center gap-x-6 gap-y-2"
+        >
+          {LEGAL_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="font-sans text-sm font-semibold text-brand-ink transition-colors hover:text-brand-orange"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <Link
+            href="/about#contact"
+            className="font-sans text-sm font-semibold text-brand-ink transition-colors hover:text-brand-orange"
+          >
+            Contact
+          </Link>
+        </nav>
 
         <nav aria-label="Social media" className="flex flex-wrap gap-x-5 gap-y-2">
           {SOCIAL_LINKS.map((link) => (
@@ -57,7 +93,7 @@ export default function SiteFooter() {
         </nav>
 
         <p className="font-sans text-sm text-brand-muted">
-          © {new Date().getFullYear()} Vitality Sweat. All rights reserved.
+          © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
         </p>
       </div>
     </footer>

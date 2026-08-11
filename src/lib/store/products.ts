@@ -2,6 +2,18 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/seo/site";
 
 export type ProductSize = string;
 
+export type StoreProductVariant = {
+  id: string;
+  size: string;
+  color: string;
+  price: string;
+  mockupUrl?: string | null;
+  sku?: string;
+  name?: string;
+  currency?: string;
+  availability?: string;
+};
+
 export type StoreProduct = {
   id: string;
   name: string;
@@ -15,6 +27,7 @@ export type StoreProduct = {
   sizes: ProductSize[];
   colors?: string[];
   mockups?: string[];
+  variants?: StoreProductVariant[];
   featured?: boolean;
   source?: "printful" | "fallback" | string;
   availability: "https://schema.org/InStock" | "https://schema.org/PreOrder";

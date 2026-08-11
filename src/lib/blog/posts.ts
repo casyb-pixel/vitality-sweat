@@ -223,8 +223,21 @@ export function buildOrganizationJsonLd() {
     founder: {
       "@type": "Person",
       name: FOUNDING_PERSON_NAME,
-      url: SITE_URL,
+      url: absoluteUrl("/about"),
     },
+    areaServed: {
+      "@type": "AdministrativeArea",
+      name: "Southwest Louisiana",
+    },
+    contactPoint: [
+      {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        email: "info@vitalitysweat.com",
+        areaServed: "US-LA",
+        availableLanguage: "English",
+      },
+    ],
   };
 }
 

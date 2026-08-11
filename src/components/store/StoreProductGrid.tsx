@@ -5,23 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import ProductCard from "@/components/store/ProductCard";
 import type { StoreProduct } from "@/lib/store/products";
 
-type FeedProduct = StoreProduct & {
-  colors?: string[];
-  mockups?: string[];
-  source?: string;
-  variants?: Array<{
-    id: string;
-    size: string;
-    color: string;
-    price: string;
-    mockupUrl: string | null;
-  }>;
-};
-
 type FeedResponse = {
   ok: boolean;
   source: "printful" | "fallback";
-  products: FeedProduct[];
+  products: StoreProduct[];
   message?: string;
   error?: string;
 };
@@ -33,7 +20,7 @@ type StoreProductGridProps = {
 export default function StoreProductGrid({
   initialProducts,
 }: StoreProductGridProps) {
-  const [products, setProducts] = useState<FeedProduct[]>(initialProducts);
+  const [products, setProducts] = useState<StoreProduct[]>(initialProducts);
   const [source, setSource] = useState<"printful" | "fallback" | "loading">(
     "loading",
   );

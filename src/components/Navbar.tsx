@@ -4,11 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
+import CartButton from "@/components/store/CartButton";
 import { SOCIAL_LINKS } from "@/lib/seo/site";
 import { createClient } from "@/utils/supabase/client";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
   { href: "/chronicles", label: "The Sweatlife Chronicles" },
   { href: "/store", label: "Store" },
 ] as const;
@@ -101,18 +103,20 @@ export default function Navbar() {
       <div className="site-shell flex h-[var(--header-h)] items-center justify-between gap-4">
         <Link
           href="/"
-          className="relative z-50 flex shrink-0 items-center focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-orange"
+          className="relative z-50 flex shrink-0 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-orange"
           onClick={() => setOpen(false)}
+          aria-label="Vitality Sweat home"
         >
           <Image
             src="/branding/logo-original-transparent.svg"
-            alt="Vitality Sweat"
+            alt=""
             width={220}
             height={54}
             priority
             sizes="(max-width: 640px) 180px, 220px"
             className="h-12 w-auto sm:h-14"
           />
+          <span className="sr-only">Vitality Sweat</span>
         </Link>
 
         <nav
@@ -140,6 +144,7 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+            <CartButton />
           </div>
           {primaryCta}
         </nav>
@@ -216,6 +221,12 @@ export default function Navbar() {
                 ) : null}
               </a>
             ))}
+            <div className="py-2.5">
+              <CartButton
+                className="text-lg"
+                onNavigate={() => setOpen(false)}
+              />
+            </div>
           </div>
           {mobileCta}
         </nav>

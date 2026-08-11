@@ -1,237 +1,224 @@
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/seo/site";
+import type { CheckoutShippingAddress } from "@/lib/store/cart";
+import {
+  attachStripeSessionToOrder,
+  persistOrder,
+  validateCheckoutItems,
+  type CheckoutCartItem,
+} from "@/lib/store/checkout-server";
+import { getStripe, isStripeConfigured } from "@/lib/store/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Mock checkout pipeline — validates cart payloads and returns a staged order
- * envelope for a future Printful/Printify fulfillment + payment provider hookup.
- *
- * Intended flow (not yet live):
- * 1. Validate line items against `/api/products/feed`
- * 2. Create a payment intent (Stripe / PayPal / etc.)
- * 3. On payment success, submit an order to Printful Orders API (or Printify)
- * 4. Persist order + fulfillment IDs in Supabase
- */
-
-export type CheckoutLineItem = {
-  productId: string;
-  variantId?: string;
-  sku?: string;
-  quantity: number;
-  unitPrice?: string;
-};
-
-export type CheckoutShippingAddress = {
-  name: string;
-  email: string;
-  phone?: string;
-  address1: string;
-  address2?: string;
-  city: string;
-  state: string;
-  country: string;
-  zip: string;
-};
-
-export type CheckoutRequestBody = {
-  items: CheckoutLineItem[];
-  shipping?: CheckoutShippingAddress;
-  /** Future: stripe | paypal | square */
-  paymentProvider?: "stripe" | "paypal" | "mock";
-  /** Future: printful | printify */
-  fulfillmentProvider?: "printful" | "printify" | "mock";
-  currency?: string;
-};
-
-export type CheckoutResponse = {
-  ok: boolean;
-  status: "mocked" | "invalid" | "error";
-  orderId?: string;
-  message: string;
-  pipeline?: {
-    payment: {
-      provider: string;
-      status: "awaiting_handler";
-      clientSecretPlaceholder: null;
-    };
-    fulfillment: {
-      provider: string;
-      status: "queued_for_api";
-      externalOrderId: null;
-    };
-  };
-  echo?: {
-    itemCount: number;
-    currency: string;
-    hasShipping: boolean;
-  };
-  error?: string;
+type CheckoutRequestBody = {
+  items: CheckoutCartItem[];
+  shipping: CheckoutShippingAddress;
 };
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function validateBody(body: unknown): {
-  ok: true;
-  data: CheckoutRequestBody;
-} | {
-  ok: false;
-  error: string;
-} {
-  if (!body || typeof body !== "object") {
-    return { ok: false, error: "Request body must be a JSON object." };
+function validateShipping(
+  shipping: unknown,
+): { ok: true; data: CheckoutShippingAddress } | { ok: false; error: string } {
+  if (!shipping || typeof shipping !== "object") {
+    return { ok: false, error: "Shipping address is required." };
   }
-
-  const candidate = body as CheckoutRequestBody;
-  if (!Array.isArray(candidate.items) || candidate.items.length === 0) {
-    return { ok: false, error: "At least one line item is required." };
-  }
-
-  for (const [index, item] of candidate.items.entries()) {
-    if (!isNonEmptyString(item.productId)) {
-      return {
-        ok: false,
-        error: `items[${index}].productId is required.`,
-      };
-    }
-    if (
-      typeof item.quantity !== "number" ||
-      !Number.isFinite(item.quantity) ||
-      item.quantity < 1
-    ) {
-      return {
-        ok: false,
-        error: `items[${index}].quantity must be a positive number.`,
-      };
+  const s = shipping as Record<string, unknown>;
+  const required = [
+    "name",
+    "email",
+    "address1",
+    "city",
+    "state",
+    "country",
+    "zip",
+  ] as const;
+  for (const key of required) {
+    if (!isNonEmptyString(s[key])) {
+      return { ok: false, error: `Missing shipping field: ${key}.` };
     }
   }
-
-  if (candidate.shipping) {
-    const required: Array<keyof CheckoutShippingAddress> = [
-      "name",
-      "email",
-      "address1",
-      "city",
-      "state",
-      "country",
-      "zip",
-    ];
-    for (const key of required) {
-      if (!isNonEmptyString(candidate.shipping[key])) {
-        return {
-          ok: false,
-          error: `shipping.${key} is required when shipping is provided.`,
-        };
-      }
-    }
+  if (!String(s.email).includes("@")) {
+    return { ok: false, error: "A valid email is required." };
   }
-
-  return { ok: true, data: candidate };
+  return {
+    ok: true,
+    data: {
+      name: String(s.name).trim(),
+      email: String(s.email).trim(),
+      phone: isNonEmptyString(s.phone) ? String(s.phone).trim() : undefined,
+      address1: String(s.address1).trim(),
+      address2: isNonEmptyString(s.address2)
+        ? String(s.address2).trim()
+        : undefined,
+      city: String(s.city).trim(),
+      state: String(s.state).trim(),
+      country: String(s.country).trim().toUpperCase(),
+      zip: String(s.zip).trim(),
+    },
+  };
 }
 
 export async function POST(request: Request) {
+  if (!isStripeConfigured()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "error",
+        message:
+          "Payments are not configured yet. Add STRIPE_SECRET_KEY to enable checkout.",
+        error: "stripe_not_configured",
+      },
+      { status: 503 },
+    );
+  }
+
   let json: unknown;
   try {
     json = await request.json();
   } catch {
     return NextResponse.json(
-      {
-        ok: false,
-        status: "invalid",
-        message: "Invalid JSON body.",
-        error: "Invalid JSON body.",
-      } satisfies CheckoutResponse,
+      { ok: false, status: "invalid", message: "Invalid JSON body." },
       { status: 400 },
     );
   }
 
-  const parsed = validateBody(json);
-  if (!parsed.ok) {
+  const body = json as CheckoutRequestBody;
+  if (!Array.isArray(body.items)) {
+    return NextResponse.json(
+      { ok: false, status: "invalid", message: "items array is required." },
+      { status: 400 },
+    );
+  }
+
+  const shippingParsed = validateShipping(body.shipping);
+  if (!shippingParsed.ok) {
+    return NextResponse.json(
+      { ok: false, status: "invalid", message: shippingParsed.error },
+      { status: 400 },
+    );
+  }
+
+  const validated = await validateCheckoutItems(body.items);
+  if (!validated.ok) {
+    return NextResponse.json(
+      { ok: false, status: "invalid", message: validated.error },
+      { status: 400 },
+    );
+  }
+
+  const orderId = await persistOrder({
+    status: "awaiting_payment",
+    paymentStatus: "pending",
+    fulfillmentStatus: "unsubmitted",
+    currency: validated.currency,
+    email: shippingParsed.data.email,
+    shipping: shippingParsed.data,
+    subtotalCents: validated.subtotalCents,
+    totalCents: validated.subtotalCents,
+    paymentProvider: "stripe",
+    fulfillmentProvider: "printful",
+    metadata: {
+      itemCount: validated.items.reduce((n, i) => n + i.quantity, 0),
+    },
+    items: validated.items,
+  });
+
+  if (!orderId) {
     return NextResponse.json(
       {
         ok: false,
-        status: "invalid",
-        message: parsed.error,
-        error: parsed.error,
-      } satisfies CheckoutResponse,
-      { status: 400 },
+        status: "error",
+        message:
+          "Could not create order record. Confirm SUPABASE_SERVICE_ROLE_KEY is set.",
+        error: "order_persist_failed",
+      },
+      { status: 500 },
     );
   }
 
-  const {
-    items,
-    shipping,
-    paymentProvider = "mock",
-    fulfillmentProvider = "printful",
-    currency = "USD",
-  } = parsed.data;
+  const stripe = getStripe();
+  const origin = (() => {
+    try {
+      return new URL(request.headers.get("origin") || SITE_URL).origin;
+    } catch {
+      return SITE_URL;
+    }
+  })();
 
-  const orderId = `vs_mock_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: shippingParsed.data.email,
+    success_url: `${origin}/store/order/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/store/checkout?cancelled=1`,
+    line_items: validated.items.map((item) => ({
+      quantity: item.quantity,
+      price_data: {
+        currency: item.currency.toLowerCase(),
+        unit_amount: item.unitPriceCents,
+        product_data: {
+          name: item.name,
+          description:
+            [item.color, item.size].filter(Boolean).join(" · ") || undefined,
+          images: item.image?.startsWith("http") ? [item.image] : undefined,
+        },
+      },
+    })),
+    shipping_options: [
+      {
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: {
+            amount: 0,
+            currency: validated.currency.toLowerCase(),
+          },
+          display_name: "Standard shipping (via Printful)",
+          delivery_estimate: {
+            minimum: { unit: "business_day", value: 5 },
+            maximum: { unit: "business_day", value: 12 },
+          },
+        },
+      },
+    ],
+    metadata: {
+      vs_order_id: orderId,
+    },
+  });
 
-  // Stub only — no payment capture or Printful order submission yet.
-  const response: CheckoutResponse = {
+  if (!session.url) {
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "error",
+        message: "Stripe did not return a checkout URL.",
+      },
+      { status: 502 },
+    );
+  }
+
+  await attachStripeSessionToOrder(orderId, session.id);
+
+  return NextResponse.json({
     ok: true,
-    status: "mocked",
+    status: "checkout_ready",
     orderId,
-    message:
-      "Checkout accepted in mock mode. Wire payment handlers and Printful/Printify fulfillment next.",
-    pipeline: {
-      payment: {
-        provider: paymentProvider,
-        status: "awaiting_handler",
-        clientSecretPlaceholder: null,
-      },
-      fulfillment: {
-        provider: fulfillmentProvider,
-        status: "queued_for_api",
-        externalOrderId: null,
-      },
-    },
-    echo: {
-      itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
-      currency,
-      hasShipping: Boolean(shipping),
-    },
-  };
-
-  return NextResponse.json(response, { status: 200 });
+    checkoutUrl: session.url,
+    sessionId: session.id,
+  });
 }
 
 export async function GET() {
-  return NextResponse.json(
-    {
-      ok: true,
-      endpoint: "/api/checkout",
-      methods: ["POST"],
-      status: "mocked",
-      message:
-        "POST a cart payload to stage a mock order. Payment and fulfillment providers are not live.",
-      expectedBody: {
-        items: [
-          {
-            productId: "string",
-            variantId: "string (optional)",
-            sku: "string (optional)",
-            quantity: 1,
-          },
-        ],
-        shipping: {
-          name: "string",
-          email: "string",
-          address1: "string",
-          city: "string",
-          state: "string",
-          country: "US",
-          zip: "string",
-        },
-        paymentProvider: "mock | stripe | paypal",
-        fulfillmentProvider: "printful | printify | mock",
-      },
-    },
-    { status: 200 },
-  );
+  return NextResponse.json({
+    ok: true,
+    endpoint: "/api/checkout",
+    methods: ["POST"],
+    stripeConfigured: isStripeConfigured(),
+    message: isStripeConfigured()
+      ? "POST shipping + cart items to create a Stripe Checkout session."
+      : "Configure STRIPE_SECRET_KEY to enable live checkout.",
+  });
 }

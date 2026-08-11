@@ -4,6 +4,7 @@ import AuthGate from "@/components/auth/AuthGate";
 import ReferralCapture from "@/components/auth/ReferralCapture";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import JsonLd from "@/components/seo/JsonLd";
+import StoreCartShell from "@/components/store/StoreCartShell";
 import { buildOrganizationJsonLd, buildWebSiteJsonLd } from "@/lib/blog/posts";
 import {
   DEFAULT_DESCRIPTION,
@@ -107,7 +108,9 @@ export default function RootLayout({
         <ReferralCapture />
         <AuthGate />
         <JsonLd data={[buildOrganizationJsonLd(), buildWebSiteJsonLd()]} />
-        <main className="flex-1">{children}</main>
+        <StoreCartShell>
+          <main className="flex-1">{children}</main>
+        </StoreCartShell>
       </body>
     </html>
   );

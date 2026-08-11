@@ -115,6 +115,7 @@ async function printfulFetch<T>(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const method = (init?.method ?? "GET").toUpperCase();
     const res = await fetch(`${PRINTFUL_API_BASE}${path}`, {
       ...init,
       headers: {
@@ -122,8 +123,9 @@ async function printfulFetch<T>(
         ...(init?.headers ?? {}),
       },
       signal: controller.signal,
-      // Always revalidate periodically — catalog can change in Printful dashboard
-      next: { revalidate: 300 },
+      ...(method === "GET"
+        ? { next: { revalidate: 300 } }
+        : { cache: "no-store" as RequestCache }),
     });
 
     const text = await res.text();
@@ -324,4 +326,85 @@ export async function fetchPrintfulStorefrontCatalog(): Promise<
   });
 
   return products;
+}
+
+export type PrintfulRecipient = {
+  name: string;
+  email?: string;
+  phone?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  state_code: string;
+  country_code: string;
+  zip: string;
+};
+
+export type PrintfulOrderItemInput = {
+  sync_variant_id: number;
+  quantity: number;
+  retail_price?: string;
+  name?: string;
+};
+
+export type PrintfulOrderResult = {
+  id: number;
+  external_id?: string | null;
+  status?: string;
+  shipping?: string;
+};
+
+/**
+ * Create a Printful order from sync variant IDs after payment succeeds.
+ * Uses confirm=true so Printful charges the store balance / billing method.
+ */
+export async function createPrintfulOrder(input: {
+  externalId: string;
+  recipient: PrintfulRecipient;
+  items: PrintfulOrderItemInput[];
+  confirm?: boolean;
+}): Promise<PrintfulOrderResult> {
+  const body = {
+    external_id: input.externalId.slice(0, 32),
+    recipient: input.recipient,
+    items: input.items,
+    confirm: input.confirm ?? true,
+  };
+
+  return printfulFetch<PrintfulOrderResult>("/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs: 30_000,
+    // Orders must not be cached
+    cache: "no-store",
+  } as RequestInit & { timeoutMs?: number });
+}
+
+/** Look up a sync product detail to validate a sync variant id still exists. */
+export async function findSyncVariantRetail(
+  syncVariantId: number,
+): Promise<{
+  id: number;
+  retail_price: string;
+  currency: string;
+  name: string;
+  sku: string | null;
+} | null> {
+  // Printful exposes sync variant via /store/variants/{id}
+  try {
+    const variant = await printfulFetch<PrintfulSyncVariant>(
+      `/store/variants/${syncVariantId}`,
+      { cache: "no-store" } as RequestInit,
+    );
+    return {
+      id: variant.id,
+      retail_price: variant.retail_price,
+      currency: variant.currency || "USD",
+      name: variant.name,
+      sku: variant.sku ?? null,
+    };
+  } catch {
+    return null;
+  }
 }

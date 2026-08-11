@@ -2,24 +2,62 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { useCart } from "@/components/store/CartProvider";
 import type { StoreProduct } from "@/lib/store/products";
+import { resolveVariant } from "@/lib/store/cart";
 
 type ProductCardProps = {
   product: StoreProduct;
 };
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { addItem } = useCart();
   const colors = product.colors?.length ? product.colors : [];
   const [size, setSize] = useState(product.sizes[0] ?? "One Size");
   const [color, setColor] = useState(colors[0] ?? "");
   const [added, setAdded] = useState(false);
 
+  const selectedVariant = useMemo(
+    () =>
+      resolveVariant(
+        {
+          id: product.id,
+          name: product.name,
+          image: product.image,
+          currency: product.currency,
+          source: product.source,
+          variants: product.variants,
+        },
+        size,
+        color || "Default",
+      ),
+    [product, size, color],
+  );
+
   const imageSrc = useMemo(() => {
+    if (selectedVariant?.mockupUrl) return selectedVariant.mockupUrl;
     if (product.mockups?.length) return product.mockups[0];
     return product.image;
-  }, [product.image, product.mockups]);
+  }, [product.image, product.mockups, selectedVariant]);
+
+  const displayPrice = selectedVariant?.price || product.price;
+  const canFulfill =
+    product.source === "printful" && Boolean(selectedVariant?.id);
 
   const onAdd = () => {
+    addItem(
+      {
+        id: product.id,
+        name: product.name,
+        image: product.image,
+        currency: product.currency,
+        source: product.source,
+        variants: product.variants,
+      },
+      size,
+      color || "Default",
+      1,
+    );
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };
@@ -46,11 +84,17 @@ export default function ProductCard({ product }: ProductCardProps) {
       </p>
 
       <p className="mt-4 font-sans text-xl font-semibold tracking-tight text-brand-ink">
-        ${product.price}
+        ${displayPrice}
         <span className="ml-1 text-sm font-medium text-brand-muted">
           {product.currency}
         </span>
       </p>
+
+      {!canFulfill ? (
+        <p className="mt-2 font-sans text-xs text-brand-muted">
+          Preview catalog item. Live Printful variants required to fulfill.
+        </p>
+      ) : null}
 
       {colors.length > 0 ? (
         <fieldset className="mt-4">
@@ -109,7 +153,8 @@ export default function ProductCard({ product }: ProductCardProps) {
       <button
         type="button"
         onClick={onAdd}
-        className="mt-5 inline-flex w-full items-center justify-center bg-brand-orange px-4 py-3.5 font-sans text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep"
+        disabled={!canFulfill}
+        className="mt-5 inline-flex w-full items-center justify-center bg-brand-orange px-4 py-3.5 font-sans text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-brand-orange-deep disabled:cursor-not-allowed disabled:bg-brand-ink/30"
       >
         {added ? `Added · ${addedLabel}` : "Add to Cart"}
       </button>
