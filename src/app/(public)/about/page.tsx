@@ -8,16 +8,20 @@ import { METROS } from "@/lib/markets/metros";
 import {
   absoluteUrl,
   APP_PRODUCT_NAME,
+  BRAND_DISAMBIGUATING_DESCRIPTION,
+  BRAND_ENTITY_DEFINITION,
+  BRAND_KNOWS_ABOUT,
   buildCanonical,
   EDITORIAL_NAME,
   FOUNDING_PERSON_NAME,
   SITE_NAME,
+  SITE_TAGLINE,
   SITE_URL,
   SOCIAL_PROFILE_URLS,
+  SWEATLIFE_SHORT,
 } from "@/lib/seo/site";
 
-const ABOUT_DESCRIPTION =
-  "Vitality Sweat is Hunter Broussard's Southwest Louisiana platform for fitness training, peak nutrition, and youth baseball. Meet the brand behind the Vitality Engine app.";
+const ABOUT_DESCRIPTION = BRAND_ENTITY_DEFINITION;
 
 export const metadata: Metadata = {
   title: "About Vitality Sweat",
@@ -81,12 +85,17 @@ function buildAboutJsonLd() {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
       name: SITE_NAME,
+      legalName: SITE_NAME,
       url: SITE_URL,
-      description: ABOUT_DESCRIPTION,
+      slogan: SITE_TAGLINE,
+      description: BRAND_ENTITY_DEFINITION,
+      disambiguatingDescription: BRAND_DISAMBIGUATING_DESCRIPTION,
+      knowsAbout: [...BRAND_KNOWS_ABOUT],
       sameAs: SOCIAL_PROFILE_URLS,
       founder: {
         "@type": "Person",
         name: FOUNDING_PERSON_NAME,
+        jobTitle: "Founder and coach",
         url: aboutUrl,
       },
       areaServed: [
@@ -140,10 +149,10 @@ export default function AboutPage() {
               Vitality Sweat
             </h1>
             <p className="mt-5 max-w-2xl font-sans text-lg leading-relaxed text-white/88">
-              Vitality Sweat is Hunter Broussard&apos;s coaching platform for
-              Southwest Louisiana athletes and families. We train with purpose,
-              fuel with intention, and develop the next generation on the
-              diamond.
+              Vitality Sweat is Hunter Broussard&apos;s Southwest Louisiana
+              training, coaching, nutrition, and youth baseball brand. We build
+              athletes and families through sweat-honest sessions, meal plans that
+              fit real kitchens, and diamond fundamentals.
             </p>
           </div>
         </section>
@@ -214,9 +223,10 @@ export default function AboutPage() {
               train and fuel.
             </p>
             <p className="mt-4 font-sans text-lg leading-relaxed text-brand-muted">
-              Stories and coaching notes live in {EDITORIAL_NAME}. Official
-              Vitality Sweat gear lives in the store. Sponsorships for local
-              partners are listed on Advertise.
+              Stories and coaching notes live in {EDITORIAL_NAME} ({SWEATLIFE_SHORT}
+              ). A small store carries official Vitality Sweat training gear for
+              the coaching community. Merch is secondary to coaching, nutrition,
+              and youth baseball.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <SignupCtaLink

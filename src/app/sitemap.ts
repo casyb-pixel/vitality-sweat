@@ -50,7 +50,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: buildCanonical("/store"),
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.8,
+      // Below homepage and About: merch is secondary to the coaching brand.
+      priority: 0.65,
     },
     {
       url: buildCanonical("/advertise"),

@@ -42,12 +42,15 @@ export const metadata: Metadata = {
   publisher: SITE_NAME,
   keywords: [
     "Vitality Sweat",
+    "vitalitysweat",
+    "Vitality Engine",
+    "Sweatlife",
     "Sweatlife Chronicles",
     "Hunter Broussard",
-    "fitness training",
+    "fitness coaching Southwest Louisiana",
     "youth baseball Louisiana",
     "performance nutrition",
-    "Southwest Louisiana",
+    "Acadiana training",
   ],
   robots: {
     index: true,

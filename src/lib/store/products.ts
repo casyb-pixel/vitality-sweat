@@ -128,10 +128,14 @@ export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
     "@type": "CollectionPage",
     name: `${SITE_NAME} Store`,
     description:
-      "Official Vitality Sweat training gear for the coaching community: performance hoodies, gym tees, bottles, and training packs.",
+      "Secondary branded training gear from Vitality Sweat, Hunter Broussard's Southwest Louisiana coaching brand. Merch supports the coaching community; it is not the primary business.",
     url: absoluteUrl("/store"),
+    about: {
+      "@id": `${SITE_URL}/#organization`,
+    },
     isPartOf: {
       "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
       name: SITE_NAME,
       url: SITE_URL,
     },
