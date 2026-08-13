@@ -15,8 +15,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 const EXERCISE_SELECT = `
   id, day_id, exercise_id, sort_order, sets, rep_min, rep_max, set_style,
-  rest_sec, coach_notes, baseline_weight_lb, baseline_reps, last_prescription, created_at,
-  exercise:exercises ( id, name, category, primary_muscle, equipment, tracking_type )
+  rest_sec, coach_notes, baseline_weight_lb, baseline_reps, last_prescription,
+  superset_group, created_at,
+  exercise:exercises ( id, name, category, primary_muscle, equipment, tracking_type, cues, how_to, youtube_url )
 `;
 
 /** Update or swap a planned exercise row. */
@@ -174,6 +175,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       } else {
         return NextResponse.json(
           { ok: false, error: "coach_notes must be a string or null." },
+          { status: 400 },
+        );
+      }
+    }
+
+    if ("superset_group" in body) {
+      if (body.superset_group === null || body.superset_group === "") {
+        patch.superset_group = null;
+      } else if (typeof body.superset_group === "string") {
+        patch.superset_group = body.superset_group.trim().slice(0, 24) || null;
+      } else {
+        return NextResponse.json(
+          { ok: false, error: "superset_group must be a string or null." },
           { status: 400 },
         );
       }

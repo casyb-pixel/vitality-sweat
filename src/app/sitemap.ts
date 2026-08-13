@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
 import { getAllBlogPosts, getAllBlogPostsAsync } from "@/lib/blog/posts";
+import { TOOLS } from "@/lib/tools/catalog";
+import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
+import { COMPARE_PAGES } from "@/lib/marketing/compare";
+import { GEAR_REVIEWS } from "@/lib/gear/catalog";
 import { buildCanonical, SITE_URL } from "@/lib/seo/site";
 
 /**
@@ -54,10 +58,70 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.65,
     },
     {
-      url: buildCanonical("/advertise"),
+      url: buildCanonical("/tools"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: buildCanonical("/exercises"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: buildCanonical("/programs"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: buildCanonical("/train"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: buildCanonical("/fuel"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: buildCanonical("/gear"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.65,
+    },
+    {
+      url: buildCanonical("/search"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
+      url: buildCanonical("/author/hunter-broussard"),
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.5,
+    },
+    {
+      url: buildCanonical("/begin"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.65,
+    },
+    {
+      url: buildCanonical("/compete"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.65,
+    },
+    {
+      url: buildCanonical("/chronicles/rss.xml"),
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.4,
     },
     {
       url: buildCanonical("/privacy"),
@@ -98,5 +162,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [...staticRoutes, ...blogRoutes];
+  return [
+    ...staticRoutes,
+    ...TOOLS.map((tool) => ({
+      url: buildCanonical(`/tools/${tool.slug}`),
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.75,
+    })),
+    ...NAMED_PROGRAMS.map((program) => ({
+      url: buildCanonical(`/programs/${program.slug}`),
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
+    ...COMPARE_PAGES.map((page) => ({
+      url: buildCanonical(`/compare/${page.slug}`),
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.55,
+    })),
+    ...GEAR_REVIEWS.map((review) => ({
+      url: buildCanonical(`/gear/${review.slug}`),
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    })),
+    ...blogRoutes,
+  ];
 }

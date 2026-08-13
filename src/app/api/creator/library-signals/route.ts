@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCreatorRole } from "@/lib/auth/creator";
 import type { LibrarySearchSignal } from "@/lib/library/signals";
+import { STARTER_GSC_KEYWORDS } from "@/lib/seo/starter-keywords";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -92,7 +93,11 @@ export async function GET() {
       })
       .slice(0, 24);
 
-    return NextResponse.json({ ok: true, signals });
+    return NextResponse.json({
+      ok: true,
+      signals,
+      gscQueries: STARTER_GSC_KEYWORDS,
+    });
   } catch (err) {
     console.error("[creator/library-signals]", err);
     return NextResponse.json(

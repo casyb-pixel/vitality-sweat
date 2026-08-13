@@ -10,6 +10,9 @@ import {
   type ChangeEvent,
 } from "react";
 import { extractSectionOptionsFromPostBody } from "@/lib/blog/heading-anchor";
+import VideoTeleprompter, {
+  scriptFromIdea,
+} from "@/components/creator/VideoTeleprompter";
 import type {
   CreatorPublishedPost,
   ShortFormVideoIdea,
@@ -1564,6 +1567,11 @@ export default function VideoWizard({
                     <p className="mt-1.5 whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
                       {idea.voiceoverScript}
                     </p>
+                    <div className="mt-3">
+                      <VideoTeleprompter
+                        script={scriptFromIdea(idea)}
+                      />
+                    </div>
                   </div>
                 ) : null}
                 {idea.scriptBeats ? (
@@ -1647,11 +1655,23 @@ export default function VideoWizard({
           {selectedIdea.voiceoverScript ? (
             <div className="border border-brand-ink/10 bg-surface-elevated px-3 py-3">
               <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
-                Read this for voice-over
+                Gym cheat card
+              </p>
+              <p className="mt-1.5 font-sans text-sm font-semibold text-brand-ink">
+                {(selectedIdea.spokenLines?.[0] ||
+                  selectedIdea.voiceoverScript.split(/[.!?]/)[0] ||
+                  "Film the lift quiet.") + "."}
+              </p>
+              <p className="mt-1 font-sans text-xs text-brand-muted">
+                {selectedIdea.shotList?.[0] ||
+                  "45 degree from the working side. No talking on the floor."}
               </p>
               <p className="mt-1.5 whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
                 {selectedIdea.voiceoverScript}
               </p>
+              <div className="mt-3">
+                <VideoTeleprompter script={scriptFromIdea(selectedIdea)} />
+              </div>
             </div>
           ) : null}
           <p className="font-sans text-sm leading-relaxed text-brand-muted">

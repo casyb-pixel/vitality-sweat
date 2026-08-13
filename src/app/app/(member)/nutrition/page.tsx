@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import NutritionPlanner from "@/components/app/NutritionPlanner";
+import FuelLogClient from "@/components/app/FuelLogClient";
 import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import {
@@ -64,6 +65,7 @@ export default async function NutritionPage() {
         initialPlan={(mealPlan as MealPlan | null) ?? null}
         initialRatings={(profile?.dish_ratings as DishRatingsMap | null) ?? null}
       />
+      <FuelLogClient />
     </div>
   );
 }

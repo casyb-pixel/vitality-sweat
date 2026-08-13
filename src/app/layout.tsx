@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Sans_3, Vesper_Libre } from "next/font/google";
 import AuthGate from "@/components/auth/AuthGate";
 import ReferralCapture from "@/components/auth/ReferralCapture";
+import PwaRegister from "@/components/app/PwaRegister";
 import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import JsonLd from "@/components/seo/JsonLd";
 import StoreCartShell from "@/components/store/StoreCartShell";
@@ -93,6 +94,12 @@ export const metadata: Metadata = {
     icon: "/branding/favicon-32.png",
     apple: "/branding/app/android-icon-192.png",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Vitality Engine",
+    statusBarStyle: "default",
+  },
   category: "fitness",
 };
 
@@ -108,6 +115,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <GoogleAnalytics />
+        <PwaRegister />
         <ReferralCapture />
         <AuthGate />
         <JsonLd data={[buildOrganizationJsonLd(), buildWebSiteJsonLd()]} />

@@ -132,6 +132,8 @@ export type FitnessProfile = {
   preferred_split: PreferredSplit | null;
   meal_rejects?: string[];
   dish_ratings?: DishRatingsMap;
+  default_rest_sec?: number | null;
+  notifications_opt_in?: boolean;
   onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -184,6 +186,10 @@ export type Exercise = {
   aliases?: string[];
   tracking_type: ExerciseTrackingType;
   is_active: boolean;
+  slug?: string | null;
+  cues?: string[];
+  secondary_muscles?: string[];
+  how_to?: string | null;
   /** Public YouTube how-to Short URL once Hunter confirms it is posted. */
   youtube_url?: string | null;
   youtube_posted_at?: string | null;
@@ -289,7 +295,24 @@ export type WorkoutProgramExercise = {
     source: string;
     updated_at: string;
   } | null;
+  /** Same non-null value groups exercises into a superset or circuit. */
+  superset_group?: string | null;
   created_at: string;
+};
+
+export type WorkoutSetKind =
+  | "warmup"
+  | "working"
+  | "drop"
+  | "failure"
+  | "timed";
+
+export const WORKOUT_SET_KIND_LABELS: Record<WorkoutSetKind, string> = {
+  warmup: "Warm-up",
+  working: "Working",
+  drop: "Drop",
+  failure: "Failure",
+  timed: "Timed",
 };
 
 export type WorkoutSet = {
@@ -300,6 +323,9 @@ export type WorkoutSet = {
   weight_lb: number | null;
   reps: number | null;
   difficulty: number;
+  duration_sec?: number | null;
+  distance_m?: number | null;
+  set_kind?: WorkoutSetKind | string | null;
   created_at: string;
 };
 
@@ -309,6 +335,9 @@ export type WorkoutSetInput = {
   weight_lb?: number | null;
   reps?: number | null;
   difficulty: number;
+  duration_sec?: number | null;
+  distance_m?: number | null;
+  set_kind?: WorkoutSetKind | null;
 };
 
 export type ProgressionSuggestion = {

@@ -22,9 +22,11 @@ import {
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
+import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
+  WORKOUT_SET_KIND_LABELS,
   type Exercise,
   type ExerciseCategory,
   type ExerciseEquipment,
@@ -32,7 +34,9 @@ import {
   type ProgressionSuggestion,
   type WorkoutSession,
   type WorkoutSet,
+  type WorkoutSetKind,
 } from "@/lib/fitness/types";
+import PlateCalculator from "@/components/app/PlateCalculator";
 
 type WorkoutTrackerProps = {
   exercises: Exercise[];
@@ -59,6 +63,18 @@ export default function WorkoutTracker({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [weightLb, setWeightLb] = useState("");
   const [reps, setReps] = useState("10");
+  const [durationSec, setDurationSec] = useState("");
+  const [distanceM, setDistanceM] = useState("");
+  const [setKind, setSetKind] = useState<WorkoutSetKind>("working");
+  const [customName, setCustomName] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+  const [showPlates, setShowPlates] = useState(false);
+  const [lastWorking, setLastWorking] = useState<{
+    weightLb: string;
+    reps: string;
+    durationSec: string;
+    distanceM: string;
+  } | null>(null);
   const [difficulty, setDifficulty] = useState(3);
   const [setNumber, setSetNumber] = useState(1);
   const [loggedSets, setLoggedSets] = useState<WorkoutSet[]>([]);
@@ -114,6 +130,15 @@ export default function WorkoutTracker({
     }
     if (result.data.suggestion?.suggestedReps != null) {
       setReps(String(result.data.suggestion.suggestedReps));
+    }
+    const last = result.data.sets?.[result.data.sets.length - 1];
+    if (last) {
+      setLastWorking({
+        weightLb: last.weight_lb != null ? String(last.weight_lb) : "",
+        reps: last.reps != null ? String(last.reps) : "",
+        durationSec: last.duration_sec != null ? String(last.duration_sec) : "",
+        distanceM: last.distance_m != null ? String(last.distance_m) : "",
+      });
     }
   }, []);
 
@@ -205,6 +230,9 @@ export default function WorkoutTracker({
         weightLb: weightLb === "" ? null : Number(weightLb),
         reps: reps === "" ? null : Number(reps),
         difficulty,
+        durationSec: durationSec === "" ? null : Number(durationSec),
+        distanceM: distanceM === "" ? null : Number(distanceM),
+        setKind,
       });
       if (!result.ok) {
         setError(result.error);
@@ -219,6 +247,12 @@ export default function WorkoutTracker({
       setMessage(
         `Logged set ${result.data.set.set_number}. ${DIFFICULTY_LABELS[difficulty] ?? difficulty}.`,
       );
+      setLastWorking({
+        weightLb,
+        reps,
+        durationSec,
+        distanceM,
+      });
     });
   }
 
@@ -590,40 +624,69 @@ export default function WorkoutTracker({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label htmlFor="weight" className={labelClass}>
-              Weight (lb)
-            </label>
-            <input
-              id="weight"
-              type="number"
-              min={0}
-              step="0.5"
-              value={weightLb}
-              onChange={(e) => setWeightLb(e.target.value)}
-              className={fieldClass}
-              placeholder={
-                selected?.tracking_type === "reps_only" ||
-                selected?.tracking_type === "duration" ||
-                selected?.tracking_type === "distance"
-                  ? "optional"
-                  : ""
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor="reps" className={labelClass}>
-              Reps
-            </label>
-            <input
-              id="reps"
-              type="number"
-              min={0}
-              value={reps}
-              onChange={(e) => setReps(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
+          {selected?.tracking_type === "duration" ? (
+            <div>
+              <label htmlFor="duration" className={labelClass}>
+                Duration (sec)
+              </label>
+              <input
+                id="duration"
+                type="number"
+                min={0}
+                value={durationSec}
+                onChange={(e) => setDurationSec(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+          ) : selected?.tracking_type === "distance" ? (
+            <div>
+              <label htmlFor="distance" className={labelClass}>
+                Distance (m)
+              </label>
+              <input
+                id="distance"
+                type="number"
+                min={0}
+                step="1"
+                value={distanceM}
+                onChange={(e) => setDistanceM(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="weight" className={labelClass}>
+                  Weight (lb)
+                </label>
+                <input
+                  id="weight"
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={weightLb}
+                  onChange={(e) => setWeightLb(e.target.value)}
+                  className={fieldClass}
+                  placeholder={
+                    selected?.tracking_type === "reps_only" ? "optional" : ""
+                  }
+                />
+              </div>
+              <div>
+                <label htmlFor="reps" className={labelClass}>
+                  Reps
+                </label>
+                <input
+                  id="reps"
+                  type="number"
+                  min={0}
+                  value={reps}
+                  onChange={(e) => setReps(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+            </>
+          )}
           <div>
             <label htmlFor="setNumber" className={labelClass}>
               Set #
@@ -638,6 +701,92 @@ export default function WorkoutTracker({
             />
           </div>
         </div>
+
+        <fieldset>
+          <legend className={labelClass}>Set type</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(Object.keys(WORKOUT_SET_KIND_LABELS) as WorkoutSetKind[]).map(
+              (kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setSetKind(kind)}
+                  className={`${chipBase} ${
+                    setKind === kind
+                      ? "border-brand-orange bg-brand-orange text-white"
+                      : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                  }`}
+                >
+                  {WORKOUT_SET_KIND_LABELS[kind]}
+                </button>
+              ),
+            )}
+          </div>
+        </fieldset>
+
+        {selected ? (
+          <div className="mt-2">
+            <ExerciseHowToSheet exercise={selected} />
+          </div>
+        ) : null}
+
+        {lastWorking ? (
+          <button
+            type="button"
+            onClick={() => {
+              setWeightLb(lastWorking.weightLb);
+              setReps(lastWorking.reps);
+              setDurationSec(lastWorking.durationSec);
+              setDistanceM(lastWorking.distanceM);
+            }}
+            className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
+          >
+            Same as last
+          </button>
+        ) : null}
+
+        {selected?.name.toLowerCase().includes("barbell") ||
+        selected?.name.toLowerCase().includes("deadlift") ||
+        selected?.name.toLowerCase().includes("squat") ? (
+          <button
+            type="button"
+            onClick={() => setShowPlates((v) => !v)}
+            className="block font-sans text-xs font-semibold text-brand-orange"
+          >
+            {showPlates ? "Hide plates" : "Plate calculator"}
+          </button>
+        ) : null}
+        {showPlates ? (
+          <PlateCalculator targetLb={Number(weightLb) || 135} />
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => setShowCustom((v) => !v)}
+          className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange"
+        >
+          {showCustom ? "Hide custom exercise" : "Create custom exercise"}
+        </button>
+        {showCustom ? (
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              placeholder="My machine row"
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSearch(customName);
+                void resolveWithGemini();
+              }}
+              className="inline-flex min-h-10 items-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em]"
+            >
+              Add to library
+            </button>
+          </div>
+        ) : null}
 
         <fieldset>
           <legend className={labelClass}>How did it feel?</legend>

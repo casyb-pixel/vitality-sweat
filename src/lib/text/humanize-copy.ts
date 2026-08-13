@@ -46,4 +46,15 @@ export function stripEmDashesDeep<T>(value: T): T {
 
 /** Paste into every AI prompt that writes user-facing or publishable text. */
 export const NO_EM_DASH_RULE =
-  "HOUSE RULE: Never use em dashes (—) or en dashes (–). They look AI-generated. Use commas, periods, colons, or a simple hyphen (-) instead.";
+  "HOUSE RULE: Never use em dashes (\u2014) or en dashes (\u2013). They look AI-generated. Use commas, periods, colons, or a simple hyphen (-) instead.";
+
+/** Gym-bro spoken scripts for shy Hunter. Paste into video-assist prompts. */
+export const GYM_BRO_SCRIPT_RULES = [
+  "Write word-for-word spoken lines. Hunter never ad-libs. No blank 'say a few words about form'.",
+  "Contractions. Short sentences. 8-14 words each. One cue at a time.",
+  "Sound like a teammate in the rack, not a YouTube intro.",
+  "Banned phrases: Hey guys, in this video I will, without further ado, let's dive in, it's important to note.",
+  "Allowed texture: brace like someone is about to poke you, own the last inch, save this for later.",
+  "Always end with one Engine CTA line already written and timed.",
+  "Default filmMode is silent_vo: film the lift quiet, read the script at home.",
+].join(" ");

@@ -15,8 +15,9 @@ type RouteContext = { params: Promise<{ dayId: string }> };
 
 const EXERCISE_SELECT = `
   id, day_id, exercise_id, sort_order, sets, rep_min, rep_max, set_style,
-  rest_sec, coach_notes, baseline_weight_lb, baseline_reps, last_prescription, created_at,
-  exercise:exercises ( id, name, category, primary_muscle, equipment, tracking_type )
+  rest_sec, coach_notes, baseline_weight_lb, baseline_reps, last_prescription,
+  superset_group, created_at,
+  exercise:exercises ( id, name, category, primary_muscle, equipment, tracking_type, cues, how_to, youtube_url )
 `;
 
 /** Add an exercise to a program day (append or insert after a row). */

@@ -48,6 +48,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: latest } = await admin
+    .from("posts")
+    .select("title, slug")
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const tip = latest?.title
+    ? `This week: log one honest workout, then read "${latest.title}". Open Engine after.`
+    : "This week: log one honest workout and rate one meal. Consistency beats intensity.";
+
   const results = [];
   for (const profile of profiles ?? []) {
     if (!profile.email) continue;
@@ -55,6 +67,8 @@ export async function POST(request: Request) {
       userId: profile.id as string,
       toEmail: profile.email as string,
       displayName: (profile.display_name as string | null) ?? null,
+      tip,
+      chronicleSlug: (latest?.slug as string | null) ?? null,
     });
     results.push({ userId: profile.id, ...result });
   }

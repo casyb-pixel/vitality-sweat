@@ -92,6 +92,9 @@ export async function logWorkoutSet(input: {
   weightLb: number | null;
   reps: number | null;
   difficulty: number;
+  durationSec?: number | null;
+  distanceM?: number | null;
+  setKind?: string | null;
 }): Promise<
   ApiResult<{
     set: WorkoutSet;
@@ -108,6 +111,9 @@ export async function logWorkoutSet(input: {
       weight_lb: input.weightLb,
       reps: input.reps,
       difficulty: input.difficulty,
+      duration_sec: input.durationSec ?? null,
+      distance_m: input.distanceM ?? null,
+      set_kind: input.setKind ?? "working",
     }),
   });
   const json = (await res.json()) as {

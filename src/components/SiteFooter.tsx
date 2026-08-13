@@ -5,6 +5,13 @@ import { SITE_NAME, SOCIAL_LINKS } from "@/lib/seo/site";
 const SITE_LINKS = [
   { href: "/about", label: "About" },
   { href: "/chronicles", label: "The Sweatlife Chronicles" },
+  { href: "/tools", label: "Tools" },
+  { href: "/train", label: "Train" },
+  { href: "/fuel", label: "Fuel" },
+  { href: "/exercises", label: "Exercises" },
+  { href: "/programs", label: "Programs" },
+  { href: "/gear", label: "Gear" },
+  { href: "/search", label: "Search" },
   { href: "/store", label: "Store" },
   { href: "/advertise", label: "Advertise" },
 ] as const;

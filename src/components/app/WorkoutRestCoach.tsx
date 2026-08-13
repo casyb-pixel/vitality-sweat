@@ -212,6 +212,17 @@ export default function WorkoutRestCoach({
     if (alertOn) {
       playSoftChime();
       maybeVibrate();
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const n = new Notification("Rest is over", {
+            body: "Next set. Own it.",
+            tag: "vitality-rest",
+          });
+          window.setTimeout(() => n.close(), 4000);
+        }
+      } catch {
+        // ignore
+      }
     }
   }, [remaining, running, alertOn]);
 

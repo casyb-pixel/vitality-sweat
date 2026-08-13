@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SiteFooter from "@/components/SiteFooter";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
+import AdvertiseInquiryForm from "@/components/marketing/AdvertiseInquiryForm";
 import { RATE_CARD_PACKAGES } from "@/lib/markets/audience-brief";
 import { METROS } from "@/lib/markets/metros";
 import { buildCanonical } from "@/lib/seo/site";
@@ -135,6 +136,7 @@ export default function AdvertisePage() {
           >
             Create free account
           </SignupCtaLink>
+          <AdvertiseInquiryForm />
         </section>
       </main>
       <SiteFooter />

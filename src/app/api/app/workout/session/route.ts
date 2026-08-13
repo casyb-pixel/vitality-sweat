@@ -3,6 +3,9 @@ import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
 
+const SET_SELECT =
+  "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, duration_sec, distance_m, set_kind, created_at";
+
 /** Start a new active workout session (or resume the existing one). */
 export async function POST(request: Request) {
   try {
@@ -29,7 +32,6 @@ export async function POST(request: Request) {
     }
 
     if (programDayId) {
-      // RLS limits this to the member's own program days.
       const { data: day } = await supabase
         .from("workout_program_days")
         .select("id")
@@ -104,7 +106,107 @@ export async function POST(request: Request) {
   }
 }
 
-/** Complete the active session. */
+/** List history or load one session with sets. */
+export async function GET(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized." },
+        { status: 401 },
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("id")?.trim();
+
+    if (sessionId) {
+      const { data: session, error } = await supabase
+        .from("workout_sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        return NextResponse.json(
+          { ok: false, error: error.message },
+          { status: 500 },
+        );
+      }
+      if (!session) {
+        return NextResponse.json(
+          { ok: false, error: "Session not found." },
+          { status: 404 },
+        );
+      }
+
+      const { data: sets, error: setsError } = await supabase
+        .from("workout_sets")
+        .select(SET_SELECT)
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+
+      if (setsError) {
+        return NextResponse.json(
+          { ok: false, error: setsError.message },
+          { status: 500 },
+        );
+      }
+
+      const exerciseIds = [
+        ...new Set((sets ?? []).map((s) => s.exercise_id as string)),
+      ];
+      let exercises: { id: string; name: string; tracking_type: string }[] = [];
+      if (exerciseIds.length) {
+        const { data: exRows } = await supabase
+          .from("exercises")
+          .select("id, name, tracking_type")
+          .in("id", exerciseIds);
+        exercises = (exRows ?? []) as typeof exercises;
+      }
+
+      return NextResponse.json({
+        ok: true,
+        session,
+        sets: sets ?? [],
+        exercises,
+      });
+    }
+
+    const limit = Math.min(
+      60,
+      Math.max(1, Number(searchParams.get("limit") ?? 30) || 30),
+    );
+
+    const { data: sessions, error } = await supabase
+      .from("workout_sessions")
+      .select("*")
+      .eq("user_id", user.id)
+      .in("status", ["completed", "cancelled", "active"])
+      .order("started_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, sessions: sessions ?? [] });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error.";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+/** Complete the active session, or update notes on a past session. */
 export async function PATCH(request: Request) {
   try {
     const supabase = await createClient();
@@ -137,16 +239,24 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const status =
-      body.status === "cancelled" ? "cancelled" : "completed";
+    const patch: Record<string, unknown> = {};
+    if (body.status === "cancelled" || body.status === "completed") {
+      patch.status = body.status;
+      patch.ended_at = new Date().toISOString();
+    }
+    if (typeof body.notes === "string") {
+      patch.notes = body.notes;
+    }
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "Nothing to update." },
+        { status: 400 },
+      );
+    }
 
     const { data, error } = await supabase
       .from("workout_sessions")
-      .update({
-        status,
-        ended_at: new Date().toISOString(),
-        notes: typeof body.notes === "string" ? body.notes : undefined,
-      })
+      .update(patch)
       .eq("id", sessionId)
       .eq("user_id", user.id)
       .select("*")

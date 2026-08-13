@@ -26,6 +26,18 @@ export default function CreatorAppLayout({
           </Link>
           <nav className="flex items-center gap-3 sm:gap-4">
             <Link
+              href="/app/creator/today"
+              className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
+            >
+              Today
+            </Link>
+            <Link
+              href="/app/creator/gyms"
+              className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
+            >
+              Gyms
+            </Link>
+            <Link
               href="/chronicles"
               className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
             >

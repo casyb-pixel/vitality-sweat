@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import AudiencePanel from "@/components/creator/AudiencePanel";
 import BlogWizard from "@/components/creator/BlogWizard";
 import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
+import DailyBriefClient from "@/components/creator/DailyBriefClient";
+import EditorialCalendarPanel from "@/components/creator/EditorialCalendarPanel";
 import GrowthCampaignPanel from "@/components/creator/GrowthCampaignPanel";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import SponsorsPanel from "@/components/creator/SponsorsPanel";
@@ -13,7 +15,14 @@ import type {
   VideoScriptPreset,
 } from "@/lib/marketing/campaign-templates";
 
-type StudioTab = "projects" | "blog" | "video" | "audience" | "sponsors";
+type StudioTab =
+  | "today"
+  | "calendar"
+  | "projects"
+  | "blog"
+  | "video"
+  | "audience"
+  | "sponsors";
 
 type CreatorStudioProps = {
   creatorLabel: string;
@@ -21,6 +30,8 @@ type CreatorStudioProps = {
 };
 
 const TABS: { id: StudioTab; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "calendar", label: "Calendar" },
   { id: "projects", label: "Projects" },
   { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
@@ -148,6 +159,18 @@ export default function CreatorStudio({
           })}
         </div>
       </header>
+
+      {tab === "today" ? (
+        <div id="studio-panel-today" role="tabpanel">
+          <DailyBriefClient />
+        </div>
+      ) : null}
+
+      {tab === "calendar" ? (
+        <div id="studio-panel-calendar" role="tabpanel">
+          <EditorialCalendarPanel />
+        </div>
+      ) : null}
 
       {tab === "projects" ? (
         <div

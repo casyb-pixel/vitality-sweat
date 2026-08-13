@@ -36,7 +36,7 @@ export default async function WorkoutPage() {
     supabase
       .from("exercises")
       .select(
-        "id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active, created_by, created_at, updated_at",
+        "id, name, category, primary_muscle, equipment, aliases, tracking_type, is_active, created_by, created_at, updated_at, youtube_url, cues, how_to",
       )
       .eq("is_active", true)
       .order("name", { ascending: true }),
@@ -58,7 +58,7 @@ export default async function WorkoutPage() {
           exercises:workout_program_exercises (
             *,
             exercise:exercises (
-              id, name, category, primary_muscle, equipment, youtube_url
+              id, name, category, primary_muscle, equipment, youtube_url, cues, how_to
             )
           )
         )

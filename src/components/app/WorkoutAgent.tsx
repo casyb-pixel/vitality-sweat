@@ -34,6 +34,8 @@ export type NestedProgramExercise = WorkoutProgramExercise & {
     | "primary_muscle"
     | "equipment"
     | "youtube_url"
+    | "cues"
+    | "how_to"
   > | null;
 };
 

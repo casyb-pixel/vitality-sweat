@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/chronicles", label: "Chronicles", title: "The Sweatlife Chronicles" },
+  { href: "/tools", label: "Tools" },
   { href: "/store", label: "Store" },
 ] as const;
 

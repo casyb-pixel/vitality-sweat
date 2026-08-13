@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
+import SweatScoreCard from "@/components/app/SweatScoreCard";
 import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import {
@@ -25,6 +26,16 @@ const QUICK_LINKS = [
     href: "/app/workout",
     title: "Today's workout",
     body: "Start a session, log sets, and get progressive overload suggestions.",
+  },
+  {
+    href: "/app/history",
+    title: "History",
+    body: "Open past sessions, fix a bad set, and keep notes.",
+  },
+  {
+    href: "/app/progress",
+    title: "Progress",
+    body: "Best set, volume, and estimated 1RM charts.",
   },
   {
     href: "/app/nutrition",
@@ -130,6 +141,8 @@ export default async function MemberDashboardPage() {
           here.
         </p>
       </header>
+
+      <SweatScoreCard />
 
       <section className="border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">

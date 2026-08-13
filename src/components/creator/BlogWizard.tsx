@@ -15,6 +15,7 @@ import {
   type BlogArticleType,
 } from "@/lib/marketing/campaign-templates";
 import { METROS, type MetroId } from "@/lib/markets/metros";
+import { POST_CLUSTERS, type PostCluster } from "@/lib/blog/supabase-posts";
 
 type WizardPhase =
   | "PHASE_1_INPUT"
@@ -114,8 +115,12 @@ export default function BlogWizard({
   const [publishWarning, setPublishWarning] = useState<string | null>(null);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [publishedStatus, setPublishedStatus] = useState<
-    "published" | "draft" | null
+    "published" | "draft" | "scheduled" | null
   >(null);
+  const [cluster, setCluster] = useState<PostCluster>("train");
+  const [keywordQuery, setKeywordQuery] = useState("");
+  const [keywordIntent, setKeywordIntent] = useState("how-to");
+  const [scheduleAt, setScheduleAt] = useState("");
   const [growthChecklist, setGrowthChecklist] = useState<{
     cta: boolean;
     promoCopy: boolean;
@@ -271,8 +276,12 @@ export default function BlogWizard({
     }
   }
 
-  async function publishArticle(status: "published" | "draft") {
+  async function publishArticle(status: "published" | "draft" | "scheduled") {
     if (!article) return;
+    if (status !== "draft" && !cluster) {
+      setPublishError("Pick a topic cluster before you publish.");
+      return;
+    }
     setPublishError(null);
     setPublishWarning(null);
 
@@ -288,7 +297,7 @@ export default function BlogWizard({
     let coverImage: string | undefined;
     const coverAlt = `${article.title} — Sweatlife Chronicles`;
 
-    if (status === "published") {
+    if (status === "published" || status === "scheduled") {
       setPublishStage("visual");
       try {
         const res = await fetch("/api/creator/blog-visual", {
@@ -339,6 +348,13 @@ export default function BlogWizard({
           includeGrowthCta:
             articleType === "local_growth" ? true : includeGrowthCta,
           market,
+          cluster,
+          dueAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
+          keywordBrief: {
+            query: keywordQuery,
+            intent: keywordIntent,
+            internalLinks: ["/tools", "/exercises", "/app"],
+          },
         }),
       });
       const data = (await res.json()) as {
@@ -694,7 +710,9 @@ export default function BlogWizard({
               <p className="font-display text-xl text-brand-ink">
                 {publishedStatus === "published"
                   ? "It's live. Nice work."
-                  : "Draft saved."}
+                  : publishedStatus === "scheduled"
+                    ? "Queued. It goes live at the time you set."
+                    : "Draft saved."}
               </p>
               {publishWarning ? (
                 <p className="font-sans text-sm text-brand-muted">
@@ -729,6 +747,18 @@ export default function BlogWizard({
                   <p className="font-sans text-sm text-brand-muted">
                     Marketing project is on the Projects tab — swipe copy is
                     ready for local promotion.
+                  </p>
+                  <a
+                    href="https://www.canva.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className={secondaryButtonClass}
+                  >
+                    Open in Canva (brand kit kAHQmrFxWVQ)
+                  </a>
+                  <p className="font-sans text-xs text-brand-muted">
+                    IG 4:5 and story 9:16. Use the official logo at
+                    vitalitysweat.com/branding/logo-original-transparent.png
                   </p>
                 </>
               ) : null}
@@ -797,9 +827,53 @@ export default function BlogWizard({
                 </p>
               ) : null}
 
+              <label className="block font-sans text-sm font-semibold text-brand-ink">
+                Topic cluster (required to publish)
+                <select
+                  className={fieldClass}
+                  value={cluster}
+                  onChange={(e) => setCluster(e.target.value as PostCluster)}
+                >
+                  {POST_CLUSTERS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block font-sans text-sm font-semibold text-brand-ink">
+                Target search query
+                <input
+                  className={fieldClass}
+                  value={keywordQuery}
+                  onChange={(e) => setKeywordQuery(e.target.value)}
+                  placeholder="first gym workout 45 minutes"
+                />
+              </label>
+              <label className="block font-sans text-sm font-semibold text-brand-ink">
+                Search intent
+                <input
+                  className={fieldClass}
+                  value={keywordIntent}
+                  onChange={(e) => setKeywordIntent(e.target.value)}
+                  placeholder="how-to / local / comparison"
+                />
+              </label>
+              <label className="block font-sans text-sm font-semibold text-brand-ink">
+                Schedule (optional)
+                <input
+                  type="datetime-local"
+                  className={fieldClass}
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                />
+              </label>
+
               <button
                 type="button"
-                onClick={() => publishArticle("published")}
+                onClick={() =>
+                  publishArticle(scheduleAt ? "scheduled" : "published")
+                }
                 disabled={publishStage !== "idle" || !draftConfirmed}
                 className={bigButtonClass}
               >

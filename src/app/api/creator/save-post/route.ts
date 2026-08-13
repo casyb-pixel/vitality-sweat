@@ -21,7 +21,7 @@ type SavePostBody = {
   excerpt?: string;
   bodyMarkdown?: string;
   body_markdown?: string;
-  status?: PostStatus;
+  status?: PostStatus | "scheduled";
   slug?: string;
   description?: string;
   keywords?: string[];
@@ -31,8 +31,11 @@ type SavePostBody = {
   cover_alt?: string;
   featured?: boolean;
   includeGrowthCta?: boolean;
-  /** Phase 3 market playbook id (lafayette, lake-charles, …). */
   market?: string | null;
+  cluster?: string | null;
+  dueAt?: string | null;
+  due_at?: string | null;
+  keywordBrief?: SavePostInput["keywordBrief"];
 };
 
 /**
@@ -74,6 +77,13 @@ export async function POST(request: Request) {
     const input = parsed.data;
     const slug = input.slug?.trim() || slugifyTitle(input.title);
     const now = new Date().toISOString();
+    const isScheduled = input.status === "scheduled";
+    const isPublished = input.status === "published";
+    const publishedAt = isPublished
+      ? now
+      : isScheduled && input.dueAt
+        ? input.dueAt
+        : null;
     const description =
       input.description?.trim() ||
       input.excerpt.trim() ||
@@ -108,7 +118,15 @@ export async function POST(request: Request) {
       cover_alt: input.coverAlt?.trim() || null,
       keywords: input.keywords ?? ["Sweatlife Chronicles", "Vitality Sweat"],
       featured: Boolean(input.featured),
-      published_at: input.status === "published" ? now : null,
+      published_at: publishedAt,
+      cluster: input.cluster ?? null,
+      editorial_status: isPublished
+        ? "published"
+        : isScheduled
+          ? "scheduled"
+          : "draft",
+      due_at: input.dueAt ?? null,
+      keyword_brief: input.keywordBrief ?? {},
       updated_at: now,
       growth_packaging: growthPackaging,
     };
@@ -215,12 +233,26 @@ function validateSaveBody(
   if (!bodyMarkdown) {
     return { ok: false, error: "Body markdown is required." };
   }
-  if (status !== "draft" && status !== "published") {
+  if (status !== "draft" && status !== "published" && status !== "scheduled") {
     return {
       ok: false,
-      error: "Status must be 'draft' or 'published'.",
+      error: "Status must be draft, scheduled, or published.",
     };
   }
+
+  const clusters = new Set([
+    "train",
+    "fuel",
+    "mindset",
+    "baseball",
+    "beginner",
+    "gear",
+    "local",
+  ]);
+  const cluster =
+    typeof body.cluster === "string" && clusters.has(body.cluster)
+      ? (body.cluster as SavePostInput["cluster"])
+      : null;
 
   return {
     ok: true,
@@ -228,7 +260,7 @@ function validateSaveBody(
       title: stripEmDashes(title),
       excerpt: stripEmDashes(excerpt),
       bodyMarkdown: stripEmDashes(bodyMarkdown),
-      status,
+      status: status === "scheduled" ? "scheduled" : status,
       slug: body.slug,
       description: body.description
         ? stripEmDashes(body.description)
@@ -246,6 +278,9 @@ function validateSaveBody(
       featured: body.featured,
       includeGrowthCta: body.includeGrowthCta !== false,
       market: typeof body.market === "string" ? body.market : body.market ?? null,
+      cluster,
+      dueAt: body.dueAt ?? body.due_at ?? null,
+      keywordBrief: body.keywordBrief ?? null,
     },
   };
 }

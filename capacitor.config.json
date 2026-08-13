@@ -1,0 +1,9 @@
+{
+  "appId": "com.vitalitysweat.engine",
+  "appName": "Vitality Engine",
+  "webDir": "out",
+  "server": {
+    "url": "https://vitalitysweat.com/app",
+    "cleartext": false
+  }
+}

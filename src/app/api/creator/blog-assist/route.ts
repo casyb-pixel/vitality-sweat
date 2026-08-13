@@ -426,6 +426,8 @@ function buildFinalizePrompt(
     "Ensure absolute grammatical perfection. Expand fragments into full sentences. Do NOT invent PRs, weights, or numbers he did not provide.",
     NO_EM_DASH_RULE,
     "Write like a real coach-athlete voice. Avoid AI tells: no em dashes, no stiff transitions like 'In conclusion' or 'It is important to note'.",
+    "Do not fake medically reviewed. Stay in coaching, training, and first-person experience. Cite sources. No disease treatment, PED protocols, or shame copy.",
+    "Include an Engine action: log a workout, generate a meal plan, or share a grocery list.",
     localGrowthRules,
     "",
     "MATCH OUR HISTORICAL H2/H3 FINGERPRINT (calorie-deficit archive baseline):",

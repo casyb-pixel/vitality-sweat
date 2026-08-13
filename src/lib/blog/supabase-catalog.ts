@@ -71,6 +71,7 @@ export async function fetchPublishedSupabasePosts(): Promise<MigratedPost[]> {
       .from("posts")
       .select("*")
       .eq("status", "published")
+      .lte("published_at", new Date().toISOString())
       .order("published_at", { ascending: false });
 
     if (error) {

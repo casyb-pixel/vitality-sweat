@@ -3,7 +3,26 @@
  * Apply `supabase/migrations/20260720153000_create_posts.sql` in the project.
  */
 
-export type PostStatus = "draft" | "published";
+export type PostCluster =
+  | "train"
+  | "fuel"
+  | "mindset"
+  | "baseball"
+  | "beginner"
+  | "gear"
+  | "local";
+
+export const POST_CLUSTERS: { id: PostCluster; label: string }[] = [
+  { id: "train", label: "Train" },
+  { id: "fuel", label: "Fuel" },
+  { id: "mindset", label: "Mindset" },
+  { id: "baseball", label: "Baseball" },
+  { id: "beginner", label: "Beginner" },
+  { id: "gear", label: "Gear" },
+  { id: "local", label: "Local" },
+];
+
+export type PostStatus = "draft" | "published" | "scheduled";
 
 export type BlogPostRecord = {
   id: string;
@@ -13,7 +32,11 @@ export type BlogPostRecord = {
   body_markdown: string;
   body_blocks?: unknown;
   description: string | null;
-  status: PostStatus;
+  status: PostStatus | "scheduled";
+  cluster?: PostCluster | null;
+  editorial_status?: string | null;
+  keyword_brief?: Record<string, unknown> | null;
+  due_at?: string | null;
   author_id: string | null;
   author_name: string;
   cover_image: string | null;
@@ -48,8 +71,14 @@ export type SavePostInput = {
   coverAlt?: string;
   featured?: boolean;
   bodyBlocks?: unknown;
-  /** Default true — append end CTA + store ad slot metadata. */
   includeGrowthCta?: boolean;
+  cluster?: PostCluster | null;
+  dueAt?: string | null;
+  keywordBrief?: {
+    query?: string;
+    intent?: string;
+    internalLinks?: string[];
+  } | null;
 };
 
 export function slugifyTitle(title: string): string {

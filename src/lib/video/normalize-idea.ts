@@ -80,6 +80,17 @@ export function normalizeVideoIdea(item: unknown): ShortFormVideoIdea | null {
     formTips: kind === "exercise_howto" && formTips.length ? formTips : null,
     voiceoverScript: voiceoverScript || null,
     scriptBeats: coerceScriptBeats(row.scriptBeats),
+    spokenLines: asStringArray(row.spokenLines).slice(0, 12),
+    durationSec:
+      typeof row.durationSec === "number" && Number.isFinite(row.durationSec)
+        ? Math.round(row.durationSec)
+        : null,
+    filmMode: row.filmMode === "talking_head" ? "talking_head" : "silent_vo",
+    shotList: asStringArray(row.shotList).slice(0, 8),
+    coachNote:
+      typeof row.coachNote === "string" && row.coachNote.trim()
+        ? row.coachNote.trim()
+        : null,
   };
 }
 
@@ -114,5 +125,10 @@ export function serializeVideoIdea(idea: ShortFormVideoIdea): ShortFormVideoIdea
         : null,
     voiceoverScript: (idea.voiceoverScript ?? "").trim() || null,
     scriptBeats: idea.scriptBeats ?? null,
+    spokenLines: idea.spokenLines?.map((l) => l.trim()).filter(Boolean).slice(0, 12) ?? null,
+    durationSec: idea.durationSec ?? null,
+    filmMode: idea.filmMode === "talking_head" ? "talking_head" : "silent_vo",
+    shotList: idea.shotList?.map((s) => s.trim()).filter(Boolean).slice(0, 8) ?? null,
+    coachNote: (idea.coachNote ?? "").trim() || null,
   };
 }

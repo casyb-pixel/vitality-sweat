@@ -81,6 +81,7 @@ export default function ProgramDayEditor({
     rest_sec: string;
     set_style: WorkoutSetStyle;
     coach_notes: string;
+    superset_group: string;
   } | null>(null);
 
   const exercises = useMemo(
@@ -120,6 +121,7 @@ export default function ProgramDayEditor({
         ? ex.set_style
         : "hypertrophy") as WorkoutSetStyle,
       coach_notes: ex.coach_notes ?? "",
+      superset_group: ex.superset_group ?? "",
     });
   }
 
@@ -253,6 +255,7 @@ export default function ProgramDayEditor({
           rest_sec: restSec,
           set_style: editDraft.set_style,
           coach_notes: editDraft.coach_notes.trim() || null,
+          superset_group: editDraft.superset_group.trim() || null,
         }),
       });
       const json = (await res.json()) as {
@@ -513,6 +516,9 @@ export default function ProgramDayEditor({
                 </p>
                 <p className="text-xs text-brand-muted">
                   {styleLabel(ex.set_style)} · {formatPrescription(ex)}
+                  {ex.superset_group
+                    ? ` · superset ${ex.superset_group}`
+                    : ""}
                 </p>
                 {ex.coach_notes ? (
                   <p className="mt-0.5 text-xs text-brand-muted">
@@ -637,6 +643,20 @@ export default function ProgramDayEditor({
                     />
                   </label>
                 </div>
+                <label className="block font-sans text-xs text-brand-muted">
+                  Superset group (same letter = pair, skip rest in between)
+                  <input
+                    className={fieldClass}
+                    value={editDraft.superset_group}
+                    placeholder="A"
+                    onChange={(e) =>
+                      setEditDraft({
+                        ...editDraft,
+                        superset_group: e.target.value,
+                      })
+                    }
+                  />
+                </label>
                 <label className="block font-sans text-xs text-brand-muted">
                   Set style
                   <select

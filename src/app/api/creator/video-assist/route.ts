@@ -17,7 +17,7 @@ import {
   type StrengthExerciseCandidate,
 } from "@/lib/video/pick-exercises-for-howto";
 import { createClient } from "@/utils/supabase/server";
-import { NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
+import { GYM_BRO_SCRIPT_RULES, NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
 
 export const runtime = "edge";
 export const maxDuration = 60;
@@ -313,7 +313,14 @@ async function handleGenerateVideoIdeas(input: {
           "string â€” concrete form cue Hunter must demonstrate correctly",
         ],
         voiceoverScript:
-          "string â€” full voice-over script naming the exercise, walking through setup + reps, calling out form tips, ending with a soft Vitality Engine CTA",
+          "string - full voice-over script naming the exercise, walking through setup + reps, calling out form tips, ending with a soft Vitality Engine CTA",
+        spokenLines: [
+          "string - 8 to 14 words Hunter reads. No ad-lib blanks.",
+        ],
+        durationSec: 20,
+        filmMode: "silent_vo",
+        shotList: ["string - where to stand and where the camera looks"],
+        coachNote: "string - one sentence for the parent coach",
       },
     ],
   };
@@ -327,9 +334,12 @@ async function handleGenerateVideoIdeas(input: {
     "Optimize for algorithmic engagement. Gym-native visuals under 45 seconds.",
     "Voice: direct, sweaty, encouraging - never corporate.",
     NO_EM_DASH_RULE,
+    GYM_BRO_SCRIPT_RULES,
     "Do not invent facts that contradict the article.",
     "For exercise how-tos: formTips must be specific coaching cues (brace, bar path, knee tracking, etc.).",
     "voiceoverScript must be readable aloud as continuous narration (not bullet points).",
+    "spokenLines are the teleprompter. 4-6 short sentences. Last line is the Engine CTA.",
+    "Default filmMode is silent_vo. Hunter films the lift with no talking, then reads the script at home.",
     "",
     appInvite,
     "",
@@ -442,6 +452,7 @@ async function handleRegenerateVideoIdea(input: {
     "Optimize for TikTok / Reels / YouTube Shorts. Gym-native, under 45 seconds.",
     "Voice: direct, sweaty, encouraging - never corporate.",
     NO_EM_DASH_RULE,
+    GYM_BRO_SCRIPT_RULES,
     appInvite,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
@@ -536,8 +547,10 @@ async function regenerateExerciseHowTo(input: {
     "You are the Vitality Sweat AI Director for YouTube Shorts exercise how-tos.",
     "Hunter films on his phone at the gym. Generate ONE exercise how-to concept.",
     "Include formTips Hunter must demonstrate correctly and a full voiceoverScript to read aloud.",
+    "Include spokenLines (teleprompter), shotList, coachNote, filmMode silent_vo.",
     "Voice: direct, sweaty, encouraging - never corporate.",
     NO_EM_DASH_RULE,
+    GYM_BRO_SCRIPT_RULES,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
@@ -546,10 +559,15 @@ async function regenerateExerciseHowTo(input: {
         exerciseId: input.exercise.id,
         exerciseName: input.exercise.name,
         title: `How to: ${input.exercise.name}`,
-        videoHook: "string â€” 1 sentence hook",
-        shootingConcept: "string â€” camera / setup notes",
-        formTips: ["string â€” form cue"],
-        voiceoverScript: "string â€” full spoken script",
+        videoHook: "string - 1 sentence hook",
+        shootingConcept: "string - camera / setup notes",
+        formTips: ["string - form cue"],
+        voiceoverScript: "string - full spoken script",
+        spokenLines: ["string - 8 to 14 words"],
+        durationSec: 20,
+        filmMode: "silent_vo",
+        shotList: ["string"],
+        coachNote: "string",
       },
     }),
     "",
@@ -801,6 +819,19 @@ function parseMixedVideoIdeas(
           "Lock in a full range you can own",
         ],
         voiceoverScript: `This is how you do ${exercise.name} the right way. Set up tall, brace hard, and own every rep. Save this, then build your free Vitality Engine plan so you know exactly when this lift hits your week.`,
+        spokenLines: [
+          `This is a ${exercise.name} you can actually control.`,
+          "Plant your base. Brace. Own the last inch.",
+          "If it gets sloppy, cut the set. Log the honest reps.",
+          "Log this in the free Vitality Engine so it shows up on the right day.",
+        ],
+        filmMode: "silent_vo",
+        durationSec: 20,
+        shotList: [
+          "45 degree from the working side so the joint path is obvious",
+          "No talking on the gym floor. VO at home.",
+        ],
+        coachNote: "Have him smile on the last line, then look at the bar.",
         scriptBeats: null,
       };
       howtoIdeas.push(bindExerciseIdea(parsedIdea, exercise));

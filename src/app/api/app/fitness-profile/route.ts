@@ -152,6 +152,36 @@ export async function PATCH(request: Request) {
       patch.weight_lb = weight;
     }
 
+    if ("unit_system" in body) {
+      const units = body.unit_system;
+      if (units !== "imperial" && units !== "metric") {
+        return NextResponse.json(
+          { ok: false, error: "unit_system must be imperial or metric." },
+          { status: 400 },
+        );
+      }
+      patch.unit_system = units;
+    }
+
+    if ("default_rest_sec" in body) {
+      if (body.default_rest_sec === null || body.default_rest_sec === "") {
+        patch.default_rest_sec = null;
+      } else {
+        const rest = Number(body.default_rest_sec);
+        if (!Number.isInteger(rest) || rest < 15 || rest > 600) {
+          return NextResponse.json(
+            { ok: false, error: "Rest must be 15-600 seconds." },
+            { status: 400 },
+          );
+        }
+        patch.default_rest_sec = rest;
+      }
+    }
+
+    if ("notifications_opt_in" in body) {
+      patch.notifications_opt_in = Boolean(body.notifications_opt_in);
+    }
+
     const prefsValidated = validateTrainingPreferencesInput(body);
     if (!prefsValidated.ok) {
       return NextResponse.json(

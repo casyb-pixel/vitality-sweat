@@ -59,14 +59,35 @@ export const SPONSOR_SLOTS: readonly SponsorSlotDefinition[] = [
     size: "banner",
     surfaces: ["grocery"],
   },
-  {
-    id: "app-home",
-    label: "App · home",
-    description: "Member app home (when wired).",
-    size: "banner",
-    surfaces: ["app"],
-  },
-] as const;
+    {
+      id: "app-home",
+      label: "App · home",
+      description: "Member app home (when wired).",
+      size: "banner",
+      surfaces: ["app"],
+    },
+    {
+      id: "tools-inline",
+      label: "Tools · inline",
+      description: "Calculator and tools pages.",
+      size: "banner",
+      surfaces: ["tools"],
+    },
+    {
+      id: "exercise-sidebar",
+      label: "Exercise · sidebar",
+      description: "Public exercise encyclopedia.",
+      size: "rectangle",
+      surfaces: ["exercises"],
+    },
+    {
+      id: "program-end",
+      label: "Program · end",
+      description: "End of a public program page.",
+      size: "banner",
+      surfaces: ["programs"],
+    },
+  ] as const;
 
 export type SponsorSlotId = (typeof SPONSOR_SLOTS)[number]["id"];
 

@@ -7,6 +7,7 @@ import WorkoutAgent, {
 } from "@/components/app/WorkoutAgent";
 import WorkoutRunner from "@/components/app/WorkoutRunner";
 import WorkoutTracker from "@/components/app/WorkoutTracker";
+import ProgramTemplatesPanel from "@/components/app/ProgramTemplatesPanel";
 import type {
   Exercise,
   PrimaryGoal,
@@ -153,6 +154,8 @@ export default function WorkoutWorkspace({
           </p>
         </header>
       ) : null}
+
+      <ProgramTemplatesPanel />
 
       <WorkoutAgent
         initialProgram={program}

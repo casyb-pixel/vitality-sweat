@@ -49,6 +49,12 @@ export type ShortFormVideoIdea = {
     tip: string;
     cta: string;
   } | null;
+  /** Word-for-word gym-bro lines. Hunter reads these, he does not invent. */
+  spokenLines?: string[] | null;
+  durationSec?: number | null;
+  filmMode?: "silent_vo" | "talking_head" | null;
+  shotList?: string[] | null;
+  coachNote?: string | null;
 };
 
 /**

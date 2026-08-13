@@ -21,6 +21,8 @@ import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
+import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
+import { nextSupersetIndex } from "@/lib/fitness/supersets";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
@@ -364,7 +366,19 @@ export default function WorkoutRunner({
         return;
       }
       setLoggedSets((prev) => [...prev, result.data.set]);
-      setRestTrigger((n) => n + 1);
+      const hop = nextSupersetIndex(localExercises, exerciseIndex);
+      if (hop != null) {
+        setExerciseIndex(hop);
+        const next = localExercises[hop];
+        if (next) {
+          await enterExercise(next);
+          setMessage(
+            `Superset: ${next.exercise?.name ?? "next move"}. Rest after the group.`,
+          );
+        }
+      } else {
+        setRestTrigger((n) => n + 1);
+      }
       if (result.data.milestone) {
         setMilestone(result.data.milestone);
       }
@@ -640,7 +654,25 @@ export default function WorkoutRunner({
             </h3>
             <p className="mt-1 font-sans text-sm font-semibold text-brand-ink">
               {formatPrescription(current)}
+              {current.superset_group
+                ? ` · superset ${current.superset_group}`
+                : ""}
             </p>
+            <div className="mt-2">
+              <ExerciseHowToSheet
+                exercise={
+                  current.exercise
+                    ? {
+                        name: current.exercise.name,
+                        primary_muscle: current.exercise.primary_muscle,
+                        cues: current.exercise.cues,
+                        how_to: current.exercise.how_to,
+                        youtube_url: current.exercise.youtube_url,
+                      }
+                    : null
+                }
+              />
+            </div>
           </div>
           {onDayChange ? (
             <button

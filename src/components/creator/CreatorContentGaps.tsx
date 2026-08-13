@@ -11,6 +11,7 @@ export default function CreatorContentGaps({
   onWriteAbout,
 }: CreatorContentGapsProps) {
   const [signals, setSignals] = useState<LibrarySearchSignal[]>([]);
+  const [gscQueries, setGscQueries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +23,7 @@ export default function CreatorContentGaps({
         const json = (await res.json()) as {
           ok?: boolean;
           signals?: LibrarySearchSignal[];
+          gscQueries?: string[];
           error?: string;
         };
         if (cancelled) return;
@@ -31,6 +33,7 @@ export default function CreatorContentGaps({
           return;
         }
         setSignals(json.signals ?? []);
+        setGscQueries(json.gscQueries ?? []);
         setError(null);
       } catch {
         if (!cancelled) {
@@ -74,6 +77,13 @@ export default function CreatorContentGaps({
           No strong Library search signals yet. When members search topics with
           thin coverage, prompts show up here.
         </p>
+        {gscQueries.length ? (
+          <ul className="mt-3 list-disc pl-5 font-sans text-sm text-brand-ink">
+            {gscQueries.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+        ) : null}
       </section>
     );
   }
@@ -121,6 +131,22 @@ export default function CreatorContentGaps({
           </li>
         ))}
       </ul>
+      {gscQueries.length ? (
+        <div className="border border-brand-ink/10 bg-surface-elevated p-3">
+          <p className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange">
+            Search Console starter queries
+          </p>
+          <p className="mt-1 font-sans text-xs text-brand-muted">
+            Pipe live GSC for sc-domain:vitalitysweat.com when that property is
+            connected. Until then, write these 17-25 queries first.
+          </p>
+          <ul className="mt-2 list-disc pl-5 font-sans text-sm text-brand-ink">
+            {gscQueries.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

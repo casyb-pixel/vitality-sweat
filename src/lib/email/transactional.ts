@@ -236,14 +236,23 @@ export async function enqueueTransactionalEmail(
  */
 export async function enqueueWeeklyTipStub(
   admin: SupabaseClient,
-  input: { userId: string; toEmail: string; displayName?: string | null },
+  input: {
+    userId: string;
+    toEmail: string;
+    displayName?: string | null;
+    tip?: string | null;
+    chronicleSlug?: string | null;
+  },
 ): Promise<EmailSendResult> {
-  const content = buildWeeklyTipEmail({ displayName: input.displayName });
+  const content = buildWeeklyTipEmail({
+    displayName: input.displayName,
+    tip: input.tip,
+  });
   return enqueueTransactionalEmail(admin, {
     userId: input.userId,
     toEmail: input.toEmail,
     template: "weekly_tip",
-    payload: { stub: true },
+    payload: { stub: false, chronicleSlug: input.chronicleSlug ?? null },
     subject: content.subject,
     html: content.html,
     text: content.text,

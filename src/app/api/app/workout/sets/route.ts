@@ -27,6 +27,9 @@ export async function POST(request: Request) {
       weight_lb?: number | null;
       reps?: number | null;
       difficulty?: number;
+      duration_sec?: number | null;
+      distance_m?: number | null;
+      set_kind?: string | null;
     };
     try {
       body = (await request.json()) as typeof body;
@@ -83,6 +86,20 @@ export async function POST(request: Request) {
       body.reps === null || body.reps === undefined
         ? null
         : Number(body.reps);
+    const durationSec =
+      body.duration_sec === null || body.duration_sec === undefined
+        ? null
+        : Number(body.duration_sec);
+    const distanceM =
+      body.distance_m === null || body.distance_m === undefined
+        ? null
+        : Number(body.distance_m);
+    const setKindRaw = (body.set_kind ?? "working").trim();
+    const setKind = ["warmup", "working", "drop", "failure", "timed"].includes(
+      setKindRaw,
+    )
+      ? setKindRaw
+      : "working";
 
     if (weight != null && (!Number.isFinite(weight) || weight < 0)) {
       return NextResponse.json(
@@ -93,6 +110,18 @@ export async function POST(request: Request) {
     if (reps != null && (!Number.isInteger(reps) || reps < 0)) {
       return NextResponse.json(
         { ok: false, error: "reps must be a non-negative integer." },
+        { status: 400 },
+      );
+    }
+    if (durationSec != null && (!Number.isFinite(durationSec) || durationSec < 0)) {
+      return NextResponse.json(
+        { ok: false, error: "duration_sec must be >= 0." },
+        { status: 400 },
+      );
+    }
+    if (distanceM != null && (!Number.isFinite(distanceM) || distanceM < 0)) {
+      return NextResponse.json(
+        { ok: false, error: "distance_m must be >= 0." },
         { status: 400 },
       );
     }
@@ -143,6 +172,9 @@ export async function POST(request: Request) {
         weight_lb: weight,
         reps,
         difficulty,
+        duration_sec: durationSec,
+        distance_m: distanceM,
+        set_kind: setKind,
       })
       .select("*")
       .single();
@@ -208,7 +240,7 @@ export async function GET(request: Request) {
       const { data: sets, error } = await supabase
         .from("workout_sets")
         .select(
-          "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, created_at",
+          "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, duration_sec, distance_m, set_kind, created_at",
         )
         .eq("session_id", sessionId)
         .order("created_at", { ascending: true });
@@ -250,7 +282,7 @@ export async function GET(request: Request) {
 
     const { data: sets, error } = await supabase
       .from("workout_sets")
-      .select("id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, created_at")
+      .select("id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, duration_sec, distance_m, set_kind, created_at")
       .eq("exercise_id", exerciseId)
       .in("session_id", sessionIds)
       .order("created_at", { ascending: false })
@@ -296,6 +328,162 @@ export async function GET(request: Request) {
       suggestion,
       last_session_at: lastSessionAt,
     });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error.";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+/** Edit a logged set (history or active session). */
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized." },
+        { status: 401 },
+      );
+    }
+
+    let body: {
+      id?: string;
+      weight_lb?: number | null;
+      reps?: number | null;
+      difficulty?: number;
+      duration_sec?: number | null;
+      distance_m?: number | null;
+      set_kind?: string;
+      notes?: string;
+    };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Invalid JSON body." },
+        { status: 400 },
+      );
+    }
+
+    const id = body.id?.trim();
+    if (!id) {
+      return NextResponse.json(
+        { ok: false, error: "Send id." },
+        { status: 400 },
+      );
+    }
+
+    const { data: existing } = await supabase
+      .from("workout_sets")
+      .select("id, session_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, error: "Set not found." },
+        { status: 404 },
+      );
+    }
+
+    const { data: session } = await supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("id", existing.session_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "Set not found." },
+        { status: 404 },
+      );
+    }
+
+    const patch: Record<string, unknown> = {};
+    if ("weight_lb" in body) patch.weight_lb = body.weight_lb;
+    if ("reps" in body) patch.reps = body.reps;
+    if ("difficulty" in body) patch.difficulty = body.difficulty;
+    if ("duration_sec" in body) patch.duration_sec = body.duration_sec;
+    if ("distance_m" in body) patch.distance_m = body.distance_m;
+    if (typeof body.set_kind === "string") patch.set_kind = body.set_kind;
+
+    const { data, error } = await supabase
+      .from("workout_sets")
+      .update(patch)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ ok: true, set: data });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error.";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized." },
+        { status: 401 },
+      );
+    }
+
+    const id = new URL(request.url).searchParams.get("id")?.trim();
+    if (!id) {
+      return NextResponse.json(
+        { ok: false, error: "Pass id." },
+        { status: 400 },
+      );
+    }
+
+    const { data: existing } = await supabase
+      .from("workout_sets")
+      .select("id, session_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, error: "Set not found." },
+        { status: 404 },
+      );
+    }
+
+    const { data: session } = await supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("id", existing.session_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "Set not found." },
+        { status: 404 },
+      );
+    }
+
+    const { error } = await supabase.from("workout_sets").delete().eq("id", id);
+    if (error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ ok: true });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
