@@ -3,9 +3,10 @@
 ## Referrals
 
 - Each profile gets a unique `referral_code` (e.g. `VSAB12CD`).
-- Invite URL shape: `/?auth=signup&next=/app&ref=CODE` (also works as `/app?ref=CODE` — code is stored in session before auth redirect).
+- Invite URL shape: `/?auth=signup&next=/app&ref=CODE` (also works as `/app?ref=CODE`. Code is stored in session before auth redirect).
 - On signup, `user_metadata.ref` is read by `handle_new_user` and stored as `profiles.referred_by`.
-- Soft rewards only: profile badges (“brought X friends”) — no paid credits.
+- Soft badges stay on the profile (Community connector / Crew builder / Community champion).
+- **Active-referral contests** are the real reward: Creator Studio → Crew. A referred member counts as active after they start a workout or build a meal plan. Hunter fulfills hoodie / pump cover manually from the board.
 
 ## Transactional email
 

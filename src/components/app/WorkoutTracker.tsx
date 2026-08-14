@@ -23,6 +23,7 @@ import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
+import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
   DIFFICULTY_LABELS,
@@ -385,6 +386,10 @@ export default function WorkoutTracker({
       <MilestoneCelebrate
         milestone={milestone}
         onDismiss={() => setMilestone(null)}
+        onPostToEngineRoom={(win) => {
+          void postWinToEngineRoom(win);
+          setMilestone(null);
+        }}
       />
 
       {showInvitePrompt ? (

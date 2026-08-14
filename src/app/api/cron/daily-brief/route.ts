@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       skipped: true,
-      reason: "School quiet hours 7:20am-3:15pm America/Chicago.",
+      reason: "School quiet hours 7:20am-11:30am America/Chicago.",
     });
   }
 

@@ -22,7 +22,8 @@ export function isSchoolHours(now = new Date(), tzOffsetHours = -5): boolean {
   const minute = local.getUTCMinutes();
   const mins = hour * 60 + minute;
   const weekday = day >= 1 && day <= 5;
-  return weekday && mins >= 7 * 60 + 20 && mins < 15 * 60 + 15;
+  // Senior semester: two classes, out at 11:30am America/Chicago.
+  return weekday && mins >= 7 * 60 + 20 && mins < 11 * 60 + 30;
 }
 
 export async function materializeCreatorTasks(
@@ -65,7 +66,7 @@ export async function materializeCreatorTasks(
     if (post.status === "draft" || post.editorial_status === "draft") {
       rows.push({
         creator_id: creatorId,
-        due_at: new Date(start.getTime() + 15.5 * 3600 * 1000).toISOString(),
+        due_at: new Date(start.getTime() + 11.75 * 3600 * 1000).toISOString(),
         kind: "blog_draft",
         title: `Finish draft: ${post.title}`,
         deep_link: `/app/creator?tab=blog&slug=${post.slug}`,
@@ -83,7 +84,7 @@ export async function materializeCreatorTasks(
     } else if (post.status === "published" && !post.ig_post_done) {
       rows.push({
         creator_id: creatorId,
-        due_at: new Date(start.getTime() + 16 * 3600 * 1000).toISOString(),
+        due_at: new Date(start.getTime() + 12.5 * 3600 * 1000).toISOString(),
         kind: "post_instagram",
         title: `Post IG promo: ${post.title}`,
         deep_link: `/app/creator?tab=projects`,
@@ -95,7 +96,7 @@ export async function materializeCreatorTasks(
   if (rows.length < cap) {
     rows.push({
       creator_id: creatorId,
-      due_at: new Date(start.getTime() + 16.5 * 3600 * 1000).toISOString(),
+      due_at: new Date(start.getTime() + 13 * 3600 * 1000).toISOString(),
       kind: "film_howto",
       title: "Film one how-to (silent lift, VO at home)",
       deep_link: "/app/creator?tab=video",

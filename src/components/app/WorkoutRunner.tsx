@@ -18,10 +18,13 @@ import {
   startWorkoutSession,
 } from "@/lib/fitness/workout-logging";
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
+import WorkoutSafetyNote from "@/components/legal/WorkoutSafetyNote";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
+import TrainTogetherSheet from "@/components/app/TrainTogetherSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
+import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import { nextSupersetIndex } from "@/lib/fitness/supersets";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import {
@@ -43,6 +46,7 @@ type WorkoutRunnerProps = {
   onExit: () => void;
   primaryGoal?: PrimaryGoal | null;
   onDayChange?: (day: NestedProgramDay) => void;
+  paired?: boolean;
   onBaselinesSaved?: (
     programExerciseId: string,
     baseline: { baseline_weight_lb: number; baseline_reps: number },
@@ -100,6 +104,7 @@ export default function WorkoutRunner({
   primaryGoal = null,
   onDayChange,
   onBaselinesSaved,
+  paired = false,
 }: WorkoutRunnerProps) {
   const exercises = useMemo(
     () =>
@@ -168,17 +173,19 @@ export default function WorkoutRunner({
   const persistPrescription = useCallback(
     async (ex: NestedProgramExercise, rx: ExercisePrescription) => {
       const snap = prescriptionToSnapshot(rx, ex.set_style);
-      await saveProgramExercisePrescription({
-        id: ex.id,
-        lastPrescription: snap,
-      });
+      if (!paired) {
+        await saveProgramExercisePrescription({
+          id: ex.id,
+          lastPrescription: snap,
+        });
+      }
       setLocalExercises((prev) =>
         prev.map((row) =>
           row.id === ex.id ? { ...row, last_prescription: snap } : row,
         ),
       );
     },
-    [],
+    [paired],
   );
 
   const enterExercise = useCallback(
@@ -237,7 +244,17 @@ export default function WorkoutRunner({
     startTransition(async () => {
       setBooting(true);
       setError(null);
-      const started = await startWorkoutSession(day.id);
+      const started = paired
+        ? initialSession
+          ? {
+              ok: true as const,
+              data: { session: initialSession, resumed: true },
+            }
+          : {
+              ok: false as const,
+              error: "Paired session was not started.",
+            }
+        : await startWorkoutSession(day.id);
       if (cancelled) return;
       if (!started.ok) {
         setError(started.error);
@@ -295,6 +312,18 @@ export default function WorkoutRunner({
 
     setError(null);
     startTransition(async () => {
+      if (paired) {
+        const updated: NestedProgramExercise = {
+          ...current,
+          baseline_weight_lb: weight,
+          baseline_reps: expectedReps,
+        };
+        setLocalExercises((prev) =>
+          prev.map((row) => (row.id === current.id ? updated : row)),
+        );
+        setPhase("log");
+        return;
+      }
       const saved = await saveProgramExerciseBaseline({
         id: current.id,
         baselineWeightLb: weight,
@@ -585,6 +614,7 @@ export default function WorkoutRunner({
 
   return (
     <div className="space-y-4">
+      <WorkoutSafetyNote />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow text-brand-orange">{day.label}</p>
@@ -593,6 +623,9 @@ export default function WorkoutRunner({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!paired && !day.id.startsWith("paired-") ? (
+            <TrainTogetherSheet day={day} sessionId={session?.id ?? null} />
+          ) : null}
           {session ? (
             <button
               type="button"
@@ -644,6 +677,10 @@ export default function WorkoutRunner({
       <MilestoneCelebrate
         milestone={milestone}
         onDismiss={() => setMilestone(null)}
+        onPostToEngineRoom={(win) => {
+          void postWinToEngineRoom(win);
+          setMilestone(null);
+        }}
       />
 
       <article className="space-y-3 border border-brand-ink/10 bg-surface-elevated p-4 sm:p-5">

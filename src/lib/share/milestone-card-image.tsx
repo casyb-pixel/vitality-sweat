@@ -23,6 +23,7 @@ async function logoDataUrl(): Promise<string> {
  */
 export async function renderMilestoneCardPng(
   card: MilestoneShareCard,
+  eyebrow = "Milestone",
 ): Promise<Buffer> {
   const logoUrl = await logoDataUrl();
   const response = new ImageResponse(
@@ -61,7 +62,7 @@ export async function renderMilestoneCardPng(
               fontWeight: 700,
             }}
           >
-            Milestone
+            {eyebrow}
           </div>
           <div
             style={{

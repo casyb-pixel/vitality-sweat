@@ -3,7 +3,12 @@ import {
   type PrimaryGoal,
 } from "@/lib/fitness/types";
 
-export type MilestoneType = "personal_best" | "goal_weight";
+export type MilestoneType =
+  | "personal_best"
+  | "goal_weight"
+  | "streak"
+  | "program_week"
+  | "custom";
 
 export type MilestoneStats = {
   weight_lb?: number | null;

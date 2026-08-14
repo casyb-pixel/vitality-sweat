@@ -209,6 +209,8 @@ export type WorkoutSession = {
   notes: string | null;
   /** Optional link to a planned workout_program_days row. */
   program_day_id: string | null;
+  session_source?: "solo" | "paired" | "freeform" | string | null;
+  paired_invite_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -250,7 +252,7 @@ export type WorkoutProgram = {
 };
 
 export type WorkoutProgramDayKind = "scheduled" | "bonus";
-export type WorkoutProgramDaySource = "program" | "bonus_agent";
+export type WorkoutProgramDaySource = "program" | "bonus_agent" | "paired";
 
 export type WorkoutProgramDay = {
   id: string;

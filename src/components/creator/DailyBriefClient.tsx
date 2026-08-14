@@ -70,8 +70,9 @@ export default function DailyBriefClient({
           {coachView ? "Hunter's tasks today" : "Today's three"}
         </h1>
         <p className="mt-2 font-sans text-sm text-brand-muted">
-          School quiet hours 7:20am-3:15pm Chicago time. After school, finish
-          what is on this list. Do not invent extra work.
+          School quiet hours 7:20am-11:30am Chicago time (senior semester, two
+          classes). After 11:45am, finish what is on this list. Do not invent
+          extra work.
         </p>
       </header>
 

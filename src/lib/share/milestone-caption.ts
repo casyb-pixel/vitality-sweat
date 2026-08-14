@@ -23,22 +23,17 @@ export function buildMilestoneCaption(
   milestone: Pick<WorkoutMilestone, "type" | "title" | "detail">,
   shareUrl: string,
 ): string {
-  const lines =
+  const joinLine =
     milestone.type === "personal_best"
-      ? [
-          milestone.title,
-          milestone.detail,
-          "",
-          "Training in Vitality Engine. Join free:",
-          shareUrl,
-        ]
-      : [
-          milestone.title,
-          milestone.detail,
-          "",
-          "Tracking progress in Vitality Engine. Join free:",
-          shareUrl,
-        ];
+      ? "Training in Vitality Engine. Join free:"
+      : "Tracking progress in Vitality Engine. Join free:";
+  const lines = [
+    milestone.title,
+    milestone.detail,
+    "",
+    joinLine,
+    shareUrl,
+  ];
   return stripEmDashes(lines.join("\n"));
 }
 

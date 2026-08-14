@@ -53,9 +53,16 @@ export async function POST(request: Request) {
     const title = (body.title ?? "").trim();
     const detail = (body.detail ?? "").trim();
 
-    if (type !== "personal_best" && type !== "goal_weight") {
+    const allowed: MilestoneType[] = [
+      "personal_best",
+      "goal_weight",
+      "streak",
+      "program_week",
+      "custom",
+    ];
+    if (!type || !allowed.includes(type)) {
       return NextResponse.json(
-        { ok: false, error: "type must be personal_best or goal_weight." },
+        { ok: false, error: "Send a valid milestone type." },
         { status: 400 },
       );
     }

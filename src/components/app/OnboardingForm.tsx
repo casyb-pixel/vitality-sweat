@@ -132,7 +132,7 @@ export default function OnboardingForm({
           return;
         }
 
-        router.replace("/app");
+        router.replace("/app?share=engine");
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Save failed.");

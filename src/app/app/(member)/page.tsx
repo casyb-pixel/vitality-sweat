@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
+import ShareEngineHomeSection from "@/components/app/ShareEngineHomeSection";
 import SweatScoreCard from "@/components/app/SweatScoreCard";
 import { getMemberCompletionRedirect } from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
@@ -143,6 +144,8 @@ export default async function MemberDashboardPage() {
       </header>
 
       <SweatScoreCard />
+
+      <ShareEngineHomeSection />
 
       <section className="border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">

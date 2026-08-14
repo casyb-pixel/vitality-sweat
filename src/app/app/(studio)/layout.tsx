@@ -32,6 +32,12 @@ export default function CreatorAppLayout({
               Today
             </Link>
             <Link
+              href="/app/creator/crew"
+              className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
+            >
+              Crew
+            </Link>
+            <Link
               href="/app/creator/gyms"
               className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
             >

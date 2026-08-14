@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import WorkoutAgent, {
   type NestedProgramDay,
   type NestedWorkoutProgram,
@@ -8,6 +8,8 @@ import WorkoutAgent, {
 import WorkoutRunner from "@/components/app/WorkoutRunner";
 import WorkoutTracker from "@/components/app/WorkoutTracker";
 import ProgramTemplatesPanel from "@/components/app/ProgramTemplatesPanel";
+import WorkoutSafetyNote from "@/components/legal/WorkoutSafetyNote";
+import { syntheticDayFromSnapshot, type PairedDaySnapshot } from "@/lib/fitness/workout-pairing";
 import type {
   Exercise,
   PrimaryGoal,
@@ -70,6 +72,10 @@ export default function WorkoutWorkspace({
   const [runningDay, setRunningDay] = useState<NestedProgramDay | null>(() =>
     findDayById(initialProgram, initialSession?.program_day_id),
   );
+  const [paired, setPaired] = useState(
+    initialSession?.session_source === "paired" ||
+      Boolean(initialSession?.paired_invite_id),
+  );
 
   const effectiveGoal = program?.primary_goal ?? profileGoal ?? null;
   const focusMode = Boolean(runningDay);
@@ -78,6 +84,41 @@ export default function WorkoutWorkspace({
     const map = new Map(exercises.map((ex) => [ex.id, ex]));
     return map;
   }, [exercises]);
+
+  useEffect(() => {
+    const inviteId = session?.paired_invite_id;
+    if (!inviteId && typeof window === "undefined") return;
+    let token: string | null = null;
+    try {
+      token = sessionStorage.getItem("vs_paired_invite_token");
+    } catch {
+      token = null;
+    }
+    if (!inviteId && !token) return;
+    if (runningDay?.id.startsWith("paired-")) return;
+
+    let cancelled = false;
+    (async () => {
+      const qs = token
+        ? `token=${encodeURIComponent(token)}`
+        : `invite_id=${encodeURIComponent(inviteId ?? "")}`;
+      const res = await fetch(`/api/app/workout/pair?${qs}`);
+      const json = (await res.json()) as {
+        ok?: boolean;
+        invite?: { id?: string; snapshot?: PairedDaySnapshot };
+      };
+      if (cancelled || !res.ok || !json.ok || !json.invite?.snapshot) return;
+      const day = syntheticDayFromSnapshot(
+        (json.invite.id as string) ?? inviteId ?? "join",
+        json.invite.snapshot,
+      );
+      setRunningDay(enrichDay(day, catalogById));
+      setPaired(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.paired_invite_id, catalogById, runningDay?.id]);
 
   function handleStartDay(day: NestedProgramDay) {
     setRunningDay(enrichDay(day, catalogById));
@@ -142,6 +183,7 @@ export default function WorkoutWorkspace({
 
   return (
     <div className="space-y-6">
+      <WorkoutSafetyNote />
       {!focusMode ? (
         <header className="space-y-3">
           <p className="eyebrow text-brand-orange">Training</p>
@@ -184,7 +226,16 @@ export default function WorkoutWorkspace({
             onBaselinesSaved={handleBaselinesSaved}
             onDayChange={handleRunningDayChange}
             primaryGoal={effectiveGoal}
-            onExit={() => setRunningDay(null)}
+            paired={paired || runningDay.id.startsWith("paired-")}
+            onExit={() => {
+              setRunningDay(null);
+              setPaired(false);
+              try {
+                sessionStorage.removeItem("vs_paired_invite_token");
+              } catch {
+                // ignore
+              }
+            }}
           />
         ) : (
           <>

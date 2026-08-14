@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ShareWinCard from "@/components/app/ShareWinCard";
 import { formatWeight } from "@/lib/fitness/units";
 
 type Point = {
@@ -63,6 +64,8 @@ export default function WorkoutProgressClient() {
           not a tested max.
         </p>
       </header>
+
+      <ShareWinCard />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Completed sessions" value={String(totals.sessions)} />
