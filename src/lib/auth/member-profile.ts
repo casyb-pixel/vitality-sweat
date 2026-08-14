@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CURRENT_TERMS_VERSION } from "@/lib/legal/terms-2026-08-14";
 
 /** US ZIP: 12345 or 12345-6789 */
 export const US_ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
@@ -14,6 +15,8 @@ export type MemberProfile = {
   region: string | null;
   referral_code: string | null;
   referred_by: string | null;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -31,6 +34,19 @@ export function normalizeUsZip(value: string): string {
 export function isValidUsZip(value: string | null | undefined): boolean {
   if (!value) return false;
   return US_ZIP_PATTERN.test(normalizeUsZip(value));
+}
+
+export function hasAcceptedCurrentTerms(
+  profile:
+    | Pick<MemberProfile, "terms_version" | "terms_accepted_at">
+    | { terms_version?: string | null; terms_accepted_at?: string | null }
+    | null
+    | undefined,
+): boolean {
+  return Boolean(
+    profile?.terms_accepted_at &&
+      profile.terms_version === CURRENT_TERMS_VERSION,
+  );
 }
 
 export function hasRequiredGeo(
@@ -94,7 +110,7 @@ export async function getMemberProfile(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, created_at, updated_at",
+      "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, terms_version, terms_accepted_at, created_at, updated_at",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -109,13 +125,18 @@ export async function getMemberProfile(
 
 /**
  * Where to send a signed-in member before full app use.
- * Fitness onboarding first; then geo-only completion on /profile.
+ * Current Terms first; then fitness onboarding; then geo-only completion on /profile.
  */
 export async function getMemberCompletionRedirect(
   supabase: SupabaseClient,
   userId: string,
   opts?: { fitnessOnboardingComplete?: boolean },
 ): Promise<string | null> {
+  const profile = await getMemberProfile(supabase, userId);
+  if (!hasAcceptedCurrentTerms(profile)) {
+    return "/app/legal/accept";
+  }
+
   let fitnessDone = opts?.fitnessOnboardingComplete;
 
   if (fitnessDone === undefined) {
@@ -135,7 +156,6 @@ export async function getMemberCompletionRedirect(
     return "/app/onboarding";
   }
 
-  const profile = await getMemberProfile(supabase, userId);
   if (!hasRequiredGeo(profile)) {
     return "/profile?complete=geo";
   }

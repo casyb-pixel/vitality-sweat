@@ -7,6 +7,7 @@ import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
 import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
+import HealthFitnessDisclaimer from "@/components/legal/HealthFitnessDisclaimer";
 import JsonLd from "@/components/seo/JsonLd";
 import FeaturedGearSlider from "@/components/store/FeaturedGearSlider";
 import {
@@ -155,6 +156,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
             {showGrowthCta ? (
               <JoinEngineCTA location="blog_mid" variant="mid" />
             ) : null}
+            <HealthFitnessDisclaimer />
             <Link
               href="/chronicles"
               className="mt-10 inline-flex font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange hover:text-brand-orange-deep"

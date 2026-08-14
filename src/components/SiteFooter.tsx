@@ -18,7 +18,8 @@ const SITE_LINKS = [
 
 const LEGAL_LINKS = [
   { href: "/privacy", label: "Privacy Policy" },
-  { href: "/terms", label: "Terms & Conditions" },
+  { href: "/terms", label: "Terms of Use" },
+  { href: "/community-guidelines", label: "Community Guidelines" },
   { href: "/return-policy", label: "Return Policy" },
 ] as const;
 

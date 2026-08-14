@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import HealthFitnessDisclaimer from "@/components/legal/HealthFitnessDisclaimer";
 import PublicPage from "@/components/public/PublicPage";
 import { getNamedProgram, NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
 import { buildCanonical } from "@/lib/seo/site";
@@ -74,6 +75,7 @@ export default async function ProgramDetailPage({
           Start this in Engine
         </Link>
       </p>
+      <HealthFitnessDisclaimer compact />
     </PublicPage>
   );
 }

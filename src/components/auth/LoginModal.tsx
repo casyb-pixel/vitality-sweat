@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 import {
@@ -12,6 +13,10 @@ import { trackSignupComplete, trackSignupStart } from "@/lib/analytics/ga";
 import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
+import {
+  CURRENT_TERMS_VERSION,
+  TERMS_ACCEPT_LABEL,
+} from "@/lib/legal/terms-2026-08-14";
 import {
   clearRememberedReferralCode,
   normalizeReferralCode,
@@ -58,6 +63,7 @@ export default function LoginModal({
   const [city, setCity] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [region, setRegion] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(
     normalizeReferralCode(initialReferralCode),
   );
@@ -75,6 +81,7 @@ export default function LoginModal({
         initialIntent === "signup" || resolvedRef ? "signup" : initialIntent;
       setIntent(nextIntent);
       setError(null);
+      setAcceptedTerms(false);
       if (nextIntent === "signup" && initialView === "form") {
         trackSignupStart("deep_link");
       }
@@ -115,6 +122,7 @@ export default function LoginModal({
     };
     if (region.trim()) meta.region = region.trim();
     if (referralCode) meta.ref = referralCode;
+    meta.terms_version = CURRENT_TERMS_VERSION;
     Object.assign(
       meta,
       campaignToSignupMetadata(readRememberedCampaignAttribution()),
@@ -134,6 +142,13 @@ export default function LoginModal({
     if (!city.trim()) return "Enter your city.";
     if (!isValidUsZip(zipCode)) {
       return "Enter a valid US ZIP code (12345 or 12345-6789).";
+    }
+    return null;
+  }
+
+  function validateSignupTerms(): string | null {
+    if (!acceptedTerms) {
+      return "Check the box to agree to the Terms of Use and Release of Liability.";
     }
     return null;
   }
@@ -192,6 +207,11 @@ export default function LoginModal({
             setError(geoError);
             return;
           }
+          const termsError = validateSignupTerms();
+          if (termsError) {
+            setError(termsError);
+            return;
+          }
           if (password.length < 8) {
             setError("Password must be at least 8 characters.");
             return;
@@ -212,7 +232,7 @@ export default function LoginModal({
           }
 
           if (data.session) {
-            // Persist geo in case the trigger missed metadata.
+            // Persist geo and recorded terms accept. Do not trust metadata alone.
             await supabase
               .from("profiles")
               .update({
@@ -221,6 +241,13 @@ export default function LoginModal({
                 region: region.trim() || null,
               })
               .eq("id", data.session.user.id);
+            await fetch("/api/profile", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accept_terms: true }),
+            }).catch(() => {
+              // Gate on /app/legal/accept if this fails.
+            });
             trackSignupComplete("password");
             triggerWelcomeEmail();
             await afterAuthenticated();
@@ -258,6 +285,11 @@ export default function LoginModal({
             setError(geoError);
             return;
           }
+          const termsError = validateSignupTerms();
+          if (termsError) {
+            setError(termsError);
+            return;
+          }
         }
 
         const supabase = createClient();
@@ -268,7 +300,7 @@ export default function LoginModal({
           email: email.trim(),
           options: {
             emailRedirectTo: redirectTo,
-            shouldCreateUser: true,
+            shouldCreateUser: isSignup,
             data: isSignup ? geoMetadata() : undefined,
           },
         });
@@ -647,6 +679,29 @@ export default function LoginModal({
                     </span>
                     .
                   </p>
+                ) : null}
+
+                {isSignup ? (
+                  <label className="flex cursor-pointer items-start gap-3 font-sans text-sm leading-relaxed text-brand-ink">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(event) => setAcceptedTerms(event.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-brand-orange"
+                    />
+                    <span>
+                      {TERMS_ACCEPT_LABEL}{" "}
+                      <Link
+                        href="/terms"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold text-brand-orange underline-offset-2 hover:underline"
+                      >
+                        Read the Terms
+                      </Link>
+                      .
+                    </span>
+                  </label>
                 ) : null}
 
                 {error ? (

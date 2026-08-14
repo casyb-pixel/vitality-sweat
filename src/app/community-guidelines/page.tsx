@@ -3,14 +3,14 @@ import SiteFooter from "@/components/SiteFooter";
 import LegalDocument from "@/components/legal/LegalDocument";
 import JsonLd from "@/components/seo/JsonLd";
 import { buildPolicyMetadata } from "@/lib/legal/build-policy-metadata";
-import { TERMS_PAGE } from "@/lib/legal/terms-2026-08-14";
+import { COMMUNITY_GUIDELINES_PAGE } from "@/lib/legal/terms-2026-08-14";
 import { buildCanonical, SITE_NAME } from "@/lib/seo/site";
 
-const page = TERMS_PAGE;
+const page = COMMUNITY_GUIDELINES_PAGE;
 
 export const metadata = buildPolicyMetadata(page);
 
-export default function TermsPage() {
+export default function CommunityGuidelinesPage() {
   return (
     <>
       <Navbar />
@@ -20,7 +20,7 @@ export default function TermsPage() {
           "@type": "WebPage",
           name: page.title,
           description: page.description,
-          url: buildCanonical("/terms"),
+          url: buildCanonical("/community-guidelines"),
           isPartOf: {
             "@type": "WebSite",
             name: SITE_NAME,

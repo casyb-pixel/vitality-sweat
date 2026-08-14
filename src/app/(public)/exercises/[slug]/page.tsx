@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
+import HealthFitnessDisclaimer from "@/components/legal/HealthFitnessDisclaimer";
 import PublicPage from "@/components/public/PublicPage";
 import JsonLd from "@/components/seo/JsonLd";
 import {
@@ -70,6 +71,7 @@ export default async function ExercisePage({
           Log this in Engine
         </Link>
       </p>
+      <HealthFitnessDisclaimer compact />
       <JsonLd
         data={{
           "@context": "https://schema.org",

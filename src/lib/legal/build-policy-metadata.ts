@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { PolicyPage } from "@/lib/legal/policies";
+import type { PolicyPage } from "@/lib/legal/policy-types";
 import { absoluteUrl, buildCanonical, SITE_NAME } from "@/lib/seo/site";
 
 export function buildPolicyMetadata(page: PolicyPage): Metadata {
@@ -24,7 +24,7 @@ export function buildPolicyMetadata(page: PolicyPage): Metadata {
           url: absoluteUrl("/images/hero-strength-stamina-collage.png"),
           width: 1200,
           height: 630,
-          alt: `${SITE_NAME} — ${title}`,
+          alt: `${SITE_NAME} - ${title}`,
         },
       ],
     },

@@ -1,18 +1,15 @@
-/** Auto-generated from Blogger policy pages. */
+import {
+  COMMUNITY_GUIDELINES_PAGE,
+  TERMS_PAGE,
+} from "@/lib/legal/terms-2026-08-14";
+import type { PolicyBlock, PolicyPage } from "@/lib/legal/policy-types";
 
-export type PolicyBlock =
-  | { type: "p"; text: string }
-  | { type: "h2"; text: string }
-  | { type: "h3"; text: string }
-  | { type: "ul"; items: string[] };
-
-export type PolicyPage = {
-  slug: string;
-  title: string;
-  description: string;
-  sourceUrl: string;
-  blocks: PolicyBlock[];
-};
+export type { PolicyBlock, PolicyPage };
+export {
+  CURRENT_TERMS_VERSION,
+  TERMS_ACCEPT_LABEL,
+  TERMS_LAST_UPDATED,
+} from "@/lib/legal/terms-2026-08-14";
 
 export const POLICY_PAGES: Record<string, PolicyPage> = {
   "return-policy": {
@@ -46,42 +43,8 @@ export const POLICY_PAGES: Record<string, PolicyPage> = {
       { type: "p", text: "Vitality Sweat Email: returns@vitalitysweat.com Website: vitalitysweat.com" },
     ],
   },
-  "terms": {
-    slug: "terms",
-    title: "Terms & Conditions",
-    description: "Terms and conditions for using Vitality Sweat websites, products, and services.",
-    sourceUrl: "https://vitalitysweat.blogspot.com/p/terms-conditions.html",
-    blocks: [
-      { type: "h2", text: "Introduction" },
-      { type: "p", text: "Welcome to Vitality Sweat. These Terms and Conditions govern your use of our website, located at vitalitysweat.com, and any related services provided by Vitality Sweat. By accessing or using our website, you agree to be bound by these Terms and Conditions. If you disagree with any part of the terms, you may not access the website." },
-      { type: "h2", text: "Intellectual Property Rights" },
-      { type: "p", text: "Unless otherwise stated, Vitality Sweat and/or its licensors own the intellectual property rights for all material on vitalitysweat.com. All intellectual property rights are reserved. You may access this from vitalitysweat.com for your own personal use, subject to restrictions set in these terms and conditions." },
-      { type: "p", text: "You must not:" },
-      { type: "ul", items: ["Republish material from vitalitysweat.com", "Sell, rent, or sub-license material from vitalitysweat.com", "Reproduce, duplicate, or copy material from vitalitysweat.com", "Redistribute content from vitalitysweat.com"] },
-      { type: "h2", text: "User-Generated Content" },
-      { type: "p", text: "Parts of this website offer an opportunity for users to post and exchange opinions and information. Vitality Sweat does not filter, edit, publish, or review comments prior to their presence on the website. Comments do not reflect the views and opinions of Vitality Sweat, its agents, or affiliates. Comments reflect the views and opinions of the person who posts their views and opinions. To the extent permitted by applicable laws, Vitality Sweat shall not be liable for the comments or for any liability, damages, or expenses caused and/or suffered as a result of any use of and/or posting of and/or appearance of the comments on this website." },
-      { type: "p", text: "Vitality Sweat reserves the right to monitor all comments and to remove any comments which can be considered inappropriate, offensive, or causes breach of these Terms and Conditions." },
-      { type: "h2", text: "Hyperlinking to our Content" },
-      { type: "p", text: "The following organizations may link to our website without prior written approval:" },
-      { type: "ul", items: ["Government agencies;", "Search engines;", "News organizations;", "Online directory distributors may link to our website in the same manner as they hyperlink to the websites of other listed businesses; and", "System-wide Accredited Businesses except soliciting non-profit organizations, charity shopping malls, and charity fundraising groups which may not hyperlink to our website."] },
-      { type: "p", text: "These organizations may link to our home page, to publications, or to other website information so long as the link: (a) is not in any way deceptive; (b) does not falsely imply sponsorship, endorsement, or approval of the linking party and its products and/or services; and (c) fits within the context of the linking party's site." },
-      { type: "h2", text: "Content Liability" },
-      { type: "p", text: "We shall not be held responsible for any content that appears on your website. You agree to protect and defend us against all claims that are rising on your website. No link(s) should appear on any website that may be interpreted as libelous, obscene, or criminal, or which infringes, otherwise violates, or advocates the infringement or other violation of, any third party rights." },
-      { type: "h2", text: "Your Privacy" },
-      { type: "p", text: "Please read our Privacy Policy." },
-      { type: "h2", text: "Reservation of Rights" },
-      { type: "p", text: "We reserve the right to request that you remove all links or any particular link to our website. You approve to immediately remove all links to our website upon request. We also reserve the right to amend these terms and conditions and its linking policy at any time. By continuously linking to our website, you agree to be bound to and follow these linking terms and conditions." },
-      { type: "h2", text: "Removal of Links from Our Website" },
-      { type: "p", text: "If you find any link on our website that is offensive for any reason, you are free to contact and inform us at any moment. We will consider requests to remove links but we are not obligated to or so or to respond to you directly." },
-      { type: "h2", text: "Disclaimer" },
-      { type: "p", text: "To the maximum extent permitted by applicable law, we exclude all representations, warranties, and conditions relating to our website and the use of this website. Nothing in this disclaimer will:" },
-      { type: "ul", items: ["Limit or exclude our or your liability for death or personal injury;", "Limit or exclude our or your liability for fraud or fraudulent misrepresentation;", "Limit any of our or your liabilities in any way that is not permitted under applicable law; or", "Exclude any of our or your liabilities that may not be excluded under applicable law."] },
-      { type: "p", text: "The limitations and prohibitions of liability set in this Section and elsewhere in this disclaimer: (a) are subject to the preceding paragraph; and (b) govern all liabilities arising under the disclaimer, including liabilities arising in contract, in tort, and for breach of statutory duty." },
-      { type: "p", text: "As long as the website and the information and services on the website are provided free of charge, we will not be liable for any loss or damage of any nature." },
-      { type: "h2", text: "Contact Information" },
-      { type: "p", text: "If you have any questions about these Terms and Conditions, please contact us at info@vitalitysweat.com." },
-    ],
-  },
+  terms: TERMS_PAGE,
+  "community-guidelines": COMMUNITY_GUIDELINES_PAGE,
   "privacy": {
     slug: "privacy",
     title: "Privacy Policy",

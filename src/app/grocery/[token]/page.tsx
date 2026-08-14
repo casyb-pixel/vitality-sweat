@@ -5,6 +5,7 @@ import GroceryShareClientActions from "@/components/app/GroceryShareClientAction
 import GroceryShareViewTracker from "@/components/marketing/GroceryShareViewTracker";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import type { GroceryItem } from "@/lib/fitness/types";
+import { GROCERY_SHARE_SAFETY_LINE } from "@/lib/legal/terms-2026-08-14";
 import { createServiceRoleClient } from "@/utils/supabase/admin";
 
 export const metadata: Metadata = {
@@ -53,6 +54,9 @@ export default async function SharedGroceryPage({ params }: PageProps) {
         </h1>
         <p className="mt-2 font-sans text-sm text-brand-muted print:text-black">
           Week of {data.week_start}
+        </p>
+        <p className="mt-3 font-sans text-xs leading-relaxed text-brand-muted print:text-black">
+          {GROCERY_SHARE_SAFETY_LINE}
         </p>
 
         <div className="mt-6 print:hidden">

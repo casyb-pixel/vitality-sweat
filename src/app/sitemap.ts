@@ -136,6 +136,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
     },
     {
+      url: buildCanonical("/community-guidelines"),
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
       url: buildCanonical("/return-policy"),
       lastModified: now,
       changeFrequency: "yearly",

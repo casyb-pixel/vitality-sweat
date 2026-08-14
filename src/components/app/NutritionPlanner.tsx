@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
+import NutritionSafetyBanner from "@/components/legal/NutritionSafetyBanner";
 import { normalizeDishKey } from "@/lib/fitness/dishes";
 import type {
   DishRatingsMap,
@@ -328,6 +329,7 @@ export default function NutritionPlanner({
 
   return (
     <div className="space-y-6">
+      <NutritionSafetyBanner />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"

@@ -3,9 +3,13 @@ import {
   getMemberProfile,
   validateMemberGeoInput,
 } from "@/lib/auth/member-profile";
+import { CURRENT_TERMS_VERSION } from "@/lib/legal/terms-2026-08-14";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
+
+const PROFILE_SELECT =
+  "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, terms_version, terms_accepted_at, created_at, updated_at";
 
 export async function GET() {
   const supabase = await createClient();
@@ -45,34 +49,52 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const row = body as Record<string, unknown>;
+    const acceptTerms = row.accept_terms === true;
     const validated = validateMemberGeoInput(body);
-    if (!validated.ok) {
+    const displayName =
+      typeof row.display_name === "string" ? row.display_name.trim() : undefined;
+
+    if (!acceptTerms && !validated.ok && displayName === undefined) {
+      return NextResponse.json(
+        { ok: false, error: validated.ok ? "Nothing to update." : validated.error },
+        { status: 400 },
+      );
+    }
+
+    if (!acceptTerms && !validated.ok) {
       return NextResponse.json(
         { ok: false, error: validated.error },
         { status: 400 },
       );
     }
 
-    const row = body as Record<string, unknown>;
-    const displayName =
-      typeof row.display_name === "string" ? row.display_name.trim() : undefined;
-
-    const payload: Record<string, string | null> = {
-      city: validated.data.city,
-      zip_code: validated.data.zip_code,
-      region: validated.data.region ?? null,
-    };
+    const payload: Record<string, string | null> = {};
+    if (validated.ok) {
+      payload.city = validated.data.city;
+      payload.zip_code = validated.data.zip_code;
+      payload.region = validated.data.region ?? null;
+    }
     if (displayName !== undefined) {
       payload.display_name = displayName || null;
+    }
+    if (acceptTerms) {
+      payload.terms_version = CURRENT_TERMS_VERSION;
+      payload.terms_accepted_at = new Date().toISOString();
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "Nothing to update." },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase
       .from("profiles")
       .update(payload)
       .eq("id", user.id)
-      .select(
-        "id, email, role, display_name, avatar_url, city, zip_code, region, referral_code, referred_by, created_at, updated_at",
-      )
+      .select(PROFILE_SELECT)
       .single();
 
     if (error) {

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import OnboardingForm from "@/components/app/OnboardingForm";
-import { getMemberProfile } from "@/lib/auth/member-profile";
+import {
+  getMemberProfile,
+  hasAcceptedCurrentTerms,
+} from "@/lib/auth/member-profile";
 import { requireMemberAccess } from "@/lib/auth/member";
 import { createClient } from "@/utils/supabase/server";
 
@@ -13,6 +17,9 @@ export default async function OnboardingPage() {
   const { user } = await requireMemberAccess("/app/onboarding");
   const supabase = await createClient();
   const profile = await getMemberProfile(supabase, user.id);
+  if (!hasAcceptedCurrentTerms(profile)) {
+    redirect("/app/legal/accept");
+  }
 
   return (
     <div className="space-y-6">

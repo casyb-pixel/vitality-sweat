@@ -1,4 +1,4 @@
-import type { PolicyBlock, PolicyPage } from "@/lib/legal/policies";
+import type { PolicyBlock, PolicyPage } from "@/lib/legal/policy-types";
 
 function Block({ block }: { block: PolicyBlock }) {
   switch (block.type) {
