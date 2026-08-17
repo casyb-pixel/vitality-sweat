@@ -58,6 +58,11 @@ function normalizeExerciseJoin(
     category: exercise.category,
     primary_muscle: exercise.primary_muscle,
     equipment: exercise.equipment,
+    tracking_type:
+      "tracking_type" in exercise ? exercise.tracking_type : undefined,
+    youtube_url: "youtube_url" in exercise ? exercise.youtube_url : undefined,
+    cues: "cues" in exercise ? exercise.cues : undefined,
+    how_to: "how_to" in exercise ? exercise.how_to : undefined,
   };
 }
 

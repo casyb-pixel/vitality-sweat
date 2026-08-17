@@ -24,6 +24,12 @@ export default function MemberSettingsClient({
     profile.default_rest_sec != null ? String(profile.default_rest_sec) : "",
   );
   const [notify, setNotify] = useState(Boolean(profile.notifications_opt_in));
+  const [leaderboardOn, setLeaderboardOn] = useState(
+    profile.leaderboard_opt_in !== false,
+  );
+  const [sessionCoachOn, setSessionCoachOn] = useState(
+    profile.session_coach_opt_in !== false,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -45,6 +51,8 @@ export default function MemberSettingsClient({
           weight_lb: weightLb ? Number(weightLb) : undefined,
           default_rest_sec: restSec ? Number(restSec) : null,
           notifications_opt_in: notify,
+          leaderboard_opt_in: leaderboardOn,
+          session_coach_opt_in: sessionCoachOn,
         }),
       });
       const json = (await res.json()) as { ok?: boolean; error?: string };
@@ -123,6 +131,24 @@ export default function MemberSettingsClient({
           onChange={(e) => setNotify(e.target.checked)}
         />
         Rest-timer and Daily Brief alerts (needs Home Screen install on iPhone)
+      </label>
+
+      <label className="flex items-center gap-2 font-sans text-sm text-brand-ink">
+        <input
+          type="checkbox"
+          checked={leaderboardOn}
+          onChange={(e) => setLeaderboardOn(e.target.checked)}
+        />
+        Show Engine Room leaderboards (off hides boards and removes you from rankings)
+      </label>
+
+      <label className="flex items-center gap-2 font-sans text-sm text-brand-ink">
+        <input
+          type="checkbox"
+          checked={sessionCoachOn}
+          onChange={(e) => setSessionCoachOn(e.target.checked)}
+        />
+        Workout start coach (challenges and comments when a session begins)
       </label>
 
       <button

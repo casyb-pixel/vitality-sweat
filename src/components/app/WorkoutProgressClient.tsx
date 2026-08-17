@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ShareWinCard from "@/components/app/ShareWinCard";
+import BodyTransformSection from "@/components/app/BodyTransformSection";
 import { formatWeight } from "@/lib/fitness/units";
+import type { BodyMeasurementLog } from "@/lib/fitness/body-logs";
+import type { PrimaryGoal } from "@/lib/fitness/types";
 
 type Point = {
   sessionId: string;
@@ -21,6 +24,12 @@ export default function WorkoutProgressClient() {
   const [points, setPoints] = useState<Point[]>([]);
   const [totals, setTotals] = useState({ sessions: 0, sets: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [goal, setGoal] = useState<PrimaryGoal | null>(null);
+  const [regularTraining, setRegularTraining] = useState(false);
+  const [weights, setWeights] = useState<
+    Array<{ recorded_on: string; weight_lb: number; bmi: number | null }>
+  >([]);
+  const [measurements, setMeasurements] = useState<BodyMeasurementLog[]>([]);
 
   const load = useCallback(async (id: string) => {
     setError(null);
@@ -42,9 +51,29 @@ export default function WorkoutProgressClient() {
     setTotals(json.totals ?? { sessions: 0, sets: 0 });
   }, []);
 
+  const loadBody = useCallback(async () => {
+    const res = await fetch("/api/app/progress/body");
+    const json = (await res.json()) as {
+      ok?: boolean;
+      goal?: PrimaryGoal | null;
+      regularTraining?: boolean;
+      weights?: Array<{ recorded_on: string; weight_lb: number; bmi: number | null }>;
+      measurements?: BodyMeasurementLog[];
+    };
+    if (!res.ok || !json.ok) return;
+    setGoal(json.goal ?? null);
+    setRegularTraining(Boolean(json.regularTraining));
+    setWeights(json.weights ?? []);
+    setMeasurements(json.measurements ?? []);
+  }, []);
+
   useEffect(() => {
     void load(exerciseId);
   }, [exerciseId, load]);
+
+  useEffect(() => {
+    void loadBody();
+  }, [loadBody]);
 
   const maxVolume = useMemo(
     () => Math.max(1, ...points.map((p) => p.volume)),
@@ -66,6 +95,14 @@ export default function WorkoutProgressClient() {
       </header>
 
       <ShareWinCard />
+
+      <BodyTransformSection
+        goal={goal}
+        regularTraining={regularTraining}
+        weights={weights}
+        measurements={measurements}
+        onRefresh={loadBody}
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Completed sessions" value={String(totals.sessions)} />

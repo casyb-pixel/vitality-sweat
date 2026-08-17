@@ -94,6 +94,8 @@ export async function logWorkoutSet(input: {
   difficulty: number;
   durationSec?: number | null;
   distanceM?: number | null;
+  inclinePct?: number | null;
+  elevationM?: number | null;
   setKind?: string | null;
 }): Promise<
   ApiResult<{
@@ -113,6 +115,8 @@ export async function logWorkoutSet(input: {
       difficulty: input.difficulty,
       duration_sec: input.durationSec ?? null,
       distance_m: input.distanceM ?? null,
+      incline_pct: input.inclinePct ?? null,
+      elevation_m: input.elevationM ?? null,
       set_kind: input.setKind ?? "working",
     }),
   });

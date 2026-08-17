@@ -27,6 +27,7 @@ import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
 import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import { nextSupersetIndex } from "@/lib/fitness/supersets";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
+import type { CoachBrief } from "@/lib/fitness/session-coach";
 import {
   DIFFICULTY_LABELS,
   WORKOUT_SET_STYLE_COACHING,
@@ -122,6 +123,12 @@ export default function WorkoutRunner({
   const [baselineReps, setBaselineReps] = useState("");
   const [weightLb, setWeightLb] = useState("");
   const [reps, setReps] = useState("");
+  const [distanceM, setDistanceM] = useState("");
+  const [inclinePct, setInclinePct] = useState("");
+  const [elevationM, setElevationM] = useState("");
+  const [durationSec, setDurationSec] = useState("");
+  const [coachBrief, setCoachBrief] = useState<CoachBrief | null>(null);
+  const [coachDismissed, setCoachDismissed] = useState(false);
   const [difficulty, setDifficulty] = useState(3);
   const [prescription, setPrescription] =
     useState<ExercisePrescription | null>(null);
@@ -192,7 +199,9 @@ export default function WorkoutRunner({
     async (ex: NestedProgramExercise) => {
       setError(null);
       setCatchUp([]);
-      const needsBaseline = ex.baseline_weight_lb == null;
+      const tracking = ex.exercise?.tracking_type ?? "weight_reps";
+      const cardio = tracking === "distance" || tracking === "duration";
+      const needsBaseline = !cardio && ex.baseline_weight_lb == null;
       setPhase(needsBaseline ? "baseline" : "log");
       setBaselineWeight(
         ex.baseline_weight_lb != null ? String(ex.baseline_weight_lb) : "",
@@ -263,6 +272,31 @@ export default function WorkoutRunner({
       }
       setSession(started.data.session);
       onSessionChange(started.data.session);
+
+      const existingBrief = started.data.session.coach_brief as CoachBrief | null;
+      if (existingBrief?.headline) {
+        setCoachBrief(existingBrief);
+      } else {
+        try {
+          const coachRes = await fetch("/api/app/workout/coach/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              session_id: started.data.session.id,
+              program_day_id: day.id,
+            }),
+          });
+          const coachJson = (await coachRes.json()) as {
+            ok?: boolean;
+            brief?: CoachBrief | null;
+          };
+          if (!cancelled && coachJson.ok && coachJson.brief) {
+            setCoachBrief(coachJson.brief);
+          }
+        } catch {
+          // Coach is optional.
+        }
+      }
 
       const loaded = await fetchSessionSets(started.data.session.id);
       if (cancelled) return;
@@ -369,15 +403,33 @@ export default function WorkoutRunner({
 
   function logCurrentSet() {
     if (!session || !current) return;
+    const tracking = current.exercise?.tracking_type ?? "weight_reps";
     const weight = weightLb === "" ? null : Number(weightLb);
     const repCount = reps === "" ? null : Number(reps);
-    if (weight != null && (!Number.isFinite(weight) || weight < 0)) {
-      setError("Weight must be 0 or more.");
-      return;
-    }
-    if (repCount == null || !Number.isInteger(repCount) || repCount < 0) {
-      setError("Enter reps for this set.");
-      return;
+    const distance = distanceM === "" ? null : Number(distanceM);
+    const incline = inclinePct === "" ? null : Number(inclinePct);
+    const elevation = elevationM === "" ? null : Number(elevationM);
+    const duration = durationSec === "" ? null : Number(durationSec);
+
+    if (tracking === "distance") {
+      if (distance == null || !Number.isFinite(distance) || distance < 0) {
+        setError("Enter distance for this set.");
+        return;
+      }
+    } else if (tracking === "duration") {
+      if (duration == null || !Number.isFinite(duration) || duration < 0) {
+        setError("Enter duration for this set.");
+        return;
+      }
+    } else {
+      if (weight != null && (!Number.isFinite(weight) || weight < 0)) {
+        setError("Weight must be 0 or more.");
+        return;
+      }
+      if (repCount == null || !Number.isInteger(repCount) || repCount < 0) {
+        setError("Enter reps for this set.");
+        return;
+      }
     }
 
     setError(null);
@@ -389,6 +441,10 @@ export default function WorkoutRunner({
         weightLb: weight,
         reps: repCount,
         difficulty,
+        durationSec: duration,
+        distanceM: distance,
+        inclinePct: incline,
+        elevationM: elevation,
       });
       if (!result.ok) {
         setError(result.error);
@@ -558,7 +614,11 @@ export default function WorkoutRunner({
       setSession(null);
       onSessionChange(null);
       setShowInvitePrompt(true);
-      setMessage("Workout completed. Nice work.");
+      setMessage(
+        primaryGoal === "muscle_gain" || primaryGoal === "strength"
+          ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
+          : "Workout completed. Nice work.",
+      );
     });
   }
 
@@ -615,6 +675,34 @@ export default function WorkoutRunner({
   return (
     <div className="space-y-4">
       <WorkoutSafetyNote />
+      {coachBrief && !coachDismissed ? (
+        <aside className="space-y-2 border border-brand-orange/30 bg-brand-orange/5 p-4">
+          <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+            Coach
+          </p>
+          <p className="font-display text-lg text-brand-ink">{coachBrief.headline}</p>
+          <p className="font-sans text-sm leading-relaxed text-brand-ink">
+            {coachBrief.body}
+          </p>
+          {coachBrief.crossover ? (
+            <p className="font-sans text-sm font-semibold text-brand-ink">
+              {coachBrief.crossover.message}
+            </p>
+          ) : null}
+          {coachBrief.sessionChallenge ? (
+            <p className="font-sans text-xs text-brand-muted">
+              Today&apos;s work: {coachBrief.sessionChallenge.message}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
+            onClick={() => setCoachDismissed(true)}
+          >
+            Dismiss
+          </button>
+        </aside>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow text-brand-orange">{day.label}</p>
@@ -861,33 +949,111 @@ export default function WorkoutRunner({
             {currentSets.length >= current.sets ? " (extra ok)" : ""}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="run-weight" className={labelClass}>
-                Weight (lb)
-              </label>
-              <input
-                id="run-weight"
-                type="number"
-                min={0}
-                step="0.5"
-                value={weightLb}
-                onChange={(e) => setWeightLb(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="run-reps" className={labelClass}>
-                Reps
-              </label>
-              <input
-                id="run-reps"
-                type="number"
-                min={0}
-                value={reps}
-                onChange={(e) => setReps(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
+            {current.exercise?.tracking_type === "distance" ? (
+              <>
+                <div>
+                  <label htmlFor="run-distance" className={labelClass}>
+                    Distance (m)
+                  </label>
+                  <input
+                    id="run-distance"
+                    type="number"
+                    min={0}
+                    value={distanceM}
+                    onChange={(e) => setDistanceM(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="run-incline" className={labelClass}>
+                    Incline %
+                  </label>
+                  <input
+                    id="run-incline"
+                    type="number"
+                    min={0}
+                    max={40}
+                    step="0.5"
+                    value={inclinePct}
+                    onChange={(e) => setInclinePct(e.target.value)}
+                    className={fieldClass}
+                    placeholder="optional"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="run-elevation" className={labelClass}>
+                    Elevation (m)
+                  </label>
+                  <input
+                    id="run-elevation"
+                    type="number"
+                    min={0}
+                    value={elevationM}
+                    onChange={(e) => setElevationM(e.target.value)}
+                    className={fieldClass}
+                    placeholder="optional"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="run-strokes" className={labelClass}>
+                    Reps / strokes
+                  </label>
+                  <input
+                    id="run-strokes"
+                    type="number"
+                    min={0}
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value)}
+                    className={fieldClass}
+                    placeholder="optional"
+                  />
+                </div>
+              </>
+            ) : current.exercise?.tracking_type === "duration" ? (
+              <div>
+                <label htmlFor="run-duration" className={labelClass}>
+                  Duration (sec)
+                </label>
+                <input
+                  id="run-duration"
+                  type="number"
+                  min={0}
+                  value={durationSec}
+                  onChange={(e) => setDurationSec(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="run-weight" className={labelClass}>
+                    Weight (lb)
+                  </label>
+                  <input
+                    id="run-weight"
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={weightLb}
+                    onChange={(e) => setWeightLb(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="run-reps" className={labelClass}>
+                    Reps
+                  </label>
+                  <input
+                    id="run-reps"
+                    type="number"
+                    min={0}
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+              </>
+            )}
           </div>
           <fieldset>
             <legend className={labelClass}>How hard / intense?</legend>

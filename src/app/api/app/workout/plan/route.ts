@@ -295,6 +295,7 @@ export async function POST() {
         days_per_week: expectedDays,
         session_minutes: prefs.session_minutes ?? 45,
         summary: payload.summary,
+        origin: "ai",
         preferences: preferencesSnapshot,
       })
       .select("*")

@@ -612,3 +612,204 @@ export function parseWorkoutDayRegenPayload(
 ): BonusDayPayload | null {
   return parseBonusDayPayload(raw, opts);
 }
+
+export type WorkoutEvaluatePayload = {
+  summary: string;
+  working: string[];
+  gaps: string[];
+  tweaks: string[];
+};
+
+export function buildWorkoutEvaluatePrompt(input: {
+  profile: FitnessProfile;
+  prefs: TrainingPreferences;
+  programSummary: string | null;
+  origin: string | null;
+  days: Array<{
+    label: string;
+    focus: string | null;
+    exercises: Array<{ name: string; sets: number; repMin: number | null; repMax: number | null }>;
+  }>;
+  recentSessions: Array<{
+    startedAt: string;
+    status: string;
+    exercises: Array<{
+      name: string;
+      sets: number;
+      bestWeightLb: number | null;
+      bestReps: number | null;
+      distanceM: number | null;
+    }>;
+  }>;
+  weighIns: Array<{ recordedOn: string; weightLb: number }>;
+  measurements: Array<{ recordedOn: string; chestIn: number | null; bicepIn: number | null; waistIn: number | null; thighIn: number | null }>;
+}): string {
+  const { profile, prefs } = input;
+  const age = profile.birthdate ? ageFromBirthdate(profile.birthdate) : null;
+  const goal = profile.primary_goal
+    ? PRIMARY_GOAL_LABELS[profile.primary_goal]
+    : "General fitness";
+  const safety = safetyTrainingGuards(profile, prefs.equipment);
+  const planBlock = input.days
+    .map((day) => {
+      const moves = day.exercises
+        .map(
+          (ex) =>
+            `    - ${ex.name}: ${ex.sets} sets ${ex.repMin ?? "?"}-${ex.repMax ?? "?"} reps`,
+        )
+        .join("\n");
+      return `  ${day.label} (${day.focus ?? "unspecified"}):\n${moves || "    - empty day"}`;
+    })
+    .join("\n");
+  const historyBlock = input.recentSessions.length
+    ? input.recentSessions
+        .slice(0, 8)
+        .map((session) => {
+          const moves = session.exercises
+            .map((ex) => {
+              const lift =
+                ex.bestWeightLb != null
+                  ? `${ex.bestWeightLb} lb x ${ex.bestReps ?? "?"}`
+                  : ex.distanceM != null
+                    ? `${ex.distanceM} m`
+                    : `${ex.sets} sets`;
+              return `${ex.name} (${lift})`;
+            })
+            .join("; ");
+          return `  - ${session.startedAt.slice(0, 10)} ${session.status}: ${moves || "no sets"}`;
+        })
+        .join("\n")
+    : "  - none yet. Comment on the written split and ask them to log sessions.";
+
+  return [
+    "You are the Vitality Sweat Peak Training coach reviewing a member-owned workout split.",
+    "Do not rewrite or replace their program. Evaluate it and suggest optional tweaks.",
+    "No medical claims. Frame guidance as coaching suggestions.",
+    NO_EM_DASH_RULE,
+    "",
+    "Return ONLY valid JSON (no markdown fences) with this exact shape:",
+    JSON.stringify({
+      summary: "string: 2-4 sentences on how the split fits their goal and logged work",
+      working: ["string: what is working"],
+      gaps: ["string: missing patterns, recovery, or stalled lifts"],
+      tweaks: ["string: optional next tweak they can apply themselves"],
+    }),
+    "",
+    "Rules:",
+    "- Keep working, gaps, and tweaks to 1-3 short items each.",
+    "- If history is thin, say so plainly and still comment on the written split.",
+    "- Do not invent load numbers. Speak in patterns, volume, and next-session ideas.",
+    ...safety,
+    "",
+    "MEMBER:",
+    `- Age: ${age ?? "unspecified"}`,
+    `- Fitness level: ${profile.fitness_level ?? "unspecified"}`,
+    `- Primary goal: ${goal}`,
+    `- Equipment: ${prefs.equipment.join(", ") || "unspecified"}`,
+    `- Avoidances: ${prefs.avoidances?.trim() || "none"}`,
+    `- Restrictions: ${profile.activity_restrictions?.trim() || "none"}`,
+    "",
+    `PROGRAM origin: ${input.origin ?? "unknown"}`,
+    `Summary: ${input.programSummary ?? "none"}`,
+    planBlock || "  (empty program)",
+    "",
+    "RECENT SESSIONS:",
+    historyBlock,
+    "",
+    "WEIGH-INS:",
+    input.weighIns.length
+      ? input.weighIns
+          .slice(0, 6)
+          .map((w) => `  - ${w.recordedOn}: ${w.weightLb} lb`)
+          .join("\n")
+      : "  - none",
+    "",
+    "TAPE (if any):",
+    input.measurements.length
+      ? input.measurements
+          .slice(0, 4)
+          .map(
+            (m) =>
+              `  - ${m.recordedOn}: chest ${m.chestIn ?? "-"}, biceps ${m.bicepIn ?? "-"}, waist ${m.waistIn ?? "-"}, thigh ${m.thighIn ?? "-"}`,
+          )
+          .join("\n")
+      : "  - none",
+  ].join("\n");
+}
+
+export function parseWorkoutEvaluatePayload(raw: string): WorkoutEvaluatePayload | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const summary =
+      typeof parsed.summary === "string" ? parsed.summary.trim() : "";
+    if (!summary) return null;
+    const asList = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value
+            .filter((item): item is string => typeof item === "string")
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .slice(0, 3)
+        : [];
+    return stripEmDashesDeep({
+      summary,
+      working: asList(parsed.working),
+      gaps: asList(parsed.gaps),
+      tweaks: asList(parsed.tweaks),
+    });
+  } catch {
+    return null;
+  }
+}
+
+export type WorkoutStartCoachCopy = {
+  headline: string;
+  body: string;
+};
+
+export function buildWorkoutStartCoachPrompt(input: {
+  profile: FitnessProfile;
+  sessionLabel: string;
+  sessionChallenge: string;
+  crossoverChallenge: string | null;
+  ageUnder35: boolean;
+}): string {
+  const goal = input.profile.primary_goal
+    ? PRIMARY_GOAL_LABELS[input.profile.primary_goal]
+    : "General fitness";
+  return [
+    "You are a Vitality Sweat training partner writing a short start-of-workout comment.",
+    "Motivate. Stay positive. No medical claims. Do not invent numbers.",
+    "Use only the challenge facts provided. You may rephrase, not change targets.",
+    NO_EM_DASH_RULE,
+    "",
+    "Return ONLY valid JSON (no markdown fences):",
+    JSON.stringify({
+      headline: "string: one short line",
+      body: "string: 1-3 sentences",
+    }),
+    "",
+    `Goal: ${goal}`,
+    `Today: ${input.sessionLabel}`,
+    `Today's work challenge: ${input.sessionChallenge}`,
+    input.crossoverChallenge
+      ? `Crossover challenge (headline this for under-35): ${input.crossoverChallenge}`
+      : "No crossover challenge.",
+    input.ageUnder35
+      ? "Tone: direct, competitive, encouraging. Like a teammate in the rack."
+      : "Tone: steady, encouraging, no trash talk.",
+  ].join("\n");
+}
+
+export function parseWorkoutStartCoachCopy(raw: string): WorkoutStartCoachCopy | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const headline =
+      typeof parsed.headline === "string" ? parsed.headline.trim() : "";
+    const body = typeof parsed.body === "string" ? parsed.body.trim() : "";
+    if (!headline || !body) return null;
+    return stripEmDashesDeep({ headline, body });
+  } catch {
+    return null;
+  }
+}

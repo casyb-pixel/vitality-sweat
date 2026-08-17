@@ -54,6 +54,7 @@ function enrichDay(
                 primary_muscle:
                   catalogById.get(row.exercise_id)!.primary_muscle,
                 equipment: catalogById.get(row.exercise_id)!.equipment,
+                tracking_type: catalogById.get(row.exercise_id)!.tracking_type,
               }
             : null),
       })),
@@ -191,8 +192,9 @@ export default function WorkoutWorkspace({
             Workout Agent
           </h1>
           <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-            Build a plan, start a programmed day, set baselines, and log sets
-            with coaching cues. Freeform logging is still available anytime.
+            Bring your own split or let AI draft one. Start a programmed day,
+            set baselines, and log sets. Evaluate with AI anytime. Freeform
+            logging is still available.
           </p>
         </header>
       ) : null}

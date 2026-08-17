@@ -113,6 +113,12 @@ export async function GET() {
     .eq("id", user.id)
     .maybeSingle();
 
+  const { data: fitness } = await supabase
+    .from("fitness_profiles")
+    .select("leaderboard_opt_in")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return NextResponse.json({
     ok: true,
     posts: feed,
@@ -120,6 +126,7 @@ export async function GET() {
       id: user.id,
       username: me?.username ?? null,
       display_name: me?.display_name ?? null,
+      leaderboard_opt_in: fitness?.leaderboard_opt_in !== false,
     },
   });
 }

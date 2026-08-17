@@ -26,7 +26,8 @@ export type PreferredSplit =
   | "full_body"
   | "upper_lower"
   | "push_pull_legs"
-  | "ai_choose";
+  | "ai_choose"
+  | "custom";
 
 export type TrainingEquipment =
   | "gym"
@@ -76,6 +77,7 @@ export const PREFERRED_SPLIT_LABELS: Record<PreferredSplit, string> = {
   upper_lower: "Upper / lower",
   push_pull_legs: "Push / pull / legs",
   ai_choose: "Let AI choose",
+  custom: "Custom split",
 };
 
 export type TrainingPreferences = {
@@ -134,6 +136,8 @@ export type FitnessProfile = {
   dish_ratings?: DishRatingsMap;
   default_rest_sec?: number | null;
   notifications_opt_in?: boolean;
+  leaderboard_opt_in?: boolean;
+  session_coach_opt_in?: boolean;
   onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -211,6 +215,8 @@ export type WorkoutSession = {
   program_day_id: string | null;
   session_source?: "solo" | "paired" | "freeform" | string | null;
   paired_invite_id?: string | null;
+  body_weight_lb?: number | null;
+  coach_brief?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };
@@ -238,6 +244,8 @@ export const WORKOUT_SET_STYLE_COACHING: Record<WorkoutSetStyle, string> = {
   metabolic: "Higher reps, shorter rest, keep moving",
 };
 
+export type WorkoutProgramOrigin = "ai" | "template" | "custom";
+
 export type WorkoutProgram = {
   id: string;
   user_id: string;
@@ -247,6 +255,7 @@ export type WorkoutProgram = {
   session_minutes: number | null;
   summary: string | null;
   preferences: Record<string, unknown>;
+  origin?: WorkoutProgramOrigin | string | null;
   created_at: string;
   updated_at: string;
 };
@@ -327,6 +336,8 @@ export type WorkoutSet = {
   difficulty: number;
   duration_sec?: number | null;
   distance_m?: number | null;
+  incline_pct?: number | null;
+  elevation_m?: number | null;
   set_kind?: WorkoutSetKind | string | null;
   created_at: string;
 };
@@ -339,6 +350,8 @@ export type WorkoutSetInput = {
   difficulty: number;
   duration_sec?: number | null;
   distance_m?: number | null;
+  incline_pct?: number | null;
+  elevation_m?: number | null;
   set_kind?: WorkoutSetKind | null;
 };
 

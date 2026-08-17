@@ -161,13 +161,13 @@ export default async function MemberDashboardPage() {
             href="/app/workout"
             className="inline-flex min-h-10 items-center justify-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
           >
-            {activeProgram ? "Open workout" : "Build a plan"}
+            {activeProgram ? "Open workout" : "Build your split"}
           </Link>
         </div>
 
         {!activeProgram ? (
           <p className="mt-3 font-sans text-sm text-brand-muted">
-            Use the Workout Agent to generate a mapped weekly plan.
+            Use Workout to bring your own split or let AI draft one.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-3">

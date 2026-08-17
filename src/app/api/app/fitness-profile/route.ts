@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { detectGoalWeight } from "@/lib/fitness/milestones";
+import { upsertBodyWeightLog } from "@/lib/fitness/body-logs";
 import {
   getFitnessProfile,
   validateFitnessProfileInput,
@@ -95,6 +96,10 @@ export async function POST(request: Request) {
       );
     }
 
+    if (typeof fitnessFields.weight_lb === "number") {
+      await upsertBodyWeightLog(supabase, user.id, fitnessFields.weight_lb);
+    }
+
     return NextResponse.json({ ok: true, profile: data });
   } catch (error) {
     const message =
@@ -182,6 +187,14 @@ export async function PATCH(request: Request) {
       patch.notifications_opt_in = Boolean(body.notifications_opt_in);
     }
 
+    if ("leaderboard_opt_in" in body) {
+      patch.leaderboard_opt_in = Boolean(body.leaderboard_opt_in);
+    }
+
+    if ("session_coach_opt_in" in body) {
+      patch.session_coach_opt_in = Boolean(body.session_coach_opt_in);
+    }
+
     const prefsValidated = validateTrainingPreferencesInput(body);
     if (!prefsValidated.ok) {
       return NextResponse.json(
@@ -217,6 +230,10 @@ export async function PATCH(request: Request) {
 
     let milestone = null;
     if (typeof patch.weight_lb === "number") {
+      const logged = await upsertBodyWeightLog(supabase, user.id, patch.weight_lb);
+      if (!logged.ok) {
+        return NextResponse.json({ ok: false, error: logged.error }, { status: 400 });
+      }
       milestone = detectGoalWeight({
         previousWeightLb: previousWeight,
         currentWeightLb: patch.weight_lb,

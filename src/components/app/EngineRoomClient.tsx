@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import ShareEngineCard from "@/components/app/ShareEngineCard";
+import EngineRoomLeaderboard from "@/components/app/EngineRoomLeaderboard";
 
 type RoomPost = {
   id: string;
@@ -32,6 +33,8 @@ export default function EngineRoomClient() {
   const [posts, setPosts] = useState<RoomPost[]>([]);
   const [username, setUsername] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [leaderboardOn, setLeaderboardOn] = useState(true);
+  const [tab, setTab] = useState<"feed" | "leaderboard">("feed");
   const [accepted, setAccepted] = useState(false);
   const [body, setBody] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -46,7 +49,7 @@ export default function EngineRoomClient() {
     const json = (await res.json()) as {
       ok?: boolean;
       posts?: RoomPost[];
-      me?: { id?: string; username?: string | null };
+      me?: { id?: string; username?: string | null; leaderboard_opt_in?: boolean };
       error?: string;
     };
     if (!res.ok || !json.ok) {
@@ -56,6 +59,7 @@ export default function EngineRoomClient() {
     setPosts(json.posts ?? []);
     setUsername(json.me?.username ?? null);
     setMeId(json.me?.id ?? null);
+    setLeaderboardOn(json.me?.leaderboard_opt_in !== false);
   }, []);
 
   useEffect(() => {
@@ -229,6 +233,31 @@ export default function EngineRoomClient() {
         </div>
       </section>
 
+      {leaderboardOn ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={tab === "feed" ? primaryBtn : secondaryBtn}
+            onClick={() => setTab("feed")}
+          >
+            Feed
+          </button>
+          <button
+            type="button"
+            className={tab === "leaderboard" ? primaryBtn : secondaryBtn}
+            onClick={() => setTab("leaderboard")}
+          >
+            Leaderboard
+          </button>
+        </div>
+      ) : null}
+
+      {tab === "leaderboard" && leaderboardOn ? (
+        <EngineRoomLeaderboard />
+      ) : null}
+
+      {tab === "feed" || !leaderboardOn ? (
+        <>
       <section className="border border-brand-ink/10 bg-surface-elevated p-5">
         <h2 className="font-display text-xl text-brand-ink">Post</h2>
         <textarea
@@ -390,6 +419,8 @@ export default function EngineRoomClient() {
           ))}
         </ul>
       )}
+        </>
+      ) : null}
     </div>
   );
 }

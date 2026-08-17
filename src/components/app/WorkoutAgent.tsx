@@ -24,9 +24,11 @@ import {
   TRAINING_EQUIPMENT_OPTIONS,
 } from "@/lib/fitness/types";
 import ProgramDayEditor from "@/components/app/ProgramDayEditor";
+import { defaultDayDrafts } from "@/lib/fitness/custom-split";
+import type { WorkoutEvaluatePayload } from "@/lib/ai/workouts";
 
 export type NestedProgramExercise = WorkoutProgramExercise & {
-  exercise?: Pick<
+  exercise?: (Pick<
     Exercise,
     | "id"
     | "name"
@@ -36,7 +38,7 @@ export type NestedProgramExercise = WorkoutProgramExercise & {
     | "youtube_url"
     | "cues"
     | "how_to"
-  > | null;
+  > & { tracking_type?: Exercise["tracking_type"] }) | null;
 };
 
 export type NestedProgramDay = WorkoutProgramDay & {
@@ -47,7 +49,7 @@ export type NestedWorkoutProgram = WorkoutProgram & {
   days: NestedProgramDay[];
 };
 
-type AgentMode = "view" | "wizard" | "review";
+type AgentMode = "choose" | "custom" | "view" | "wizard" | "review";
 
 type WizardStep =
   | "days"
@@ -110,7 +112,7 @@ export default function WorkoutAgent({
     onProgramChange?.(next);
   }
   const [mode, setMode] = useState<AgentMode>(
-    initialProgram ? "view" : "wizard",
+    initialProgram ? "view" : "choose",
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -142,13 +144,23 @@ export default function WorkoutAgent({
   const [bonusMinutes, setBonusMinutes] = useState(
     initialPrefs.session_minutes ?? 45,
   );
+  const [customLabels, setCustomLabels] = useState<string[]>(() =>
+    defaultDayDrafts(initialPrefs.days_per_week ?? 3, "custom").map(
+      (d) => d.label,
+    ),
+  );
+  const [evaluation, setEvaluation] = useState<WorkoutEvaluatePayload | null>(
+    null,
+  );
+  const [renameDayId, setRenameDayId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     setProgramState(initialProgram);
     if (initialProgram && mode === "view") {
       // keep view
     } else if (!initialProgram && mode === "view") {
-      setMode("wizard");
+      setMode("choose");
     }
     // Only sync when server props change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,7 +229,13 @@ export default function WorkoutAgent({
     setError(null);
     setMessage(null);
     setStepIndex(0);
-    setMode("wizard");
+    setEvaluation(null);
+    setMode("choose");
+  }
+
+  function syncCustomLabels(count: number, split: PreferredSplit) {
+    const drafts = defaultDayDrafts(count, split);
+    setCustomLabels(drafts.map((d) => d.label));
   }
 
   function validateStep(): string | null {
@@ -250,7 +268,7 @@ export default function WorkoutAgent({
   function goBack() {
     setError(null);
     if (stepIndex === 0) {
-      if (program) setMode("view");
+      setMode(program ? "view" : "choose");
       return;
     }
     setStepIndex((i) => Math.max(i - 1, 0));
@@ -361,6 +379,184 @@ export default function WorkoutAgent({
     });
   }
 
+  function createCustomPlan() {
+    if (daysPerWeek < 1 || daysPerWeek > 7) {
+      setError("Pick 1 to 7 training days.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      const res = await fetch("/api/app/workout/plan/custom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          days_per_week: daysPerWeek,
+          session_minutes: sessionMinutes,
+          preferred_split: preferredSplit === "ai_choose" ? "custom" : preferredSplit,
+          days: customLabels.slice(0, daysPerWeek).map((label) => ({ label })),
+        }),
+      });
+      const raw = await res.text();
+      const json = parseJsonSafe<{
+        ok?: boolean;
+        program?: NestedWorkoutProgram;
+        error?: string;
+      }>(raw);
+      if (!res.ok || !json?.ok || !json.program) {
+        setError(json?.error ?? "Could not create your split.");
+        return;
+      }
+      setProgram(json.program);
+      setMode("view");
+      setMessage(
+        "Your split is ready. Add exercises to each day, then start. Evaluate with AI anytime.",
+      );
+      router.refresh();
+    });
+  }
+
+  function evaluatePlan() {
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      const res = await fetch("/api/app/workout/plan/evaluate", { method: "POST" });
+      const raw = await res.text();
+      const json = parseJsonSafe<{
+        ok?: boolean;
+        evaluation?: WorkoutEvaluatePayload;
+        error?: string;
+      }>(raw);
+      if (!res.ok || !json?.ok || !json.evaluation) {
+        setError(json?.error ?? "Could not evaluate right now.");
+        return;
+      }
+      setEvaluation(json.evaluation);
+      setMessage("Evaluation ready. Your split is unchanged.");
+    });
+  }
+
+  function addScheduledDay() {
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch("/api/app/workout/plan/days", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: `Day ${(scheduledDays.length || 0) + 1}`,
+        }),
+      });
+      const json = parseJsonSafe<{
+        ok?: boolean;
+        program?: NestedWorkoutProgram;
+        error?: string;
+      }>(await res.text());
+      if (!res.ok || !json?.ok || !json.program) {
+        setError(json?.error ?? "Could not add a day.");
+        return;
+      }
+      setProgram(json.program);
+    });
+  }
+
+  function saveDayLabel(dayId: string) {
+    const label = renameValue.trim();
+    if (!label) {
+      setError("Give the day a name.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch(`/api/app/workout/plan/days/${dayId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+      });
+      const json = parseJsonSafe<{
+        ok?: boolean;
+        program?: NestedWorkoutProgram;
+        error?: string;
+      }>(await res.text());
+      if (!res.ok || !json?.ok || !json.program) {
+        setError(json?.error ?? "Could not rename day.");
+        return;
+      }
+      setProgram(json.program);
+      setRenameDayId(null);
+    });
+  }
+
+  function deleteScheduledDay(dayId: string) {
+    if (scheduledDays.length <= 1) {
+      setError("Keep at least one day in your split.");
+      return;
+    }
+    const ok = window.confirm("Remove this day from your split?");
+    if (!ok) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch(`/api/app/workout/plan/days/${dayId}`, {
+        method: "DELETE",
+      });
+      const json = parseJsonSafe<{
+        ok?: boolean;
+        program?: NestedWorkoutProgram;
+        error?: string;
+      }>(await res.text());
+      if (!res.ok || !json?.ok || !json.program) {
+        setError(json?.error ?? "Could not remove day.");
+        return;
+      }
+      setProgram(json.program);
+    });
+  }
+
+  function renderEvaluation() {
+    if (!evaluation) return null;
+    return (
+      <div className="space-y-3 border border-brand-orange/30 bg-brand-orange/5 p-4">
+        <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+          AI evaluation
+        </p>
+        <p className="font-sans text-sm leading-relaxed text-brand-ink">
+          {evaluation.summary}
+        </p>
+        {evaluation.working.length ? (
+          <div>
+            <p className="font-sans text-xs font-semibold text-brand-ink">Working</p>
+            <ul className="mt-1 list-disc pl-5 font-sans text-sm text-brand-muted">
+              {evaluation.working.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {evaluation.gaps.length ? (
+          <div>
+            <p className="font-sans text-xs font-semibold text-brand-ink">Gaps</p>
+            <ul className="mt-1 list-disc pl-5 font-sans text-sm text-brand-muted">
+              {evaluation.gaps.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {evaluation.tweaks.length ? (
+          <div>
+            <p className="font-sans text-xs font-semibold text-brand-ink">
+              Optional tweaks
+            </p>
+            <ul className="mt-1 list-disc pl-5 font-sans text-sm text-brand-muted">
+              {evaluation.tweaks.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function requestBonus(replaceExisting = false) {
     if (!program) {
       setError("Build a workout plan first, then you can add an extra session.");
@@ -468,23 +664,77 @@ export default function WorkoutAgent({
         </div>
 
         <p className="font-sans text-sm text-brand-muted">
-          The AI draft is a starting point. Swap, edit, add, or remove exercises
-          anytime. Your runner always uses this customized list.
+          {program.origin === "custom"
+            ? "This is your split. Add, swap, or remove exercises anytime. Evaluate with AI as you log more sessions."
+            : "The AI draft is a starting point. Swap, edit, add, or remove exercises anytime. Your runner always uses this customized list."}
         </p>
 
         <div className="grid gap-3 lg:grid-cols-2">
           {scheduledDays.map((day) => (
-            <ProgramDayEditor
-              key={day.id}
-              day={day}
-              catalog={catalog}
-              running={runningDayId === day.id}
-              onStartDay={mode === "view" ? onStartDay : undefined}
-              onDayChange={updateDay}
-              allowRegenerate
-            />
+            <div key={day.id} className="space-y-2">
+              {mode === "view" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {renameDayId === day.id ? (
+                    <>
+                      <input
+                        className={fieldClass}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        aria-label="Day name"
+                      />
+                      <button
+                        type="button"
+                        className={secondaryBtn}
+                        disabled={pending}
+                        onClick={() => saveDayLabel(day.id)}
+                      >
+                        Save name
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
+                      onClick={() => {
+                        setRenameDayId(day.id);
+                        setRenameValue(day.label);
+                      }}
+                    >
+                      Rename
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange"
+                    disabled={pending || scheduledDays.length <= 1}
+                    onClick={() => deleteScheduledDay(day.id)}
+                  >
+                    Remove day
+                  </button>
+                </div>
+              ) : null}
+              <ProgramDayEditor
+                day={day}
+                catalog={catalog}
+                running={runningDayId === day.id}
+                onStartDay={mode === "view" ? onStartDay : undefined}
+                onDayChange={updateDay}
+                allowRegenerate={program.origin !== "custom"}
+              />
+            </div>
           ))}
         </div>
+
+        {mode === "view" ? (
+          <button
+            type="button"
+            className={secondaryBtn}
+            disabled={pending || scheduledDays.length >= 7}
+            onClick={addScheduledDay}
+          >
+            Add a day
+          </button>
+        ) : null}
 
         {mode === "view" ? (
           <div className="space-y-3 border border-brand-ink/10 bg-surface-elevated p-4">
@@ -658,30 +908,222 @@ export default function WorkoutAgent({
               >
                 Build new plan
               </button>
+              <button
+                type="button"
+                onClick={evaluatePlan}
+                disabled={pending}
+                className={secondaryBtn}
+              >
+                {pending ? "Evaluating…" : "Evaluate with AI"}
+              </button>
             </div>
+            {renderEvaluation()}
             <h2 className="font-display text-xl text-brand-ink">
               Your active program
             </h2>
             <p className="font-sans text-sm text-brand-muted">
-              Customize any day, then tap Start to run it with baselines and
-              set-by-set coaching.
+              Bring your own routine or keep the AI draft. Customize any day,
+              then tap Start.
             </p>
             {renderPlanDays()}
           </section>
         )
       ) : null}
 
+      {mode === "choose" ? (
+        <section className="space-y-4 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
+          <div className="space-y-1">
+            <p className="eyebrow text-brand-orange">Your training</p>
+            <h2 className="font-display text-xl text-brand-ink">
+              Bring your own routine, or let AI draft one
+            </h2>
+            <p className="font-sans text-sm text-brand-muted">
+              If you already know your split, build it here. AI can still
+              evaluate it anytime as you log workouts.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              className="border border-brand-orange bg-brand-orange/5 p-4 text-left hover:bg-brand-orange/10"
+              onClick={() => {
+                setPreferredSplit("custom");
+                syncCustomLabels(daysPerWeek, "custom");
+                setMode("custom");
+              }}
+            >
+              <p className="font-sans text-sm font-semibold text-brand-ink">
+                Build my own split
+              </p>
+              <p className="mt-1 font-sans text-xs text-brand-muted">
+                Name your days, add your lifts, then start.
+              </p>
+            </button>
+            <button
+              type="button"
+              className="border border-brand-ink/15 p-4 text-left hover:border-brand-orange"
+              onClick={() => {
+                setStepIndex(0);
+                setMode("wizard");
+              }}
+            >
+              <p className="font-sans text-sm font-semibold text-brand-ink">
+                Let AI draft a plan
+              </p>
+              <p className="mt-1 font-sans text-xs text-brand-muted">
+                Answer a few questions and we will draft days you can edit.
+              </p>
+            </button>
+          </div>
+          {program ? (
+            <button type="button" className={secondaryBtn} onClick={() => setMode("view")}>
+              Cancel
+            </button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={secondaryBtn}
+                disabled={pending}
+                onClick={evaluatePlan}
+              >
+                {pending ? "Evaluating…" : "Evaluate with AI"}
+              </button>
+              <p className="font-sans text-xs text-brand-muted">
+                Works with logged sessions even before a written split exists.
+              </p>
+            </div>
+          )}
+          {renderEvaluation()}
+        </section>
+      ) : null}
+
+      {mode === "custom" ? (
+        <section className="space-y-5 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
+          <div className="space-y-1">
+            <p className="eyebrow text-brand-orange">Custom split</p>
+            <h2 className="font-display text-xl text-brand-ink">
+              Name your training days
+            </h2>
+            <p className="font-sans text-sm text-brand-muted">
+              Empty days are fine. You will add exercises next.
+            </p>
+          </div>
+          <div>
+            <p className={labelClass}>Days per week</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    setDaysPerWeek(n);
+                    syncCustomLabels(n, preferredSplit);
+                  }}
+                  className={`${chipBase} ${
+                    daysPerWeek === n
+                      ? "border-brand-orange bg-brand-orange text-white"
+                      : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className={labelClass}>Split shape</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  "custom",
+                  "full_body",
+                  "upper_lower",
+                  "push_pull_legs",
+                ] as PreferredSplit[]
+              ).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    setPreferredSplit(opt);
+                    syncCustomLabels(daysPerWeek, opt);
+                  }}
+                  className={`border px-4 py-3 text-left font-sans text-sm ${
+                    preferredSplit === opt
+                      ? "border-brand-orange bg-brand-orange/10 text-brand-ink"
+                      : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                  }`}
+                >
+                  <span className="font-semibold">
+                    {PREFERRED_SPLIT_LABELS[opt]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="session-minutes-custom" className={labelClass}>
+              Minutes per session
+            </label>
+            <input
+              id="session-minutes-custom"
+              type="number"
+              min={5}
+              max={180}
+              step={5}
+              value={sessionMinutes}
+              onChange={(e) => setSessionMinutes(Number(e.target.value))}
+              className={fieldClass}
+            />
+          </div>
+          <div className="space-y-2">
+            {customLabels.slice(0, daysPerWeek).map((label, index) => (
+              <label key={index} className={labelClass}>
+                Day {index + 1} name
+                <input
+                  className={fieldClass}
+                  value={label}
+                  onChange={(e) => {
+                    const next = [...customLabels];
+                    next[index] = e.target.value;
+                    setCustomLabels(next);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              className={secondaryBtn}
+              disabled={pending}
+              onClick={() => setMode(program ? "view" : "choose")}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className={primaryBtn}
+              disabled={pending}
+              onClick={createCustomPlan}
+            >
+              {pending ? "Saving split…" : "Save my split"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {mode === "view" && !program ? (
         <section className="space-y-4 rounded-lg border border-brand-ink/10 bg-surface-elevated p-5 sm:p-6">
           <h2 className="font-display text-xl text-brand-ink">
-            Workout Agent
+            No active split yet
           </h2>
           <p className="font-sans text-sm text-brand-muted">
-            Answer a few quick questions and we will build a training plan
-            matched to your goal and equipment.
+            Build your own days or let AI draft a starting point.
           </p>
           <button type="button" onClick={startNewPlan} className={primaryBtn}>
-            Build my plan
+            Get started
           </button>
         </section>
       ) : null}
@@ -694,7 +1136,8 @@ export default function WorkoutAgent({
               {STEP_LABELS[step]}
             </h2>
             <p className="font-sans text-xs text-brand-muted">
-              Step {stepIndex + 1} of {STEPS.length}
+              Step {stepIndex + 1} of {STEPS.length}. You can still edit every
+              day after this draft.
             </p>
           </div>
 
@@ -862,7 +1305,7 @@ export default function WorkoutAgent({
               disabled={pending}
               className={secondaryBtn}
             >
-              {stepIndex === 0 && program ? "Cancel" : "Back"}
+              {stepIndex === 0 ? (program ? "Cancel" : "Back") : "Back"}
             </button>
             <button
               type="button"
@@ -901,6 +1344,14 @@ export default function WorkoutAgent({
                 className={primaryBtn}
               >
                 Use this plan
+              </button>
+              <button
+                type="button"
+                onClick={evaluatePlan}
+                disabled={pending}
+                className={secondaryBtn}
+              >
+                {pending ? "Evaluating…" : "Evaluate with AI"}
               </button>
               <button
                 type="button"

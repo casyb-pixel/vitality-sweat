@@ -18,6 +18,7 @@ const PREFERRED_SPLITS = new Set<string>([
   "upper_lower",
   "push_pull_legs",
   "ai_choose",
+  "custom",
 ]);
 
 const EQUIPMENT_SET = new Set<string>(TRAINING_EQUIPMENT_OPTIONS);
@@ -169,7 +170,7 @@ export function validateTrainingPreferencesInput(
       return {
         ok: false,
         error:
-          "Preferred split must be full_body, upper_lower, push_pull_legs, or ai_choose.",
+          "Preferred split must be full_body, upper_lower, push_pull_legs, custom, or ai_choose.",
       };
     }
   }

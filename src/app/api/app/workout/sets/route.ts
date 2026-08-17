@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       difficulty?: number;
       duration_sec?: number | null;
       distance_m?: number | null;
+      incline_pct?: number | null;
+      elevation_m?: number | null;
       set_kind?: string | null;
     };
     try {
@@ -94,6 +96,14 @@ export async function POST(request: Request) {
       body.distance_m === null || body.distance_m === undefined
         ? null
         : Number(body.distance_m);
+    const inclinePct =
+      body.incline_pct === null || body.incline_pct === undefined
+        ? null
+        : Number(body.incline_pct);
+    const elevationM =
+      body.elevation_m === null || body.elevation_m === undefined
+        ? null
+        : Number(body.elevation_m);
     const setKindRaw = (body.set_kind ?? "working").trim();
     const setKind = ["warmup", "working", "drop", "failure", "timed"].includes(
       setKindRaw,
@@ -122,6 +132,18 @@ export async function POST(request: Request) {
     if (distanceM != null && (!Number.isFinite(distanceM) || distanceM < 0)) {
       return NextResponse.json(
         { ok: false, error: "distance_m must be >= 0." },
+        { status: 400 },
+      );
+    }
+    if (inclinePct != null && (!Number.isFinite(inclinePct) || inclinePct < 0 || inclinePct > 40)) {
+      return NextResponse.json(
+        { ok: false, error: "incline_pct must be 0 to 40." },
+        { status: 400 },
+      );
+    }
+    if (elevationM != null && (!Number.isFinite(elevationM) || elevationM < 0)) {
+      return NextResponse.json(
+        { ok: false, error: "elevation_m must be >= 0." },
         { status: 400 },
       );
     }
@@ -174,6 +196,8 @@ export async function POST(request: Request) {
         difficulty,
         duration_sec: durationSec,
         distance_m: distanceM,
+        incline_pct: inclinePct,
+        elevation_m: elevationM,
         set_kind: setKind,
       })
       .select("*")

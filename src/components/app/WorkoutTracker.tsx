@@ -25,6 +25,7 @@ import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
 import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
+import type { CoachBrief } from "@/lib/fitness/session-coach";
 import {
   DIFFICULTY_LABELS,
   WORKOUT_SET_KIND_LABELS,
@@ -66,6 +67,8 @@ export default function WorkoutTracker({
   const [reps, setReps] = useState("10");
   const [durationSec, setDurationSec] = useState("");
   const [distanceM, setDistanceM] = useState("");
+  const [inclinePct, setInclinePct] = useState("");
+  const [elevationM, setElevationM] = useState("");
   const [setKind, setSetKind] = useState<WorkoutSetKind>("working");
   const [customName, setCustomName] = useState("");
   const [showCustom, setShowCustom] = useState(false);
@@ -75,9 +78,13 @@ export default function WorkoutTracker({
     reps: string;
     durationSec: string;
     distanceM: string;
+    inclinePct: string;
+    elevationM: string;
   } | null>(null);
   const [difficulty, setDifficulty] = useState(3);
   const [setNumber, setSetNumber] = useState(1);
+  const [coachBrief, setCoachBrief] = useState<CoachBrief | null>(null);
+  const [coachDismissed, setCoachDismissed] = useState(false);
   const [loggedSets, setLoggedSets] = useState<WorkoutSet[]>([]);
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(
     null,
@@ -139,6 +146,8 @@ export default function WorkoutTracker({
         reps: last.reps != null ? String(last.reps) : "",
         durationSec: last.duration_sec != null ? String(last.duration_sec) : "",
         distanceM: last.distance_m != null ? String(last.distance_m) : "",
+        inclinePct: last.incline_pct != null ? String(last.incline_pct) : "",
+        elevationM: last.elevation_m != null ? String(last.elevation_m) : "",
       });
     }
   }, []);
@@ -189,6 +198,25 @@ export default function WorkoutTracker({
           ? "Resumed your active workout session."
           : "Workout started. Log your sets.",
       );
+      const existing = result.data.session.coach_brief as CoachBrief | null;
+      if (existing?.headline) {
+        setCoachBrief(existing);
+      } else {
+        try {
+          const coachRes = await fetch("/api/app/workout/coach/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: result.data.session.id }),
+          });
+          const coachJson = (await coachRes.json()) as {
+            ok?: boolean;
+            brief?: CoachBrief | null;
+          };
+          if (coachJson.ok && coachJson.brief) setCoachBrief(coachJson.brief);
+        } catch {
+          // optional
+        }
+      }
     });
   }
 
@@ -204,7 +232,11 @@ export default function WorkoutTracker({
       setSession(null);
       setLoggedSets([]);
       setSetNumber(1);
-      setMessage("Workout completed. Nice work.");
+      setMessage(
+        primaryGoal === "muscle_gain" || primaryGoal === "strength"
+          ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
+          : "Workout completed. Nice work.",
+      );
       setShowInvitePrompt(true);
       void loadHistory(exerciseId);
     });
@@ -233,6 +265,8 @@ export default function WorkoutTracker({
         difficulty,
         durationSec: durationSec === "" ? null : Number(durationSec),
         distanceM: distanceM === "" ? null : Number(distanceM),
+        inclinePct: inclinePct === "" ? null : Number(inclinePct),
+        elevationM: elevationM === "" ? null : Number(elevationM),
         setKind,
       });
       if (!result.ok) {
@@ -253,6 +287,8 @@ export default function WorkoutTracker({
         reps,
         durationSec,
         distanceM,
+        inclinePct,
+        elevationM,
       });
     });
   }
@@ -381,6 +417,25 @@ export default function WorkoutTracker({
           exerciseId={exerciseId || null}
           primaryMuscle={selected?.primary_muscle ?? null}
         />
+      ) : null}
+
+      {coachBrief && !coachDismissed ? (
+        <aside className="space-y-2 border border-brand-orange/30 bg-brand-orange/5 p-4">
+          <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+            Coach
+          </p>
+          <p className="font-display text-lg text-brand-ink">{coachBrief.headline}</p>
+          <p className="font-sans text-sm leading-relaxed text-brand-ink">
+            {coachBrief.body}
+          </p>
+          <button
+            type="button"
+            className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
+            onClick={() => setCoachDismissed(true)}
+          >
+            Dismiss
+          </button>
+        </aside>
       ) : null}
 
       <MilestoneCelebrate
@@ -644,20 +699,67 @@ export default function WorkoutTracker({
               />
             </div>
           ) : selected?.tracking_type === "distance" ? (
-            <div>
-              <label htmlFor="distance" className={labelClass}>
-                Distance (m)
-              </label>
-              <input
-                id="distance"
-                type="number"
-                min={0}
-                step="1"
-                value={distanceM}
-                onChange={(e) => setDistanceM(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
+            <>
+              <div>
+                <label htmlFor="distance" className={labelClass}>
+                  Distance (m)
+                </label>
+                <input
+                  id="distance"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={distanceM}
+                  onChange={(e) => setDistanceM(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="incline" className={labelClass}>
+                  Incline %
+                </label>
+                <input
+                  id="incline"
+                  type="number"
+                  min={0}
+                  max={40}
+                  step="0.5"
+                  value={inclinePct}
+                  onChange={(e) => setInclinePct(e.target.value)}
+                  className={fieldClass}
+                  placeholder="optional"
+                />
+              </div>
+              <div>
+                <label htmlFor="elevation" className={labelClass}>
+                  Elevation (m)
+                </label>
+                <input
+                  id="elevation"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={elevationM}
+                  onChange={(e) => setElevationM(e.target.value)}
+                  className={fieldClass}
+                  placeholder="optional"
+                />
+              </div>
+              <div>
+                <label htmlFor="distance-reps" className={labelClass}>
+                  Reps / strokes
+                </label>
+                <input
+                  id="distance-reps"
+                  type="number"
+                  min={0}
+                  value={reps}
+                  onChange={(e) => setReps(e.target.value)}
+                  className={fieldClass}
+                  placeholder="optional"
+                />
+              </div>
+            </>
           ) : (
             <>
               <div>

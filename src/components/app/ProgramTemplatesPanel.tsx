@@ -32,7 +32,8 @@ export default function ProgramTemplatesPanel() {
     <section className="border border-brand-ink/10 bg-surface-elevated p-4">
       <h2 className="font-display text-xl text-brand-ink">Start from a proven plan</h2>
       <p className="mt-1 font-sans text-sm text-brand-muted">
-        Copies a named template into your Engine. AI generation stays available.
+            AI generation stays available. You can also build your own split
+            above.
       </p>
       <ul className="mt-4 grid gap-2 sm:grid-cols-2">
         {NAMED_PROGRAMS.map((program) => (

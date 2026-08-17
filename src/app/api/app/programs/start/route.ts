@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       days_per_week: program.daysPerWeek,
       session_minutes: program.sessionMinutes,
       summary: program.summary,
+      origin: "template",
     })
     .select("*")
     .single();

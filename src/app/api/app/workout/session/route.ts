@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { latestBodyWeightLb } from "@/lib/fitness/body-logs";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
 
 const SET_SELECT =
-  "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, duration_sec, distance_m, set_kind, created_at";
+  "id, session_id, exercise_id, set_number, weight_lb, reps, difficulty, duration_sec, distance_m, incline_pct, elevation_m, set_kind, created_at";
 
 /** Start a new active workout session (or resume the existing one). */
 export async function POST(request: Request) {
@@ -81,12 +82,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, session: existing, resumed: true });
     }
 
+    const bodyWeightLb = await latestBodyWeightLb(supabase, user.id);
+
     const { data, error } = await supabase
       .from("workout_sessions")
       .insert({
         user_id: user.id,
         status: "active",
         program_day_id: programDayId,
+        body_weight_lb: bodyWeightLb,
       })
       .select("*")
       .single();
