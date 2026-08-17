@@ -3,6 +3,10 @@ import Link from "next/link";
 import PublicPage from "@/components/public/PublicPage";
 import JsonLd from "@/components/seo/JsonLd";
 import { getPublicExercises } from "@/lib/fitness/public-exercises";
+import {
+  ENCYCLOPEDIA_BATCH_LABEL,
+  featuredEncyclopediaPages,
+} from "@/lib/fitness/encyclopedia";
 import { buildCanonical } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -26,6 +30,31 @@ export default async function ExercisesHubPage() {
       <p className="font-sans text-sm text-brand-muted">
         {exercises.length} movements in the shared catalog.
       </p>
+      <section className="mt-8 max-w-2xl">
+        <h2 className="font-display text-2xl text-brand-ink">
+          This week ({ENCYCLOPEDIA_BATCH_LABEL})
+        </h2>
+        <p className="mt-2 font-sans text-sm text-brand-muted">
+          Beginner lifts in Hunter&apos;s voice. Log every one in Engine.
+        </p>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          {featuredEncyclopediaPages().map((page) => (
+            <li key={page.slug}>
+              <Link
+                href={`/exercises/${page.slug}`}
+                className="block border border-brand-orange/40 bg-surface-elevated px-4 py-3 hover:border-brand-orange"
+              >
+                <p className="font-sans text-sm font-semibold text-brand-ink">
+                  {page.name}
+                </p>
+                <p className="font-sans text-xs text-brand-muted">
+                  {page.eyebrow}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
       <div className="mt-4 flex flex-wrap gap-2">
         {muscles.slice(0, 16).map((m) => (
           <Link
