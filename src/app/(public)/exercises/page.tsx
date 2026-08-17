@@ -3,16 +3,13 @@ import Link from "next/link";
 import PublicPage from "@/components/public/PublicPage";
 import JsonLd from "@/components/seo/JsonLd";
 import { getPublicExercises } from "@/lib/fitness/public-exercises";
-import {
-  ENCYCLOPEDIA_BATCH_LABEL,
-  featuredEncyclopediaPages,
-} from "@/lib/fitness/encyclopedia";
+import { featuredEncyclopediaPages } from "@/lib/fitness/encyclopedia";
 import { buildCanonical } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: "Exercise encyclopedia",
+  title: "How to do the lifts",
   description:
-    "How to do the lifts in Hunter's voice. Log every one in the free Vitality Engine.",
+    "Simple cues for first-gym and everyday lifts. Log every set in the free Vitality Engine.",
   alternates: { canonical: buildCanonical("/exercises") },
 };
 
@@ -20,22 +17,22 @@ export const revalidate = 3600;
 
 export default async function ExercisesHubPage() {
   const exercises = await getPublicExercises();
-  const muscles = [...new Set(exercises.map((e) => e.primary_muscle).filter(Boolean))];
+  const muscles = [
+    ...new Set(exercises.map((e) => e.primary_muscle).filter(Boolean)),
+  ];
   return (
     <PublicPage
       eyebrow="Exercises"
-      title="Every lift gets a URL"
-      lede="Cues, tracking type, and a button to log it in Engine. These are coaching notes, not medical advice."
+      title="Pick a lift. Own the reps."
+      lede="How-to pages for the gym floor, not a challenge board. Read the cues, do the set, log it in Engine. Coaching notes, not medical advice."
     >
-      <p className="font-sans text-sm text-brand-muted">
-        {exercises.length} movements in the shared catalog.
-      </p>
-      <section className="mt-8 max-w-2xl">
+      <section className="max-w-2xl">
         <h2 className="font-display text-2xl text-brand-ink">
-          This week ({ENCYCLOPEDIA_BATCH_LABEL})
+          If the gym still feels huge, start here
         </h2>
         <p className="mt-2 font-sans text-sm text-brand-muted">
-          Beginner lifts in Hunter&apos;s voice. Log every one in Engine.
+          These are week-one lifts. Goblet squat, a press you can control, a
+          row, a hinge, a carry. Not a contest. A place to start.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {featuredEncyclopediaPages().map((page) => (
@@ -55,39 +52,45 @@ export default async function ExercisesHubPage() {
           ))}
         </ul>
       </section>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {muscles.slice(0, 16).map((m) => (
-          <Link
-            key={m}
-            href={`/exercises/muscle/${m}`}
-            className="border border-brand-ink/15 px-3 py-1 font-sans text-xs font-semibold uppercase tracking-[0.08em]"
-          >
-            {m}
-          </Link>
-        ))}
-      </div>
-      <ul className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {exercises.map((ex) => (
-          <li key={ex.id}>
+      <section className="mt-12">
+        <h2 className="font-display text-2xl text-brand-ink">All lifts</h2>
+        <p className="mt-2 font-sans text-sm text-brand-muted">
+          Same idea: tap a name, read the cues, log the set.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {muscles.slice(0, 16).map((m) => (
             <Link
-              href={`/exercises/${ex.slug}`}
-              className="block border border-brand-ink/10 bg-surface-elevated px-4 py-3 hover:border-brand-orange"
+              key={m}
+              href={`/exercises/muscle/${m}`}
+              className="border border-brand-ink/15 px-3 py-1 font-sans text-xs font-semibold uppercase tracking-[0.08em]"
             >
-              <p className="font-sans text-sm font-semibold text-brand-ink">
-                {ex.name}
-              </p>
-              <p className="font-sans text-xs text-brand-muted">
-                {ex.primary_muscle} · {ex.equipment}
-              </p>
+              {m}
             </Link>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+        <ul className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {exercises.map((ex) => (
+            <li key={ex.id}>
+              <Link
+                href={`/exercises/${ex.slug}`}
+                className="block border border-brand-ink/10 bg-surface-elevated px-4 py-3 hover:border-brand-orange"
+              >
+                <p className="font-sans text-sm font-semibold text-brand-ink">
+                  {ex.name}
+                </p>
+                <p className="font-sans text-xs text-brand-muted">
+                  {ex.primary_muscle} · {ex.equipment}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
       <JsonLd
         data={{
           "@context": "https://schema.org",
           "@type": "CollectionPage",
-          name: "Vitality Sweat exercise encyclopedia",
+          name: "Vitality Sweat lifts",
           url: buildCanonical("/exercises"),
         }}
       />
