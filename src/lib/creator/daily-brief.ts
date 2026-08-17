@@ -87,7 +87,7 @@ export async function materializeCreatorTasks(
         due_at: new Date(start.getTime() + 12.5 * 3600 * 1000).toISOString(),
         kind: "post_instagram",
         title: `Post IG promo: ${post.title}`,
-        deep_link: `/app/creator?tab=projects`,
+        deep_link: `/app/creator?tab=social`,
         source_post_id: post.id,
       });
     }

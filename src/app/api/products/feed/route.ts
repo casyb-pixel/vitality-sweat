@@ -26,6 +26,7 @@ export type ProductFeedResponse = {
  * GET /api/products/feed
  * Returns Printful sync products (hoodie variants, colors, pricing, mockups)
  * plus a Google Merchant Center–mapped feed scaffold.
+ * Public Shopping TSV (not blocked by robots /api): /feeds/google-merchant.txt
  */
 export async function GET() {
   const catalog = await getStorefrontCatalog();

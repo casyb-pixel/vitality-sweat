@@ -1,4 +1,6 @@
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/seo/site";
+import { productPath } from "@/lib/store/product-slug";
+import { stripEmDashes } from "@/lib/text/humanize-copy";
 
 export type ProductSize = string;
 
@@ -39,7 +41,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     id: "vs-performance-hoodie",
     name: "Performance Hoodie",
     description:
-      "Midweight training hoodie with Vitality Sweat mark — warm-up ready, Louisiana-humidity smart.",
+      "Midweight training hoodie with Vitality Sweat mark. Warm-up ready, Louisiana-humidity smart.",
     image: "/images/stock/fitness/studio-group-stretch.jpg",
     imageAlt: "Athletes stretching in training apparel",
     price: "68.00",
@@ -56,7 +58,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     id: "vs-everyday-gym-tee",
     name: "Everyday Gym Tee",
     description:
-      "Breathable everyday tee for lifts, lessons, and long days — charcoal wordmark, orange energy.",
+      "Breathable everyday tee for lifts, lessons, and long days. Charcoal wordmark, orange energy.",
     image: "/images/gallery-fitness-gear-flatlay.jpg",
     imageAlt: "Fitness gear flat lay with training apparel",
     price: "32.00",
@@ -88,7 +90,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     id: "sweatlife-cap",
     name: "Sweatlife Cap",
     description:
-      "Structured cap for early lifts and late practices — clean mark, high-impact orange accent.",
+      "Structured cap for early lifts and late practices. Clean mark, high-impact orange accent.",
     image: "/images/stock/fitness/gear-wakeup-flatlay.jpg",
     imageAlt: "Athlete gear flat lay including cap and training essentials",
     price: "28.00",
@@ -122,7 +124,89 @@ export function getFeaturedGear(limit = 4): StoreProduct[] {
   return pool.slice(0, limit);
 }
 
+export function buildMerchantReturnPolicyJsonLd() {
+  return {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: "US",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: 30,
+    returnMethod: "https://schema.org/ReturnByMail",
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+    merchantReturnLink: absoluteUrl("/return-policy"),
+  };
+}
+
+export function buildShippingDetailsJsonLd() {
+  return {
+    "@type": "OfferShippingDetails",
+    shippingRate: {
+      "@type": "MonetaryAmount",
+      value: "0",
+      currency: "USD",
+    },
+    shippingDestination: {
+      "@type": "DefinedRegion",
+      addressCountry: "US",
+    },
+    deliveryTime: {
+      "@type": "ShippingDeliveryTime",
+      handlingTime: {
+        "@type": "QuantitativeValue",
+        minValue: 1,
+        maxValue: 5,
+        unitCode: "DAY",
+      },
+      transitTime: {
+        "@type": "QuantitativeValue",
+        minValue: 3,
+        maxValue: 10,
+        unitCode: "DAY",
+      },
+    },
+  };
+}
+
+function productOfferJsonLd(product: StoreProduct) {
+  return {
+    "@type": "Offer",
+    url: absoluteUrl(productPath(product)),
+    priceCurrency: product.currency,
+    price: product.price,
+    availability: product.availability,
+    itemCondition: "https://schema.org/NewCondition",
+    hasMerchantReturnPolicy: buildMerchantReturnPolicyJsonLd(),
+    shippingDetails: buildShippingDetailsJsonLd(),
+  };
+}
+
+export function buildProductJsonLd(product: StoreProduct) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: stripEmDashes(product.name),
+    description: stripEmDashes(product.description),
+    sku: product.sku,
+    image: product.image.startsWith("http")
+      ? product.image
+      : absoluteUrl(product.image),
+    category: product.category,
+    brand: {
+      "@type": "Brand",
+      name: SITE_NAME,
+    },
+    offers: productOfferJsonLd(product),
+  };
+}
+
+function jsonLdEligible(product: StoreProduct): boolean {
+  return (
+    product.source === "printful" &&
+    product.availability === "https://schema.org/InStock"
+  );
+}
+
 export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
+  const live = products.filter(jsonLdEligible);
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -141,13 +225,14 @@ export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
     },
     mainEntity: {
       "@type": "ItemList",
-      itemListElement: products.map((product, index) => ({
+      itemListElement: live.map((product, index) => ({
         "@type": "ListItem",
         position: index + 1,
+        url: absoluteUrl(productPath(product)),
         item: {
           "@type": "Product",
-          name: product.name,
-          description: product.description,
+          name: stripEmDashes(product.name),
+          description: stripEmDashes(product.description),
           sku: product.sku,
           image: product.image.startsWith("http")
             ? product.image
@@ -157,13 +242,7 @@ export function buildStoreCollectionJsonLd(products: StoreProduct[]) {
             "@type": "Brand",
             name: SITE_NAME,
           },
-          offers: {
-            "@type": "Offer",
-            url: absoluteUrl("/store"),
-            priceCurrency: product.currency,
-            price: product.price,
-            availability: product.availability,
-          },
+          offers: productOfferJsonLd(product),
         },
       })),
     },

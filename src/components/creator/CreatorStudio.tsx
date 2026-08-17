@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AudiencePanel from "@/components/creator/AudiencePanel";
 import BlogWizard from "@/components/creator/BlogWizard";
 import CreatorContentGaps from "@/components/creator/CreatorContentGaps";
@@ -9,6 +9,7 @@ import EditorialCalendarPanel from "@/components/creator/EditorialCalendarPanel"
 import GrowthCampaignPanel from "@/components/creator/GrowthCampaignPanel";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import SponsorsPanel from "@/components/creator/SponsorsPanel";
+import SocialKitPanel from "@/components/creator/SocialKitPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
 import type {
   BlogArticleType,
@@ -21,6 +22,7 @@ type StudioTab =
   | "projects"
   | "blog"
   | "video"
+  | "social"
   | "audience"
   | "sponsors";
 
@@ -35,6 +37,7 @@ const TABS: { id: StudioTab; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
+  { id: "social", label: "Social kit" },
   { id: "sponsors", label: "Sponsors" },
   { id: "audience", label: "Audience" },
 ];
@@ -50,6 +53,14 @@ export default function CreatorStudio({
   const [videoScriptPreset, setVideoScriptPreset] =
     useState<VideoScriptPreset>("standard");
   const [seedVideoPostId, setSeedVideoPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("tab");
+    if (requested && TABS.some((item) => item.id === requested)) {
+      setTab(requested as StudioTab);
+    }
+  }, []);
 
   const handlePublished = useCallback((slug: string) => {
     setHighlightSlug(slug);
@@ -100,22 +111,26 @@ export default function CreatorStudio({
       ? "Film the Chronicle"
       : tab === "blog"
         ? "Log today, publish tonight"
-        : tab === "audience"
-          ? "Prove local density"
-          : tab === "sponsors"
-            ? "Sell local slots"
-            : "7-Day Marketing Projects";
+        : tab === "social"
+          ? "Paste bios. Post three times."
+          : tab === "audience"
+            ? "Prove local density"
+            : tab === "sponsors"
+              ? "Sell local slots"
+              : "7-Day Marketing Projects";
 
   const blurb =
     tab === "video"
       ? " Pick a published post, grab a gym clip + voice-over, export a Shorts/TikTok/Reels pack."
       : tab === "blog"
-        ? " Four quick steps from gym notes to a live Chronicle — no paragraphs required."
-        : tab === "audience"
-          ? " ZIP-level active members plus campaign deliverable proof for sponsorship pitches."
-          : tab === "sponsors"
-            ? " CRUD sponsors, flights, creatives, and slot assignments — house CTA fills unsold inventory."
-            : " Growth Campaign templates + active publishes with swipe copy and a 6-item delivery checklist.";
+        ? " Four quick steps from gym notes to a live Chronicle. No paragraphs required."
+        : tab === "social"
+          ? " Approved bios, UTM invite links, logo files, and the 3-post weekly cadence. Copy, post in the native app, then mark the project done."
+          : tab === "audience"
+            ? " ZIP-level active members plus campaign deliverable proof for sponsorship pitches."
+            : tab === "sponsors"
+              ? " CRUD sponsors, flights, creatives, and slot assignments. House CTA fills unsold inventory."
+              : " Growth Campaign templates + active publishes with swipe copy and a 6-item delivery checklist.";
 
   return (
     <div className="space-y-6 pb-10 pt-4 sm:space-y-8 sm:pt-6">
@@ -134,7 +149,7 @@ export default function CreatorStudio({
         <div
           role="tablist"
           aria-label="Creator studio mode"
-          className="flex flex-wrap gap-1 border border-brand-ink/10 bg-surface p-1 sm:inline-flex sm:max-w-2xl"
+          className="flex flex-wrap gap-1 border border-brand-ink/10 bg-surface p-1 sm:inline-flex sm:max-w-4xl"
         >
           {TABS.map((item) => {
             const selected = tab === item.id;
@@ -218,6 +233,16 @@ export default function CreatorStudio({
             seedNotes={seedNotes}
             initialArticleType={articleType}
           />
+        </div>
+      ) : null}
+
+      {tab === "social" ? (
+        <div
+          id="studio-panel-social"
+          role="tabpanel"
+          aria-labelledby="studio-tab-social"
+        >
+          <SocialKitPanel />
         </div>
       ) : null}
 

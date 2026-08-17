@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { StoreProduct } from "@/lib/store/products";
+import { productPath } from "@/lib/store/product-slug";
 
 type FeaturedGearSliderProps = {
   products: StoreProduct[];
@@ -19,7 +20,7 @@ export default function FeaturedGearSlider({ products }: FeaturedGearSliderProps
               Wear the work.
             </h2>
             <p className="mt-2 max-w-xl font-sans text-sm leading-relaxed text-brand-muted sm:text-base">
-              Finish the article. Gear up for the next session — Vitality Sweat
+              Finish the article. Gear up for the next session. Vitality Sweat
               merch built for training days.
             </p>
           </div>
@@ -35,7 +36,7 @@ export default function FeaturedGearSlider({ products }: FeaturedGearSliderProps
           {products.map((product) => (
             <Link
               key={product.id}
-              href="/store"
+              href={productPath(product)}
               className="w-[78%] max-w-xs shrink-0 snap-start border border-brand-ink/10 bg-surface p-3 transition-colors hover:border-brand-orange sm:w-72"
             >
               <div className="relative mb-3 aspect-[4/3] overflow-hidden bg-brand-ink/5">

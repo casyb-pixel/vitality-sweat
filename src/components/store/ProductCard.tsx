@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useCart } from "@/components/store/CartProvider";
 import type { StoreProduct } from "@/lib/store/products";
 import { resolveVariant } from "@/lib/store/cart";
+import { productPath } from "@/lib/store/product-slug";
 
 type ProductCardProps = {
   product: StoreProduct;
@@ -78,7 +80,14 @@ export default function ProductCard({ product }: ProductCardProps) {
       </div>
 
       <p className="eyebrow">{product.category}</p>
-      <h2 className="mt-2 font-display text-2xl text-brand-ink">{product.name}</h2>
+      <h2 className="mt-2 font-display text-2xl text-brand-ink">
+        <Link
+          href={productPath(product)}
+          className="hover:text-brand-orange"
+        >
+          {product.name}
+        </Link>
+      </h2>
       <p className="mt-2 flex-1 font-sans text-sm leading-relaxed text-brand-muted">
         {product.description}
       </p>

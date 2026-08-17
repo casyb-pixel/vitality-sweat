@@ -65,6 +65,7 @@ export const SITE_URL = resolveSiteUrl();
 export const DEFAULT_OG_IMAGE = "/images/hero-strength-stamina-collage.png";
 export const TWITTER_HANDLE = "@vitalitysweat";
 export const INSTAGRAM_HANDLE = "@vitalitysweat";
+export const TIKTOK_HANDLE = "@vitalitysweat";
 
 /** GA4 web stream Measurement ID — override with NEXT_PUBLIC_GA_MEASUREMENT_ID. */
 export const GA_MEASUREMENT_ID = (
@@ -83,6 +84,12 @@ export const SOCIAL_LINKS = [
     label: "Instagram",
     href: "https://www.instagram.com/vitalitysweat/",
     handle: INSTAGRAM_HANDLE,
+  },
+  {
+    id: "tiktok",
+    label: "TikTok",
+    href: "https://www.tiktok.com/@vitalitysweat",
+    handle: TIKTOK_HANDLE,
   },
   {
     id: "x",

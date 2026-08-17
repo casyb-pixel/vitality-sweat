@@ -4,6 +4,8 @@ import { TOOLS } from "@/lib/tools/catalog";
 import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
 import { COMPARE_PAGES } from "@/lib/marketing/compare";
 import { GEAR_REVIEWS } from "@/lib/gear/catalog";
+import { getStorefrontCatalog } from "@/lib/store/catalog";
+import { productPath } from "@/lib/store/product-slug";
 import { buildCanonical, SITE_URL } from "@/lib/seo/site";
 
 /**
@@ -11,6 +13,15 @@ import { buildCanonical, SITE_URL } from "@/lib/seo/site";
  * https://vitalitysweat.com for exact-brand discovery.
  * Transactional paths (cart/checkout/order) and /invite are intentionally omitted.
  */
+function toSitemapDate(value?: string | Date | null): Date {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
 function blogSitemapEntries(
   posts: {
     slug: string;
@@ -19,13 +30,27 @@ function blogSitemapEntries(
     featured?: boolean;
   }[],
 ): MetadataRoute.Sitemap {
-  return posts.map((post) => ({
-    url: buildCanonical(`/blog/${post.slug}`),
-    lastModified: new Date(post.dateModified || post.datePublished),
-    changeFrequency: "monthly" as const,
-    // Keep below homepage (1) and chronicles (0.9) so the brand home wins.
-    priority: post.featured ? 0.85 : 0.7,
-  }));
+  return posts
+    .filter((post) => typeof post.slug === "string" && post.slug.trim())
+    .map((post) => ({
+      url: buildCanonical(`/blog/${post.slug}`),
+      lastModified: toSitemapDate(post.dateModified || post.datePublished),
+      changeFrequency: "monthly" as const,
+      // Keep below homepage (1) and chronicles (0.9) so the brand home wins.
+      priority: post.featured ? 0.85 : 0.7,
+    }));
+}
+
+function safeMappedRoutes<T>(
+  items: T[],
+  mapFn: (item: T) => MetadataRoute.Sitemap[number],
+): MetadataRoute.Sitemap {
+  try {
+    return items.map(mapFn);
+  } catch (error) {
+    console.error("[sitemap] Catalog route mapping failed.", error);
+    return [];
+  }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -118,6 +143,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.65,
     },
     {
+      url: buildCanonical("/advertise"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.45,
+    },
+    {
       url: buildCanonical("/chronicles/rss.xml"),
       lastModified: now,
       changeFrequency: "daily",
@@ -149,6 +180,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  let storeProductRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const catalog = await getStorefrontCatalog();
+    if (catalog.source === "printful") {
+      storeProductRoutes = catalog.products.map((product) => ({
+        url: buildCanonical(productPath(product)),
+        lastModified: now,
+        changeFrequency: "weekly" as const,
+        priority: 0.55,
+      }));
+    }
+  } catch (error) {
+    console.error("[sitemap] Store catalog skipped.", error);
+  }
+
   let blogRoutes: MetadataRoute.Sitemap = [];
   try {
     const posts = await getAllBlogPostsAsync();
@@ -168,32 +214,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [
-    ...staticRoutes,
-    ...TOOLS.map((tool) => ({
-      url: buildCanonical(`/tools/${tool.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.75,
-    })),
-    ...NAMED_PROGRAMS.map((program) => ({
-      url: buildCanonical(`/programs/${program.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.7,
-    })),
-    ...COMPARE_PAGES.map((page) => ({
-      url: buildCanonical(`/compare/${page.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.55,
-    })),
-    ...GEAR_REVIEWS.map((review) => ({
-      url: buildCanonical(`/gear/${review.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.5,
-    })),
-    ...blogRoutes,
-  ];
+  try {
+    return [
+      ...staticRoutes,
+      ...safeMappedRoutes(TOOLS, (tool) => ({
+        url: buildCanonical(`/tools/${tool.slug}`),
+        lastModified: now,
+        changeFrequency: "monthly" as const,
+        priority: 0.75,
+      })),
+      ...safeMappedRoutes(NAMED_PROGRAMS, (program) => ({
+        url: buildCanonical(`/programs/${program.slug}`),
+        lastModified: now,
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
+      })),
+      ...safeMappedRoutes(COMPARE_PAGES, (page) => ({
+        url: buildCanonical(`/compare/${page.slug}`),
+        lastModified: now,
+        changeFrequency: "monthly" as const,
+        priority: 0.55,
+      })),
+      ...safeMappedRoutes(GEAR_REVIEWS, (review) => ({
+        url: buildCanonical(`/gear/${review.slug}`),
+        lastModified: now,
+        changeFrequency: "monthly" as const,
+        priority: 0.5,
+      })),
+      ...storeProductRoutes,
+      ...blogRoutes,
+    ];
+  } catch (error) {
+    console.error("[sitemap] Assembly failed; returning static routes only.", error);
+    return staticRoutes;
+  }
 }
