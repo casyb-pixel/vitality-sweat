@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Source_Sans_3, Vesper_Libre } from "next/font/google";
 import AuthGate from "@/components/auth/AuthGate";
 import ReferralCapture from "@/components/auth/ReferralCapture";
@@ -92,7 +92,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/branding/favicon-32.png",
-    apple: "/branding/app/android-icon-192.png",
+    apple: {
+      url: "/branding/app/apple-touch-icon.png",
+      sizes: "180x180",
+    },
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -101,6 +104,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   category: "fitness",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ff6600",
 };
 
 export default function RootLayout({

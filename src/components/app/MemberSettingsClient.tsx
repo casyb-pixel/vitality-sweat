@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAddToHomeScreen } from "@/components/app/AddToHomeScreen";
 import type { FitnessProfile, UnitSystem } from "@/lib/fitness/types";
 
 type SettingsClientProps = {
@@ -33,10 +34,10 @@ export default function MemberSettingsClient({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [installHint, setInstallHint] = useState(false);
   const [username, setUsername] = useState(initialUsername ?? "");
   const [followUser, setFollowUser] = useState("");
   const [enginePlus, setEnginePlus] = useState(initialPlus);
+  const a2hs = useAddToHomeScreen();
 
   async function save() {
     setPending(true);
@@ -151,21 +152,19 @@ export default function MemberSettingsClient({
         Workout start coach (challenges and comments when a session begins)
       </label>
 
-      <button
-        type="button"
-        onClick={() => {
-          setInstallHint(true);
-        }}
-        className="block font-sans text-xs font-semibold text-brand-orange"
-      >
-        How to add Vitality Engine to my Home Screen
-      </button>
-      {installHint ? (
+      {a2hs.isStandalone ? (
         <p className="font-sans text-sm text-brand-muted">
-          iPhone: Share, then Add to Home Screen. Android: menu, then Install
-          app. Rest alerts work best from that icon.
+          Vitality Engine is already on this Home Screen.
         </p>
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          onClick={() => void a2hs.installOrExplain()}
+          className="block font-sans text-xs font-semibold text-brand-orange"
+        >
+          How to add Vitality Engine to my Home Screen
+        </button>
+      )}
 
       <label className="block font-sans text-sm font-semibold text-brand-ink">
         Username (follow friends)
