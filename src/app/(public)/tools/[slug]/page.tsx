@@ -92,6 +92,21 @@ export default async function ToolPage({
               </div>
             ))}
           </section>
+
+          {tool.engineCta ? (
+            <p className="mt-10 max-w-2xl font-sans text-sm font-semibold text-brand-ink">
+              {tool.engineCta}
+            </p>
+          ) : null}
+
+          <p className="mt-4">
+            <Link
+              href="/app"
+              className="inline-flex min-h-11 items-center bg-brand-orange px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white"
+            >
+              Open the free Vitality Engine
+            </Link>
+          </p>
         </article>
       </main>
       <JsonLd

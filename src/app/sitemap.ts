@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllBlogPosts, getAllBlogPostsAsync } from "@/lib/blog/posts";
 import { TOOLS } from "@/lib/tools/catalog";
 import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
+import { encyclopediaSlugs } from "@/lib/fitness/encyclopedia";
 import { COMPARE_PAGES } from "@/lib/marketing/compare";
 import { GEAR_REVIEWS } from "@/lib/gear/catalog";
 import { getStorefrontCatalog } from "@/lib/store/catalog";
@@ -222,6 +223,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
         changeFrequency: "monthly" as const,
         priority: 0.75,
+      })),
+      ...safeMappedRoutes(encyclopediaSlugs(), (slug) => ({
+        url: buildCanonical(`/exercises/${slug}`),
+        lastModified: now,
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
       })),
       ...safeMappedRoutes(NAMED_PROGRAMS, (program) => ({
         url: buildCanonical(`/programs/${program.slug}`),

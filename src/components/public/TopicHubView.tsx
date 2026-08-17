@@ -3,6 +3,7 @@ import PublicPage from "@/components/public/PublicPage";
 import { getAllBlogPostsAsync } from "@/lib/blog/posts";
 import { getHub, type HubSlug } from "@/lib/content/hubs";
 import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
+import { featuredEncyclopediaPages } from "@/lib/fitness/encyclopedia";
 import { TOOLS } from "@/lib/tools/catalog";
 
 function hubKeywords(cluster: string): string[] {
@@ -42,6 +43,25 @@ export default async function TopicHubView({ slug }: { slug: HubSlug }) {
                   className="border border-brand-ink/15 px-3 py-2 font-sans text-sm font-semibold"
                 >
                   {tool.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {found.slug === "begin" ? (
+        <section className="mb-10">
+          <h2 className="font-display text-2xl text-brand-ink">
+            First lifts
+          </h2>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {featuredEncyclopediaPages().map((page) => (
+              <li key={page.slug}>
+                <Link
+                  href={`/exercises/${page.slug}`}
+                  className="border border-brand-ink/15 px-3 py-2 font-sans text-sm font-semibold"
+                >
+                  {page.name}
                 </Link>
               </li>
             ))}
