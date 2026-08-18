@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toYouTubeEmbedSrc } from "@/lib/blog/video-embeds";
 import type { Exercise } from "@/lib/fitness/types";
 
 export default function ExerciseHowToSheet({
@@ -14,7 +15,9 @@ export default function ExerciseHowToSheet({
   const [open, setOpen] = useState(false);
   if (!exercise) return null;
 
-  const youtubeId = extractYoutubeId(exercise.youtube_url);
+  const embedSrc = exercise.youtube_url
+    ? toYouTubeEmbedSrc(exercise.youtube_url, { autoplay: false })
+    : null;
   const cues = exercise.cues?.filter(Boolean) ?? [];
 
   return (
@@ -49,11 +52,11 @@ export default function ExerciseHowToSheet({
               ))}
             </ul>
           ) : null}
-          {youtubeId ? (
+          {embedSrc ? (
             <div className="mt-3 aspect-video w-full overflow-hidden bg-black">
               <iframe
                 title={`${exercise.name} how-to`}
-                src={`https://www.youtube.com/embed/${youtubeId}`}
+                src={embedSrc}
                 className="h-full w-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -64,24 +67,4 @@ export default function ExerciseHowToSheet({
       ) : null}
     </div>
   );
-}
-
-function extractYoutubeId(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      return u.pathname.replace("/", "") || null;
-    }
-    const v = u.searchParams.get("v");
-    if (v) return v;
-    const parts = u.pathname.split("/").filter(Boolean);
-    const shorts = parts.indexOf("shorts");
-    if (shorts >= 0) return parts[shorts + 1] ?? null;
-    const embed = parts.indexOf("embed");
-    if (embed >= 0) return parts[embed + 1] ?? null;
-  } catch {
-    return null;
-  }
-  return null;
 }

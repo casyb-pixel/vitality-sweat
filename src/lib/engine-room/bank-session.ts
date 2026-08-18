@@ -67,7 +67,7 @@ export async function bankSessionToEngineRoom(input: {
 
   const { data: session } = await input.supabase
     .from("workout_sessions")
-    .select("id, status, body_weight_lb")
+    .select("id, status, body_weight_lb, gym_name")
     .eq("id", input.sessionId)
     .eq("user_id", input.userId)
     .maybeSingle();
@@ -92,6 +92,10 @@ export async function bankSessionToEngineRoom(input: {
     return { ok: false, error: "Log at least one set before posting this session." };
   }
 
+  const gymName =
+    typeof session.gym_name === "string" && session.gym_name.trim()
+      ? session.gym_name.trim()
+      : null;
   const sessionBw =
     session.body_weight_lb != null ? Number(session.body_weight_lb) : null;
   const logBw = await latestBodyWeightLb(input.supabase, input.userId);
@@ -145,7 +149,7 @@ export async function bankSessionToEngineRoom(input: {
     postedOn,
   });
 
-  const body = stripEmDashes(sessionPostBody(ranks));
+  const body = stripEmDashes(sessionPostBody(ranks, gymName));
   const { data: post, error: postError } = await input.supabase
     .from("engine_room_posts")
     .insert({
@@ -159,6 +163,7 @@ export async function bankSessionToEngineRoom(input: {
         type: "session",
         session_id: input.sessionId,
         bodyWeightLb,
+        gymName,
         streakCount: streak.currentCount,
         ranks,
       },

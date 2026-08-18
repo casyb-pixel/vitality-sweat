@@ -27,6 +27,7 @@ type RoomPost = {
     title?: string;
     detail?: string;
     streakCount?: number;
+    gymName?: string;
     ranks?: PersonalLiftRank[];
   } | null;
   created_at: string;
@@ -585,6 +586,11 @@ export default function EngineRoomClient() {
                   {post.kind === "session" && post.milestone_payload.streakCount
                     ? ` · ${post.milestone_payload.streakCount}-day streak`
                     : ""}
+                </p>
+              ) : null}
+              {post.kind === "session" && post.milestone_payload?.gymName ? (
+                <p className="mt-1 font-sans text-sm text-brand-muted">
+                  Checked in at {post.milestone_payload.gymName}
                 </p>
               ) : null}
               {post.kind === "session" && post.milestone_payload?.ranks?.length ? (

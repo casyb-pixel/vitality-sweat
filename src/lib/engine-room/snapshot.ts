@@ -130,10 +130,18 @@ export async function loadGameSnapshot(
   };
 }
 
-export function sessionPostBody(ranks: PersonalLiftRank[]): string {
+export function sessionPostBody(
+  ranks: PersonalLiftRank[],
+  gymName?: string | null,
+): string {
+  const gymLine = gymName?.trim() ? `Checked in at ${gymName.trim()}.` : "";
   if (ranks.length === 0) {
-    return "Session posted. Log bodyweight to rank loaded lifts.";
+    return [gymLine, "Session posted. Log bodyweight to rank loaded lifts."]
+      .filter(Boolean)
+      .join(" ");
   }
   const lines = ranks.map((rank) => formatRankLine(rank));
-  return `Locked in ranks from today's session.\n${lines.join("\n")}`;
+  return [gymLine, "Locked in ranks from today's session.", ...lines]
+    .filter(Boolean)
+    .join("\n");
 }

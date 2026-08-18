@@ -10,6 +10,7 @@ import GrowthCampaignPanel from "@/components/creator/GrowthCampaignPanel";
 import MarketingProjectsPanel from "@/components/creator/MarketingProjectsPanel";
 import SponsorsPanel from "@/components/creator/SponsorsPanel";
 import SocialKitPanel from "@/components/creator/SocialKitPanel";
+import LiveClipsPanel from "@/components/creator/LiveClipsPanel";
 import VideoWizard from "@/components/creator/VideoWizard";
 import type {
   BlogArticleType,
@@ -22,6 +23,7 @@ type StudioTab =
   | "projects"
   | "blog"
   | "video"
+  | "live"
   | "social"
   | "audience"
   | "sponsors";
@@ -37,6 +39,7 @@ const TABS: { id: StudioTab; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "blog", label: "Blog Wizard" },
   { id: "video", label: "Video Studio" },
+  { id: "live", label: "Live clips" },
   { id: "social", label: "Social kit" },
   { id: "sponsors", label: "Sponsors" },
   { id: "audience", label: "Audience" },
@@ -109,7 +112,9 @@ export default function CreatorStudio({
   const headline =
     tab === "video"
       ? "Film the Chronicle"
-      : tab === "blog"
+      : tab === "live"
+        ? "Cut Hunter gym lives into clips"
+        : tab === "blog"
         ? "Log today, publish tonight"
         : tab === "social"
           ? "Paste bios. Post three times."
@@ -122,7 +127,9 @@ export default function CreatorStudio({
   const blurb =
     tab === "video"
       ? " Pick a published post, grab a gym clip + voice-over, export a Shorts/TikTok/Reels pack."
-      : tab === "blog"
+      : tab === "live"
+        ? " Paste a YouTube live or VOD, mark start and end, publish short training clips to the Library."
+        : tab === "blog"
         ? " Four quick steps from gym notes to a live Chronicle. No paragraphs required."
         : tab === "social"
           ? " Approved bios, UTM invite links, logo files, and the 3-post weekly cadence. Copy, post in the native app, then mark the project done."
@@ -221,6 +228,16 @@ export default function CreatorStudio({
           onSeedPostConsumed={() => setSeedVideoPostId(null)}
         />
       </div>
+
+      {tab === "live" ? (
+        <div
+          id="studio-panel-live"
+          role="tabpanel"
+          aria-labelledby="studio-tab-live"
+        >
+          <LiveClipsPanel />
+        </div>
+      ) : null}
 
       {tab === "blog" ? (
         <div

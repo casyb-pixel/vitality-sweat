@@ -21,6 +21,8 @@ import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import WorkoutSafetyNote from "@/components/legal/WorkoutSafetyNote";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import PostSessionRanks from "@/components/app/PostSessionRanks";
+import GymCheckInPicker from "@/components/app/GymCheckInPicker";
+import { LAST_GYM_STORAGE_KEY } from "@/lib/gyms/names";
 import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
 import TrainTogetherSheet from "@/components/app/TrainTogetherSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
@@ -167,6 +169,8 @@ export default function WorkoutRunner({
   const [pending, startTransition] = useTransition();
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
+  const [gymName, setGymName] = useState(initialSession?.gym_name ?? "");
+  const [gymOptionId, setGymOptionId] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [restTrigger, setRestTrigger] = useState(0);
   const [milestone, setMilestone] = useState<WorkoutMilestone | null>(null);
@@ -290,7 +294,15 @@ export default function WorkoutRunner({
               ok: false as const,
               error: "Paired session was not started.",
             }
-        : await startWorkoutSession(day.id);
+        : await startWorkoutSession(day.id, {
+            gymName:
+              gymName.trim() ||
+              (typeof window !== "undefined"
+                ? window.localStorage.getItem(LAST_GYM_STORAGE_KEY)
+                : null) ||
+              null,
+            gymOptionId,
+          });
       if (cancelled) return;
       if (!started.ok) {
         setError(started.error);
@@ -811,6 +823,15 @@ export default function WorkoutRunner({
           primaryMuscle={current.exercise?.primary_muscle ?? null}
         />
       ) : null}
+
+      <GymCheckInPicker
+        sessionId={session?.id ?? null}
+        gymName={gymName}
+        onChange={({ name, optionId }) => {
+          setGymName(name);
+          setGymOptionId(optionId);
+        }}
+      />
 
       <MilestoneCelebrate
         milestone={milestone}

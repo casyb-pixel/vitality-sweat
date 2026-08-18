@@ -217,6 +217,9 @@ export type WorkoutSession = {
   paired_invite_id?: string | null;
   body_weight_lb?: number | null;
   coach_brief?: Record<string, unknown> | null;
+  gym_name?: string | null;
+  gym_location_id?: string | null;
+  gym_directory_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -451,6 +454,11 @@ export type Video = {
   published_at: string | null;
   is_active: boolean;
   created_by: string | null;
+  start_sec?: number | null;
+  end_sec?: number | null;
+  source_url?: string | null;
+  gym_name?: string | null;
+  exercise_id?: string | null;
   created_at: string;
   updated_at: string;
 };

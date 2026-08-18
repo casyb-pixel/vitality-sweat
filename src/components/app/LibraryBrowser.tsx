@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import SafeCoverImage from "@/components/blog/SafeCoverImage";
 import { toYouTubeEmbedSrc } from "@/lib/blog/video-embeds";
+import { formatSecondsToClock } from "@/lib/video/youtube-clips";
 import type { Video } from "@/lib/fitness/types";
 import {
   filterLibraryPosts,
@@ -46,7 +47,8 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
   const qLower = debounced.toLowerCase();
   const filteredVideos = qLower
     ? videos.filter((v) => {
-        const hay = `${v.title} ${v.description} ${v.category}`.toLowerCase();
+        const hay =
+          `${v.title} ${v.description} ${v.category} ${v.gym_name ?? ""}`.toLowerCase();
         return qLower
           .split(/\s+/)
           .filter(Boolean)
@@ -63,7 +65,8 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
 
     const matched = filterLibraryPosts(posts, q);
     const videoHits = videos.filter((v) => {
-      const hay = `${v.title} ${v.description} ${v.category}`.toLowerCase();
+      const hay =
+        `${v.title} ${v.description} ${v.category} ${v.gym_name ?? ""}`.toLowerCase();
       return key
         .split(/\s+/)
         .filter(Boolean)
@@ -109,7 +112,7 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
         <p className="mt-2 font-sans text-sm text-brand-muted">
           {searching
             ? `${filteredPosts.length} post${filteredPosts.length === 1 ? "" : "s"} · ${filteredVideos.length} video${filteredVideos.length === 1 ? "" : "s"}`
-            : "Built for phone browsing mid-walk — big taps, short scrolls."}
+            : "Built for phone browsing mid-walk: big taps, short scrolls."}
         </p>
       </div>
 
@@ -134,7 +137,7 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
 
       {empty ? (
         <p className="border border-brand-ink/10 bg-surface-elevated px-4 py-6 font-sans text-base leading-relaxed text-brand-muted">
-          No matches for “{debounced}”. We logged the search — Hunter may cover
+          No matches for “{debounced}”. We logged the search. Hunter may cover
           this next. Browse everything below or try another topic.
         </p>
       ) : null}
@@ -205,7 +208,7 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
           <p className="font-sans text-sm text-brand-muted">
             {searching
               ? "No video matches for this search."
-              : "No curated videos yet — the YouTube channel above is the live feed."}
+              : "No curated videos yet. The YouTube channel above is the live feed."}
           </p>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2">
@@ -222,7 +225,17 @@ export default function LibraryBrowser({ posts, videos }: LibraryBrowserProps) {
 function LibraryVideoCard({ video }: { video: Video }) {
   const embedSrc =
     video.provider === "youtube"
-      ? toYouTubeEmbedSrc(video.video_url, { autoplay: false })
+      ? toYouTubeEmbedSrc(video.video_url, {
+          autoplay: false,
+          startSec: video.start_sec,
+          endSec: video.end_sec,
+        })
+      : null;
+  const clipRange =
+    video.start_sec != null || video.end_sec != null
+      ? `${formatSecondsToClock(video.start_sec ?? 0)}${
+          video.end_sec != null ? ` to ${formatSecondsToClock(video.end_sec)}` : " to end"
+        }`
       : null;
 
   return (
@@ -258,6 +271,14 @@ function LibraryVideoCard({ video }: { video: Video }) {
         <h3 className="mt-1 font-display text-xl text-brand-ink">
           {video.title}
         </h3>
+        {video.gym_name ? (
+          <p className="mt-1 font-sans text-sm text-brand-muted">
+            From {video.gym_name}
+            {clipRange ? ` · ${clipRange}` : ""}
+          </p>
+        ) : clipRange ? (
+          <p className="mt-1 font-sans text-sm text-brand-muted">{clipRange}</p>
+        ) : null}
         {video.description ? (
           <p className="mt-2 flex-1 font-sans text-sm leading-relaxed text-brand-muted">
             {video.description}
