@@ -194,6 +194,7 @@ export function buildExercisePrescription(input: {
       : planReps != null
         ? `No history yet. Hit about ${planReps} reps on the ${scheme} scheme and log how it felt.`
         : `No history yet. Follow the ${scheme} scheme and log how it felt.`,
+    suggestion: null,
   };
 }
 
