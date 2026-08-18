@@ -260,7 +260,7 @@ export function buildOrganizationJsonLd() {
   };
 }
 
-/** Sitewide WebSite node. No SearchAction: there is no public on-site search URL. */
+/** Sitewide WebSite node, including on-site search for sitelinks. */
 export function buildWebSiteJsonLd() {
   return {
     "@context": "https://schema.org",
@@ -274,5 +274,13 @@ export function buildWebSiteJsonLd() {
       "@id": `${SITE_URL}/#organization`,
     },
     inLanguage: "en-US",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
   };
 }

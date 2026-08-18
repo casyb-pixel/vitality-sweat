@@ -17,7 +17,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "The Sweatlife Chronicles",
   description:
-    "Stories, training notes, and performance nutrition from Hunter Broussard and the Vitality Sweat community.",
+    "The Vitality Sweat fitness blog: training notes, performance nutrition, and coaching stories from Hunter Broussard in Southwest Louisiana.",
   alternates: {
     canonical: buildCanonical("/chronicles"),
   },
