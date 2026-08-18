@@ -28,6 +28,15 @@ export default function UpdatePasswordPage() {
         );
       }
     });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setReady(true);
+        setError(null);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   function onSubmit(event: React.FormEvent) {
@@ -82,16 +91,16 @@ export default function UpdatePasswordPage() {
               Your password is set. You can sign in with it any time.
             </p>
             <Link
-              href="/app/creator"
+              href="/app"
               className="inline-flex min-h-12 w-full items-center justify-center bg-brand-ink px-4 py-3 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange"
             >
-              Open Creator Studio
+              Open the app
             </Link>
           </div>
         ) : (
           <form className="mt-6 space-y-4" onSubmit={onSubmit}>
             <p className="font-sans text-sm leading-relaxed text-brand-muted">
-              Replace the temporary password with one only you know.
+              Choose a password only you know. Use at least 8 characters.
             </p>
             <div>
               <label
@@ -143,6 +152,14 @@ export default function UpdatePasswordPage() {
             >
               {isPending ? "Saving…" : "Save new password"}
             </button>
+            {!ready ? (
+              <Link
+                href="/auth/forgot-password"
+                className="block text-center font-sans text-sm font-bold uppercase tracking-[0.1em] text-brand-orange"
+              >
+                Request a new reset link
+              </Link>
+            ) : null}
           </form>
         )}
       </div>

@@ -45,6 +45,27 @@ type LoginModalProps = {
 const fieldClass =
   "w-full border border-brand-ink/15 bg-surface px-3 py-3 font-sans text-base text-brand-ink placeholder:text-brand-muted/70 focus:border-brand-orange focus:outline-none";
 
+const EXISTING_ACCOUNT_MESSAGE =
+  "This account already exists, sign in instead.";
+
+/**
+ * GoTrue returns a fake success (no session, empty identities) when signup
+ * uses an already-confirmed email, so the client does not leak that the
+ * address is taken. Treat that as "use Sign in" instead of "check email".
+ */
+function isExistingAccountSignup(data: {
+  user: { identities?: unknown[] | null } | null;
+  session: unknown;
+}): boolean {
+  if (data.session) return false;
+  const identities = data.user?.identities;
+  return Array.isArray(identities) && identities.length === 0;
+}
+
+function isExistingAccountAuthError(message: string): boolean {
+  return /already (been )?registered|already exists/i.test(message);
+}
+
 export default function LoginModal({
   open,
   nextPath,
@@ -227,7 +248,18 @@ export default function LoginModal({
             },
           });
           if (signUpError) {
+            if (isExistingAccountAuthError(signUpError.message)) {
+              setIntent("signin");
+              setError(EXISTING_ACCOUNT_MESSAGE);
+              return;
+            }
             setError(signUpError.message);
+            return;
+          }
+
+          if (isExistingAccountSignup(data)) {
+            setIntent("signin");
+            setError(EXISTING_ACCOUNT_MESSAGE);
             return;
           }
 
@@ -311,35 +343,6 @@ export default function LoginModal({
         setView("magic-sent");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Magic link failed.");
-      }
-    });
-  }
-
-  function sendPasswordReset() {
-    setError(null);
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setError("Enter your email first, then request a reset link.");
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const supabase = createClient();
-        const redirectTo = buildAuthCallbackUrl("/auth/update-password");
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-          trimmed,
-          { redirectTo },
-        );
-        if (resetError) {
-          setError(resetError.message);
-          return;
-        }
-        setView("reset-sent");
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Could not send reset email.",
-        );
       }
     });
   }
@@ -582,14 +585,17 @@ export default function LoginModal({
                         Password
                       </label>
                       {!isSignup ? (
-                        <button
-                          type="button"
-                          onClick={sendPasswordReset}
-                          disabled={isPending}
-                          className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange hover:text-brand-orange-deep disabled:opacity-60"
+                        <Link
+                          href={
+                            email.trim()
+                              ? `/auth/forgot-password?email=${encodeURIComponent(email.trim())}`
+                              : "/auth/forgot-password"
+                          }
+                          onClick={onClose}
+                          className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange hover:text-brand-orange-deep"
                         >
                           Forgot password?
-                        </button>
+                        </Link>
                       ) : null}
                     </div>
                     <input

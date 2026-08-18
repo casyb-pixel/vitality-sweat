@@ -19,8 +19,9 @@ import {
 type AuthIntent = "signin" | "signup";
 
 /**
- * Watches `?auth=required|forbidden|signup`, referral `ref`, and campaign params.
+ * Watches `?auth=required|forbidden|signup|reset`, referral `ref`, and campaign params.
  * Also completes growth tracking when `joined=1` is present after signup.
+ * `?auth=reset` is a shareable forgot-password deep link.
  */
 function AuthQueryListener() {
   const searchParams = useSearchParams();
@@ -53,6 +54,12 @@ function AuthQueryListener() {
   }, [refCode, searchParams]);
 
   useEffect(() => {
+    if (authFlag === "reset" || authFlag === "forgot") {
+      const email = searchParams.get("email")?.trim();
+      const qs = email ? `?email=${encodeURIComponent(email)}` : "";
+      router.replace(`/auth/forgot-password${qs}`);
+      return;
+    }
     if (
       authFlag === "required" ||
       authFlag === "forbidden" ||
@@ -60,8 +67,10 @@ function AuthQueryListener() {
       Boolean(refCode)
     ) {
       setOpen(true);
+      return;
     }
-  }, [authFlag, refCode]);
+    setOpen(false);
+  }, [authFlag, refCode, router, searchParams]);
 
   useEffect(() => {
     if (searchParams.get("joined") !== "1") return;
