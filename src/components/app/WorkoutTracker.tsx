@@ -23,6 +23,7 @@ import {
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
 import PostSessionRanks from "@/components/app/PostSessionRanks";
+import GymCheckInPicker from "@/components/app/GymCheckInPicker";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
 import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
@@ -61,6 +62,8 @@ export default function WorkoutTracker({
   );
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
+  const [gymName, setGymName] = useState(initialSession?.gym_name ?? "");
+  const [gymOptionId, setGymOptionId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<ExerciseEquipment | "">("");
   const [category, setCategory] = useState<ExerciseCategory | "">("");
   const [search, setSearch] = useState("");
@@ -187,12 +190,18 @@ export default function WorkoutTracker({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await startWorkoutSession(null);
+      const result = await startWorkoutSession(null, {
+        gymName: gymName.trim() || null,
+        gymOptionId,
+      });
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setSession(result.data.session);
+      if (result.data.session.gym_name) {
+        setGymName(result.data.session.gym_name);
+      }
       setLoggedSets([]);
       setSetNumber(1);
       setRestTrigger(0);
@@ -414,6 +423,15 @@ export default function WorkoutTracker({
           </>
         )}
       </div>
+
+      <GymCheckInPicker
+        sessionId={session?.id ?? null}
+        gymName={gymName}
+        onChange={({ name, optionId }) => {
+          setGymName(name);
+          setGymOptionId(optionId);
+        }}
+      />
 
       {session ? (
         <WorkoutRestCoach

@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/utils/supabase/admin";
+import { parseClockToSeconds, parseYouTubeVideoId, youtubeEmbedSrc } from "@/lib/video/youtube-clips";
 
 export type BlogVideoEmbed = {
   id: string;
@@ -137,28 +138,30 @@ function classifyExternalUrl(raw: string | null | undefined): {
   return { provider: "unknown", url };
 }
 
-/** Build a YouTube embed src from a watch / short / youtu.be URL. */
+/** Build a YouTube embed src from a watch / short / live / youtu.be URL. */
 export function toYouTubeEmbedSrc(
   url: string,
-  options?: { autoplay?: boolean },
+  options?: { autoplay?: boolean; startSec?: number | null; endSec?: number | null },
 ): string | null {
-  const autoplay = options?.autoplay !== false;
-  const suffix = autoplay ? "autoplay=1&rel=0" : "rel=0";
+  const id = parseYouTubeVideoId(url);
+  if (!id) return null;
+  let start = options?.startSec ?? null;
+  let end = options?.endSec ?? null;
   try {
     const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      const id = u.pathname.replace(/^\//, "").split("/")[0];
-      return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
+    const t = u.searchParams.get("t") || u.searchParams.get("start");
+    if (start == null && t) {
+      start = parseClockToSeconds(String(t).replace(/s$/i, ""));
     }
-    if (u.pathname.startsWith("/shorts/")) {
-      const id = u.pathname.split("/")[2];
-      return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
-    }
-    const id = u.searchParams.get("v");
-    return id ? `https://www.youtube.com/embed/${id}?${suffix}` : null;
   } catch {
-    return null;
+    // keep parsed id
   }
+  return youtubeEmbedSrc({
+    videoId: id,
+    startSec: start,
+    endSec: end,
+    autoplay: options?.autoplay !== false,
+  });
 }
 
 export function toVimeoEmbedSrc(url: string): string | null {

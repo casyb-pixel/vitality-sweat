@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { latestBodyWeightLb } from "@/lib/fitness/body-logs";
+import { resolveGymCheckIn } from "@/lib/gyms/resolve";
 import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
@@ -23,11 +24,19 @@ export async function POST(request: Request) {
     }
 
     let programDayId: string | null = null;
+    let gymName: string | null = null;
+    let gymOptionId: string | null = null;
     try {
-      const body = (await request.json()) as { program_day_id?: unknown };
+      const body = (await request.json()) as {
+        program_day_id?: unknown;
+        gym_name?: unknown;
+        gym_option_id?: unknown;
+      };
       if (typeof body.program_day_id === "string" && body.program_day_id.trim()) {
         programDayId = body.program_day_id.trim();
       }
+      if (typeof body.gym_name === "string") gymName = body.gym_name;
+      if (typeof body.gym_option_id === "string") gymOptionId = body.gym_option_id;
     } catch {
       // Empty body is fine for freeform sessions.
     }
@@ -47,6 +56,14 @@ export async function POST(request: Request) {
       }
     }
 
+    const gym =
+      gymName || gymOptionId
+        ? await resolveGymCheckIn(supabase, user.id, {
+            gymName,
+            gymOptionId,
+          })
+        : null;
+
     const { data: existing } = await supabase
       .from("workout_sessions")
       .select("*")
@@ -57,10 +74,19 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (existing) {
+      const resumePatch: Record<string, unknown> = {};
       if (programDayId && existing.program_day_id !== programDayId) {
+        resumePatch.program_day_id = programDayId;
+      }
+      if (gym && gym.gym_name) {
+        resumePatch.gym_name = gym.gym_name;
+        resumePatch.gym_location_id = gym.gym_location_id;
+        resumePatch.gym_directory_id = gym.gym_directory_id;
+      }
+      if (Object.keys(resumePatch).length > 0) {
         const { data: patched, error: patchError } = await supabase
           .from("workout_sessions")
-          .update({ program_day_id: programDayId })
+          .update(resumePatch)
           .eq("id", existing.id)
           .eq("user_id", user.id)
           .select("*")
@@ -68,7 +94,7 @@ export async function POST(request: Request) {
 
         if (patchError || !patched) {
           return NextResponse.json(
-            { ok: false, error: patchError?.message ?? "Could not attach day." },
+            { ok: false, error: patchError?.message ?? "Could not update session." },
             { status: 500 },
           );
         }
@@ -91,6 +117,9 @@ export async function POST(request: Request) {
         status: "active",
         program_day_id: programDayId,
         body_weight_lb: bodyWeightLb,
+        gym_name: gym?.gym_name ?? null,
+        gym_location_id: gym?.gym_location_id ?? null,
+        gym_directory_id: gym?.gym_directory_id ?? null,
       })
       .select("*")
       .single();
@@ -225,7 +254,13 @@ export async function PATCH(request: Request) {
       );
     }
 
-    let body: { session_id?: string; status?: string; notes?: string };
+    let body: {
+      session_id?: string;
+      status?: string;
+      notes?: string;
+      gym_name?: string | null;
+      gym_option_id?: string | null;
+    };
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -250,6 +285,15 @@ export async function PATCH(request: Request) {
     }
     if (typeof body.notes === "string") {
       patch.notes = body.notes;
+    }
+    if (body.gym_name !== undefined || body.gym_option_id !== undefined) {
+      const gym = await resolveGymCheckIn(supabase, user.id, {
+        gymName: body.gym_name,
+        gymOptionId: body.gym_option_id,
+      });
+      patch.gym_name = gym.gym_name;
+      patch.gym_location_id = gym.gym_location_id;
+      patch.gym_directory_id = gym.gym_directory_id;
     }
     if (Object.keys(patch).length === 0) {
       return NextResponse.json(

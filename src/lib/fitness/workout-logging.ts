@@ -30,15 +30,18 @@ async function readJson<T>(res: Response): Promise<{
 
 export async function startWorkoutSession(
   programDayId?: string | null,
+  gym?: { gymName?: string | null; gymOptionId?: string | null },
 ): Promise<
   ApiResult<{ session: WorkoutSession; resumed: boolean }>
 > {
   const res = await fetch("/api/app/workout/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      programDayId ? { program_day_id: programDayId } : {},
-    ),
+    body: JSON.stringify({
+      ...(programDayId ? { program_day_id: programDayId } : {}),
+      ...(gym?.gymName ? { gym_name: gym.gymName } : {}),
+      ...(gym?.gymOptionId ? { gym_option_id: gym.gymOptionId } : {}),
+    }),
   });
   const { json, errorPage, status } = await readJson<{
     ok?: boolean;
