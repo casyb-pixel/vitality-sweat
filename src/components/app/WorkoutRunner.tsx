@@ -28,6 +28,7 @@ import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import { nextSupersetIndex } from "@/lib/fitness/supersets";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
 import type { CoachBrief } from "@/lib/fitness/session-coach";
+import { isRepsBasedExercise } from "@/lib/fitness/exercises";
 import {
   DIFFICULTY_LABELS,
   WORKOUT_SET_STYLE_COACHING,
@@ -50,7 +51,7 @@ type WorkoutRunnerProps = {
   paired?: boolean;
   onBaselinesSaved?: (
     programExerciseId: string,
-    baseline: { baseline_weight_lb: number; baseline_reps: number },
+    baseline: { baseline_weight_lb: number | null; baseline_reps: number },
   ) => void;
 };
 
@@ -94,6 +95,33 @@ function targetReps(ex: NestedProgramExercise): number {
     return Math.round((ex.rep_min + ex.rep_max) / 2);
   }
   return ex.rep_min ?? ex.rep_max ?? 10;
+}
+
+function prescriptionForExercise(
+  ex: NestedProgramExercise,
+  recentSets: {
+    weight_lb: number | null;
+    reps: number | null;
+    difficulty: number;
+    set_number: number;
+  }[],
+  lastSessionAt: string | null,
+): ExercisePrescription {
+  const repsBased = isRepsBasedExercise(ex.exercise);
+  return buildExercisePrescription({
+    exerciseId: ex.exercise_id,
+    exerciseName: ex.exercise?.name ?? "Exercise",
+    setStyle: ex.set_style,
+    baselineWeightLb: repsBased ? null : ex.baseline_weight_lb,
+    baselineReps: ex.baseline_reps,
+    repMin: ex.rep_min,
+    repMax: ex.rep_max,
+    recentSets,
+    lastPrescription: (ex.last_prescription as LastPrescription | null) ?? null,
+    lastSessionAt,
+    repsBased,
+    plannedSets: ex.sets,
+  });
 }
 
 export default function WorkoutRunner({
@@ -153,6 +181,7 @@ export default function WorkoutRunner({
   }, [exercises]);
 
   const current = localExercises[exerciseIndex] ?? null;
+  const currentRepsBased = isRepsBasedExercise(current?.exercise);
   const nextExercise = localExercises[exerciseIndex + 1] ?? null;
   const currentSets = useMemo(() => {
     if (!current) return [];
@@ -201,7 +230,10 @@ export default function WorkoutRunner({
       setCatchUp([]);
       const tracking = ex.exercise?.tracking_type ?? "weight_reps";
       const cardio = tracking === "distance" || tracking === "duration";
-      const needsBaseline = !cardio && ex.baseline_weight_lb == null;
+      const repsBased = isRepsBasedExercise(ex.exercise);
+      const needsBaseline =
+        !cardio &&
+        (repsBased ? ex.baseline_reps == null : ex.baseline_weight_lb == null);
       setPhase(needsBaseline ? "baseline" : "log");
       setBaselineWeight(
         ex.baseline_weight_lb != null ? String(ex.baseline_weight_lb) : "",
@@ -214,18 +246,11 @@ export default function WorkoutRunner({
 
       const history = await fetchExerciseSuggestion(ex.exercise_id);
       const recentSets = history.ok ? history.data.sets : [];
-      const rx = buildExercisePrescription({
-        exerciseId: ex.exercise_id,
-        exerciseName: ex.exercise?.name ?? "Exercise",
-        setStyle: ex.set_style,
-        baselineWeightLb: ex.baseline_weight_lb,
-        baselineReps: ex.baseline_reps,
-        repMin: ex.rep_min,
-        repMax: ex.rep_max,
+      const rx = prescriptionForExercise(
+        ex,
         recentSets,
-        lastPrescription: (ex.last_prescription as LastPrescription | null) ?? null,
-        lastSessionAt: history.ok ? history.data.lastSessionAt : null,
-      });
+        history.ok ? history.data.lastSessionAt : null,
+      );
       setPrescription(rx);
       applyPrefills(rx);
       if (!needsBaseline) {
@@ -333,14 +358,22 @@ export default function WorkoutRunner({
 
   function saveBaseline() {
     if (!current) return;
-    const weight = Number(baselineWeight);
+    const repsBased = isRepsBasedExercise(current.exercise);
+    const weight = repsBased
+      ? null
+      : baselineWeight === ""
+        ? null
+        : Number(baselineWeight);
     const expectedReps = Number(baselineReps);
-    if (!Number.isFinite(weight) || weight < 0) {
-      setError("Enter a starting weight (0 is ok for bodyweight).");
+    if (
+      !repsBased &&
+      (weight == null || !Number.isFinite(weight) || weight < 0)
+    ) {
+      setError("Enter a starting weight.");
       return;
     }
     if (!Number.isInteger(expectedReps) || expectedReps <= 0) {
-      setError("Enter how many reps you expect.");
+      setError("Enter how many reps you expect per set.");
       return;
     }
 
@@ -380,19 +413,11 @@ export default function WorkoutRunner({
 
       const history = await fetchExerciseSuggestion(updated.exercise_id);
       const recentSets = history.ok ? history.data.sets : [];
-      const rx = buildExercisePrescription({
-        exerciseId: updated.exercise_id,
-        exerciseName: updated.exercise?.name ?? "Exercise",
-        setStyle: updated.set_style,
-        baselineWeightLb: updated.baseline_weight_lb,
-        baselineReps: updated.baseline_reps,
-        repMin: updated.rep_min,
-        repMax: updated.rep_max,
+      const rx = prescriptionForExercise(
+        updated,
         recentSets,
-        lastPrescription:
-          (updated.last_prescription as LastPrescription | null) ?? null,
-        lastSessionAt: history.ok ? history.data.lastSessionAt : null,
-      });
+        history.ok ? history.data.lastSessionAt : null,
+      );
       setPrescription(rx);
       setPhase("log");
       applyPrefills(rx);
@@ -404,7 +429,8 @@ export default function WorkoutRunner({
   function logCurrentSet() {
     if (!session || !current) return;
     const tracking = current.exercise?.tracking_type ?? "weight_reps";
-    const weight = weightLb === "" ? null : Number(weightLb);
+    const weight =
+      currentRepsBased || weightLb === "" ? null : Number(weightLb);
     const repCount = reps === "" ? null : Number(reps);
     const distance = distanceM === "" ? null : Number(distanceM);
     const incline = inclinePct === "" ? null : Number(inclinePct);
@@ -422,7 +448,11 @@ export default function WorkoutRunner({
         return;
       }
     } else {
-      if (weight != null && (!Number.isFinite(weight) || weight < 0)) {
+      if (
+        !currentRepsBased &&
+        weight != null &&
+        (!Number.isFinite(weight) || weight < 0)
+      ) {
         setError("Weight must be 0 or more.");
         return;
       }
@@ -564,8 +594,9 @@ export default function WorkoutRunner({
 
     setError(null);
     startTransition(async () => {
-      const weight =
-        current.baseline_weight_lb != null
+      const weight = isRepsBasedExercise(current.exercise)
+        ? null
+        : current.baseline_weight_lb != null
           ? Number(current.baseline_weight_lb)
           : weightLb === ""
             ? null
@@ -860,15 +891,30 @@ export default function WorkoutRunner({
             {prescription.message}
           </p>
           {(prescription.targetWeightLb != null ||
-            prescription.targetReps != null) && (
+            prescription.targetReps != null ||
+            prescription.targetSets != null) && (
             <p className="mt-2 font-sans text-xs font-semibold text-brand-muted">
               Target:{" "}
-              {prescription.targetWeightLb != null
-                ? `${prescription.targetWeightLb} lb`
-                : "bodyweight / as planned"}
-              {prescription.targetReps != null
-                ? ` × ${prescription.targetReps} reps`
-                : ""}
+              {currentRepsBased
+                ? [
+                    prescription.targetSets != null
+                      ? `${prescription.targetSets} sets`
+                      : null,
+                    prescription.targetReps != null
+                      ? `${prescription.targetReps} reps`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" × ")
+                : `${
+                    prescription.targetWeightLb != null
+                      ? `${prescription.targetWeightLb} lb`
+                      : "as planned"
+                  }${
+                    prescription.targetReps != null
+                      ? ` × ${prescription.targetReps} reps`
+                      : ""
+                  }`}
               {prescription.source === "progression"
                 ? " · from last session"
                 : prescription.source === "baseline"
@@ -900,26 +946,30 @@ export default function WorkoutRunner({
             First time baseline
           </h4>
           <p className="font-sans text-sm text-brand-muted">
-            What weight will you start with, and how many reps do you expect?
+            {currentRepsBased
+              ? "How many clean reps can you do per set? We will use your reps and set count to coach the next session."
+              : "What weight will you start with, and how many reps do you expect?"}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="baseline-weight" className={labelClass}>
-                Starting weight (lb)
-              </label>
-              <input
-                id="baseline-weight"
-                type="number"
-                min={0}
-                step="0.5"
-                value={baselineWeight}
-                onChange={(e) => setBaselineWeight(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
+            {currentRepsBased ? null : (
+              <div>
+                <label htmlFor="baseline-weight" className={labelClass}>
+                  Starting weight (lb)
+                </label>
+                <input
+                  id="baseline-weight"
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={baselineWeight}
+                  onChange={(e) => setBaselineWeight(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+            )}
             <div>
               <label htmlFor="baseline-reps" className={labelClass}>
-                Expected reps
+                Expected reps per set
               </label>
               <input
                 id="baseline-reps"
@@ -1025,20 +1075,22 @@ export default function WorkoutRunner({
               </div>
             ) : (
               <>
-                <div>
-                  <label htmlFor="run-weight" className={labelClass}>
-                    Weight (lb)
-                  </label>
-                  <input
-                    id="run-weight"
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={weightLb}
-                    onChange={(e) => setWeightLb(e.target.value)}
-                    className={fieldClass}
-                  />
-                </div>
+                {currentRepsBased ? null : (
+                  <div>
+                    <label htmlFor="run-weight" className={labelClass}>
+                      Weight (lb)
+                    </label>
+                    <input
+                      id="run-weight"
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      value={weightLb}
+                      onChange={(e) => setWeightLb(e.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                )}
                 <div>
                   <label htmlFor="run-reps" className={labelClass}>
                     Reps

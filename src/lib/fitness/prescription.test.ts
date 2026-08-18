@@ -120,4 +120,75 @@ describe("buildExercisePrescription", () => {
     assert.equal(rx.targetWeightLb, 135);
     assert.equal(rx.suggestion?.heldForMissedWeek, true);
   });
+
+  it("coaches bodyweight work from sets and reps with no load", () => {
+    const rx = buildExercisePrescription({
+      exerciseId: "ex-push",
+      exerciseName: "Push-Up",
+      setStyle: "hypertrophy",
+      baselineWeightLb: null,
+      baselineReps: 12,
+      repMin: 8,
+      repMax: 15,
+      plannedSets: 3,
+      repsBased: true,
+      recentSets: [
+        { weight_lb: null, reps: 12, difficulty: 2, set_number: 1 },
+        { weight_lb: null, reps: 12, difficulty: 1, set_number: 2 },
+        { weight_lb: null, reps: 11, difficulty: 2, set_number: 3 },
+      ],
+    });
+    assert.equal(rx.source, "progression");
+    assert.equal(rx.targetWeightLb, null);
+    assert.equal(rx.targetReps, 14);
+    assert.equal(rx.targetSets, 3);
+    assert.match(rx.message, /3×1[12]/);
+    assert.doesNotMatch(rx.message, /lb/i);
+  });
+
+  it("uses a bodyweight baseline of reps and sets when there is no history", () => {
+    const rx = buildExercisePrescription({
+      exerciseId: "ex-push-base",
+      exerciseName: "Push-Up",
+      setStyle: "hypertrophy",
+      baselineWeightLb: null,
+      baselineReps: 10,
+      repMin: 8,
+      repMax: 12,
+      plannedSets: 4,
+      repsBased: true,
+      recentSets: [],
+    });
+    assert.equal(rx.source, "baseline");
+    assert.equal(rx.targetWeightLb, null);
+    assert.equal(rx.targetReps, 10);
+    assert.equal(rx.targetSets, 4);
+    assert.match(rx.message, /4×10/);
+  });
+});
+
+describe("suggestProgression bodyweight", () => {
+  it("adds reps when bodyweight sets felt easy", () => {
+    const tip = suggestProgression("ex-push", [
+      { weight_lb: null, reps: 10, difficulty: 2, set_number: 1 },
+      { weight_lb: null, reps: 10, difficulty: 1, set_number: 2 },
+      { weight_lb: null, reps: 10, difficulty: 2, set_number: 3 },
+    ]);
+    assert.ok(tip);
+    assert.equal(tip.suggestedWeightLb, null);
+    assert.equal(tip.suggestedReps, 12);
+    assert.equal(tip.suggestedSets, 3);
+    assert.equal(tip.lastSets, 3);
+  });
+
+  it("adds a set when high-rep bodyweight work felt easy", () => {
+    const tip = suggestProgression("ex-push-hi", [
+      { weight_lb: null, reps: 16, difficulty: 1, set_number: 1 },
+      { weight_lb: null, reps: 16, difficulty: 2, set_number: 2 },
+      { weight_lb: null, reps: 15, difficulty: 2, set_number: 3 },
+    ]);
+    assert.ok(tip);
+    assert.equal(tip.suggestedSets, 4);
+    assert.equal(tip.suggestedWeightLb, null);
+  });
 });

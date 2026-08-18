@@ -186,11 +186,11 @@ export async function fetchSessionSets(
 
 export async function saveProgramExerciseBaseline(input: {
   id: string;
-  baselineWeightLb: number;
+  baselineWeightLb: number | null;
   baselineReps: number;
 }): Promise<
   ApiResult<{
-    baseline_weight_lb: number;
+    baseline_weight_lb: number | null;
     baseline_reps: number;
   }>
 > {
@@ -217,7 +217,10 @@ export async function saveProgramExerciseBaseline(input: {
   return {
     ok: true,
     data: {
-      baseline_weight_lb: Number(json.exercise.baseline_weight_lb),
+      baseline_weight_lb:
+        json.exercise.baseline_weight_lb == null
+          ? null
+          : Number(json.exercise.baseline_weight_lb),
       baseline_reps: Number(json.exercise.baseline_reps),
     },
   };
@@ -228,6 +231,7 @@ export async function saveProgramExercisePrescription(input: {
   lastPrescription: {
     weight_lb: number | null;
     reps: number | null;
+    sets?: number | null;
     set_style: string;
     message: string;
     source: string;

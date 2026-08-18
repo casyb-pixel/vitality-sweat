@@ -17,7 +17,7 @@ export const COMPARE_PAGES: ComparePage[] = [
       "Hevy is fast logging. Vitality Engine is that habit plus meals, grocery share, and Hunter's site.",
     theyWin: "Hevy wins on social feed polish and years of gym-floor UX.",
     weSteal: "We copy the speed: same-as-last, rest timer, set types, PWA.",
-    weRefuse: "We will not drop a noisy public feed on a high-school brand. The Engine Room is followers-only.",
+    weRefuse: "We will not dump a noisy public feed by default. Engine Room posts stay followers-only unless a member opts in.",
   },
   {
     slug: "jefit",

@@ -208,6 +208,18 @@ export function isTrackingType(value: unknown): value is ExerciseTrackingType {
   );
 }
 
+/** Push-ups, pull-ups, and other bodyweight moves are rep baselines, not loaded lifts. */
+export function isRepsBasedExercise(exercise: {
+  tracking_type?: string | null;
+  equipment?: string | null;
+} | null | undefined): boolean {
+  if (!exercise) return false;
+  const tracking = exercise.tracking_type ?? "weight_reps";
+  if (tracking === "reps_only") return true;
+  if (tracking === "distance" || tracking === "duration") return false;
+  return exercise.equipment === "bodyweight";
+}
+
 export type CatalogExerciseSummary = {
   id: string;
   name: string;

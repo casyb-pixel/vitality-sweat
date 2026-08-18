@@ -34,7 +34,7 @@ export async function GET() {
   const { data: posts, error } = await supabase
     .from("engine_room_posts")
     .select(
-      "id, author_id, kind, body, image_path, milestone_payload, created_at",
+      "id, author_id, kind, body, image_path, milestone_payload, created_at, visibility",
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -72,7 +72,7 @@ export async function GET() {
 
   const { data: profiles } = authorIds.length
     ? await supabase
-        .from("profiles")
+        .from("engine_room_members")
         .select("id, display_name, username")
         .in("id", authorIds)
     : { data: [] };
@@ -109,7 +109,7 @@ export async function GET() {
 
   const { data: me } = await supabase
     .from("profiles")
-    .select("username, display_name")
+    .select("username, display_name, engine_room_public_opt_in")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -119,14 +119,54 @@ export async function GET() {
     .eq("id", user.id)
     .maybeSingle();
 
+  const [{ data: follows }, { data: blocks }, { data: directory }] =
+    await Promise.all([
+      supabase
+        .from("member_follows")
+        .select("following_id")
+        .eq("follower_id", user.id),
+      supabase
+        .from("member_blocks")
+        .select("blocker_id, blocked_id")
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
+      supabase
+        .from("engine_room_members")
+        .select("id, username, display_name, engine_room_public_opt_in")
+        .neq("id", user.id)
+        .order("username", { ascending: true })
+        .limit(80),
+    ]);
+
+  const followingIds = new Set(
+    (follows ?? []).map((f) => f.following_id as string),
+  );
+  const blockedIds = new Set(
+    (blocks ?? []).flatMap((b) =>
+      b.blocker_id === user.id
+        ? [b.blocked_id as string]
+        : [b.blocker_id as string],
+    ),
+  );
+  const members = (directory ?? [])
+    .filter((m) => !blockedIds.has(m.id as string))
+    .map((m) => ({
+      id: m.id as string,
+      username: (m.username as string | null) ?? null,
+      display_name: (m.display_name as string | null) ?? null,
+      following: followingIds.has(m.id as string),
+      public_opt_in: Boolean(m.engine_room_public_opt_in),
+    }));
+
   return NextResponse.json({
     ok: true,
     posts: feed,
+    members,
     me: {
       id: user.id,
       username: me?.username ?? null,
       display_name: me?.display_name ?? null,
       leaderboard_opt_in: fitness?.leaderboard_opt_in !== false,
+      engine_room_public_opt_in: Boolean(me?.engine_room_public_opt_in),
     },
   });
 }
@@ -159,6 +199,20 @@ export async function POST(request: Request) {
     kindRaw === "photo" || kindRaw === "win" || kindRaw === "promo"
       ? kindRaw
       : "text";
+  const visibilityRaw = String(form.get("visibility") ?? "followers");
+  const visibility = visibilityRaw === "public" ? "public" : "followers";
+  if (visibility === "public") {
+    const { error: optInError } = await supabase
+      .from("profiles")
+      .update({ engine_room_public_opt_in: true })
+      .eq("id", user.id);
+    if (optInError) {
+      return NextResponse.json(
+        { ok: false, error: optInError.message },
+        { status: 500 },
+      );
+    }
+  }
   const body = stripEmDashes(String(form.get("body") ?? "").trim());
   const photoConfirm = String(form.get("photo_confirm") ?? "") === "1";
   const milestoneRaw = String(form.get("milestone") ?? "");
@@ -233,6 +287,7 @@ export async function POST(request: Request) {
       body,
       image_path: imagePath,
       milestone_payload: milestonePayload,
+      visibility,
     })
     .select("id")
     .single();

@@ -22,7 +22,7 @@ export default async function SettingsPage() {
   if (!profile) redirect("/app/onboarding");
   const { data: account } = await supabase
     .from("profiles")
-    .select("username, engine_plus")
+    .select("username, engine_plus, engine_room_public_opt_in")
     .eq("id", user.id)
     .maybeSingle();
   return (
@@ -30,6 +30,7 @@ export default async function SettingsPage() {
       profile={profile}
       username={(account?.username as string | null) ?? ""}
       enginePlus={Boolean(account?.engine_plus)}
+      engineRoomPublic={Boolean(account?.engine_room_public_opt_in)}
     />
   );
 }

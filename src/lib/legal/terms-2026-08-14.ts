@@ -155,7 +155,7 @@ export const TERMS_PAGE: PolicyPage = {
     },
     {
       type: "p",
-      text: "We do not pre-screen member posts. Posts reflect the author's views, not Vitality Sweat. We may remove content, restrict features, or close accounts at our discretion. We are not liable for what other members post, for follows or encouragement between members, or for your decision to train with someone you met in the app. Followers-only visibility is not a promise of privacy from people you follow or who follow you.",
+      text: "We do not pre-screen member posts. Posts reflect the author's views, not Vitality Sweat. We may remove content, restrict features, or close accounts at our discretion. We are not liable for what other members post, for follows or encouragement between members, or for your decision to train with someone you met in the app. Followers-only is the default. If you opt into public Engine Room posts, those posts can be seen by other members who also opted in. Visibility settings are not a promise of privacy from people you follow, who follow you, or who share the public square.",
     },
     {
       type: "p",
@@ -210,7 +210,7 @@ export const COMMUNITY_GUIDELINES_PAGE: PolicyPage = {
     { type: "h2", text: "Purpose" },
     {
       type: "p",
-      text: "The Engine Room is a followers-only space for members to celebrate training, post encouragement, and share wins. It is not a public social network and not a place for medical advice.",
+      text: "The Engine Room is a member space for celebrating training, posting encouragement, and sharing wins. Posts default to followers only. You can opt into a public square with other members who also opt in. It is not an open internet social network and not a place for medical advice.",
     },
     { type: "h2", text: "Required conduct" },
     {
@@ -227,7 +227,7 @@ export const COMMUNITY_GUIDELINES_PAGE: PolicyPage = {
     { type: "h2", text: "Visibility and no guarantee of privacy" },
     {
       type: "p",
-      text: "Posts are visible to you and to people who follow you. Followers-only is not secrecy. People you follow, people who follow you, and Vitality Sweat operators (for safety and reports) may see content as described in the Terms.",
+      text: "Posts default to you and the people who follow you. If you opt into public Engine Room sharing, your public posts can be seen by other members who also opted in. Followers-only is not secrecy. People you follow, people who follow you, members in the public square you joined, and Vitality Sweat operators (for safety and reports) may see content as described in the Terms.",
     },
     { type: "h2", text: "Moderation" },
     {

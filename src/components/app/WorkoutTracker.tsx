@@ -12,6 +12,7 @@ import {
   EXERCISE_CATEGORY_OPTIONS,
   EXERCISE_EQUIPMENT_OPTIONS,
   filterExercises,
+  isRepsBasedExercise,
 } from "@/lib/fitness/exercises";
 import {
   fetchExerciseSuggestion,
@@ -260,7 +261,11 @@ export default function WorkoutTracker({
         sessionId: session.id,
         exerciseId,
         setNumber,
-        weightLb: weightLb === "" ? null : Number(weightLb),
+        weightLb: isRepsBasedExercise(selected)
+          ? null
+          : weightLb === ""
+            ? null
+            : Number(weightLb),
         reps: reps === "" ? null : Number(reps),
         difficulty,
         durationSec: durationSec === "" ? null : Number(durationSec),
@@ -463,10 +468,12 @@ export default function WorkoutTracker({
           <p className="mt-2 font-sans text-sm leading-relaxed text-brand-ink">
             {suggestion.message}
           </p>
-          {suggestion.lastWeightLb != null ? (
+          {suggestion.lastSets != null ? (
             <p className="mt-1 font-sans text-xs text-brand-muted">
-              Last time: {suggestion.lastWeightLb} lb × {suggestion.lastSets}{" "}
-              sets
+              Last time:{" "}
+              {suggestion.lastWeightLb != null && suggestion.lastWeightLb > 0
+                ? `${suggestion.lastWeightLb} lb × ${suggestion.lastSets} sets`
+                : `${suggestion.lastSets} sets`}
               {suggestion.lastReps != null
                 ? ` of ${suggestion.lastReps}`
                 : ""}{" "}
@@ -762,23 +769,22 @@ export default function WorkoutTracker({
             </>
           ) : (
             <>
-              <div>
-                <label htmlFor="weight" className={labelClass}>
-                  Weight (lb)
-                </label>
-                <input
-                  id="weight"
-                  type="number"
-                  min={0}
-                  step="0.5"
-                  value={weightLb}
-                  onChange={(e) => setWeightLb(e.target.value)}
-                  className={fieldClass}
-                  placeholder={
-                    selected?.tracking_type === "reps_only" ? "optional" : ""
-                  }
-                />
-              </div>
+              {isRepsBasedExercise(selected) ? null : (
+                <div>
+                  <label htmlFor="weight" className={labelClass}>
+                    Weight (lb)
+                  </label>
+                  <input
+                    id="weight"
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={weightLb}
+                    onChange={(e) => setWeightLb(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+              )}
               <div>
                 <label htmlFor="reps" className={labelClass}>
                   Reps

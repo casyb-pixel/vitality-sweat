@@ -10,6 +10,7 @@ type PatchBody = {
   last_prescription?: {
     weight_lb?: number | null;
     reps?: number | null;
+    sets?: number | null;
     set_style?: string;
     message?: string;
     source?: string;
@@ -53,22 +54,26 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = {};
 
     if ("baseline_weight_lb" in body || "baseline_reps" in body) {
-      const weight = Number(body.baseline_weight_lb);
       const reps = Number(body.baseline_reps);
-      if (!Number.isFinite(weight) || weight < 0) {
-        return NextResponse.json(
-          { ok: false, error: "baseline_weight_lb must be >= 0." },
-          { status: 400 },
-        );
-      }
       if (!Number.isInteger(reps) || reps <= 0) {
         return NextResponse.json(
           { ok: false, error: "baseline_reps must be a positive integer." },
           { status: 400 },
         );
       }
-      patch.baseline_weight_lb = weight;
       patch.baseline_reps = reps;
+      if (body.baseline_weight_lb == null) {
+        patch.baseline_weight_lb = null;
+      } else {
+        const weight = Number(body.baseline_weight_lb);
+        if (!Number.isFinite(weight) || weight < 0) {
+          return NextResponse.json(
+            { ok: false, error: "baseline_weight_lb must be >= 0." },
+            { status: 400 },
+          );
+        }
+        patch.baseline_weight_lb = weight;
+      }
     }
 
     if ("last_prescription" in body) {
@@ -87,6 +92,10 @@ export async function PATCH(request: Request) {
           snap.reps === null || snap.reps === undefined
             ? null
             : Number(snap.reps);
+        const sets =
+          snap.sets === null || snap.sets === undefined
+            ? null
+            : Number(snap.sets);
         if (weight != null && (!Number.isFinite(weight) || weight < 0)) {
           return NextResponse.json(
             { ok: false, error: "last_prescription.weight_lb must be >= 0." },
@@ -102,9 +111,19 @@ export async function PATCH(request: Request) {
             { status: 400 },
           );
         }
+        if (sets != null && (!Number.isInteger(sets) || sets < 0)) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "last_prescription.sets must be a non-negative integer.",
+            },
+            { status: 400 },
+          );
+        }
         patch.last_prescription = {
           weight_lb: weight,
           reps,
+          sets,
           set_style:
             typeof snap.set_style === "string" ? snap.set_style : "hypertrophy",
           message:

@@ -28,7 +28,8 @@ export default async function EngineRoomPage() {
           The Engine Room
         </h1>
         <p className="max-w-xl font-sans text-sm text-brand-muted">
-          Followers only. Celebrate wins, post a selfie, and spot your crew.
+          Celebrate wins with people you follow. Opt in if you want to share
+          with the wider Engine Room.
         </p>
       </header>
       <EngineRoomClient />

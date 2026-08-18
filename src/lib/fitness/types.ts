@@ -301,6 +301,7 @@ export type WorkoutProgramExercise = {
   last_prescription?: {
     weight_lb: number | null;
     reps: number | null;
+    sets?: number | null;
     set_style: WorkoutSetStyle | string;
     message: string;
     source: string;
@@ -363,6 +364,7 @@ export type ProgressionSuggestion = {
   lastAvgDifficulty: number;
   suggestedWeightLb: number | null;
   suggestedReps: number | null;
+  suggestedSets: number | null;
   message: string;
   /** True when load was held because last session was >10 days ago. */
   heldForMissedWeek?: boolean;

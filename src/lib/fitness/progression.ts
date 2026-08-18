@@ -21,15 +21,34 @@ function daysBetween(from: Date, to: Date): number {
   return ms / (1000 * 60 * 60 * 24);
 }
 
+function hasLoad(weight: number | null): weight is number {
+  return weight != null && Number.isFinite(weight) && weight > 0;
+}
+
+function formatSetsReps(sets: number | null, reps: number | null): string {
+  if (sets != null && reps != null) return `${sets}×${reps}`;
+  if (reps != null) return `${reps} reps`;
+  if (sets != null) return `${sets} sets`;
+  return "your last target";
+}
+
 /**
  * Deterministic progressive-overload suggestion from the most recent
  * completed sets for an exercise.
  *
+ * Loaded lifts:
  * - avg difficulty <= 2 (easy) → ~10% more weight, rounded to nearest 5 lb
  * - difficulty == 3 → hold weight, +1 rep target
  * - difficulty == 4 → hold weight
  * - difficulty == 5 → deload ~10%, rounded to nearest 5 lb
- * - last session > 10 days ago → hold weight (missed-week guard)
+ *
+ * Bodyweight / reps-only:
+ * - easy → +2 reps (or +1 set if reps are already high)
+ * - solid → +1 rep
+ * - hard → hold
+ * - very hard → -2 reps
+ *
+ * - last session > 10 days ago → hold targets (missed-week guard)
  */
 export function suggestProgression(
   exerciseId: string,
@@ -54,6 +73,7 @@ export function suggestProgression(
     : null;
   const lastSets = sets.length;
   const roundedAvg = Math.round(avgDifficulty * 10) / 10;
+  const loaded = hasLoad(lastWeightLb);
 
   const now = opts?.now ?? new Date();
   const lastAtRaw = opts?.lastSessionAt;
@@ -75,54 +95,53 @@ export function suggestProgression(
       lastReps,
       lastSets,
       lastAvgDifficulty: roundedAvg,
-      suggestedWeightLb: lastWeightLb,
+      suggestedWeightLb: loaded ? lastWeightLb : null,
       suggestedReps: lastReps,
-      message:
-        lastWeightLb != null
-          ? `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold ${formatWeight(lastWeightLb)} and rebuild consistency before advancing.`
-          : `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold your last targets and rebuild consistency before advancing.`,
+      suggestedSets: lastSets,
+      message: loaded
+        ? `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold ${formatWeight(lastWeightLb)} and rebuild consistency before advancing.`
+        : `Over ${MISSED_WEEK_HOLD_DAYS} days since your last session - hold ${formatSetsReps(lastSets, lastReps)} and rebuild consistency before advancing.`,
       heldForMissedWeek: true,
     };
   }
 
-  let suggestedWeightLb: number | null = lastWeightLb;
+  let suggestedWeightLb: number | null = loaded ? lastWeightLb : null;
   let suggestedReps: number | null = lastReps;
+  let suggestedSets: number | null = lastSets;
   let message: string;
 
   if (avgDifficulty <= 2) {
-    if (lastWeightLb != null && lastWeightLb > 0) {
+    if (loaded) {
       suggestedWeightLb = roundToNearest5(lastWeightLb * 1.1);
       if (suggestedWeightLb <= lastWeightLb) {
         suggestedWeightLb = lastWeightLb + 5;
       }
       message = `Last time felt easy - try ${formatWeight(suggestedWeightLb)} next (${lastSets}×${lastReps ?? "?"} at ${formatWeight(lastWeightLb)}).`;
+    } else if (lastReps != null && lastReps >= 15 && lastSets < 6) {
+      suggestedSets = lastSets + 1;
+      message = `Last time ${formatSetsReps(lastSets, lastReps)} felt easy - add a set and try ${formatSetsReps(suggestedSets, lastReps)} today.`;
     } else {
       suggestedReps = lastReps != null ? lastReps + 2 : null;
-      message =
-        "Last time felt easy - add a couple of reps or increase the load.";
+      message = `Last time ${formatSetsReps(lastSets, lastReps)} felt easy - today try ${formatSetsReps(suggestedSets, suggestedReps)}.`;
     }
   } else if (avgDifficulty < 3.5) {
     suggestedReps = lastReps != null ? lastReps + 1 : null;
-    message =
-      lastWeightLb != null
-        ? `Solid effort - hold ${formatWeight(lastWeightLb)} and aim for ${(suggestedReps ?? lastReps ?? 0)} reps.`
-        : "Solid effort - try one more rep than last time.";
+    message = loaded
+      ? `Solid effort - hold ${formatWeight(lastWeightLb)} and aim for ${(suggestedReps ?? lastReps ?? 0)} reps.`
+      : `Solid effort - last time was ${formatSetsReps(lastSets, lastReps)}. Aim for ${formatSetsReps(suggestedSets, suggestedReps)} today.`;
   } else if (avgDifficulty < 4.5) {
-    message =
-      lastWeightLb != null
-        ? `That was hard - keep ${formatWeight(lastWeightLb)} and nail the same reps.`
-        : "That was hard - repeat the same target and focus on form.";
-  } else {
-    if (lastWeightLb != null && lastWeightLb > 0) {
-      suggestedWeightLb = Math.max(5, roundToNearest5(lastWeightLb * 0.9));
-      if (suggestedWeightLb >= lastWeightLb && lastWeightLb > 5) {
-        suggestedWeightLb = lastWeightLb - 5;
-      }
-      message = `Very hard last time - deload to ${formatWeight(suggestedWeightLb)} and rebuild.`;
-    } else {
-      suggestedReps = lastReps != null ? Math.max(1, lastReps - 2) : null;
-      message = "Very hard last time - reduce volume a bit and rebuild.";
+    message = loaded
+      ? `That was hard - keep ${formatWeight(lastWeightLb)} and nail the same reps.`
+      : `That was hard - repeat ${formatSetsReps(lastSets, lastReps)} and focus on clean reps.`;
+  } else if (loaded) {
+    suggestedWeightLb = Math.max(5, roundToNearest5(lastWeightLb * 0.9));
+    if (suggestedWeightLb >= lastWeightLb && lastWeightLb > 5) {
+      suggestedWeightLb = lastWeightLb - 5;
     }
+    message = `Very hard last time - deload to ${formatWeight(suggestedWeightLb)} and rebuild.`;
+  } else {
+    suggestedReps = lastReps != null ? Math.max(1, lastReps - 2) : null;
+    message = `Very hard last time - drop to ${formatSetsReps(suggestedSets, suggestedReps)} and rebuild.`;
   }
 
   return {
@@ -133,6 +152,7 @@ export function suggestProgression(
     lastAvgDifficulty: roundedAvg,
     suggestedWeightLb,
     suggestedReps,
+    suggestedSets,
     message,
     heldForMissedWeek: false,
   };

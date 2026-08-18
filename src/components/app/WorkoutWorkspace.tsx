@@ -133,7 +133,7 @@ export default function WorkoutWorkspace({
 
   function handleBaselinesSaved(
     programExerciseId: string,
-    baseline: { baseline_weight_lb: number; baseline_reps: number },
+    baseline: { baseline_weight_lb: number | null; baseline_reps: number },
   ) {
     setProgram((prev) => {
       if (!prev) return prev;
@@ -199,8 +199,6 @@ export default function WorkoutWorkspace({
         </header>
       ) : null}
 
-      <ProgramTemplatesPanel />
-
       <WorkoutAgent
         initialProgram={program}
         initialPrefs={initialPrefs}
@@ -217,6 +215,10 @@ export default function WorkoutWorkspace({
         onStartDay={handleStartDay}
         runningDayId={runningDay?.id ?? null}
       />
+
+      {!focusMode ? (
+        <ProgramTemplatesPanel hasActiveProgram={Boolean(program)} />
+      ) : null}
 
       <section id="log-workout" className="space-y-4 scroll-mt-24">
         {runningDay ? (

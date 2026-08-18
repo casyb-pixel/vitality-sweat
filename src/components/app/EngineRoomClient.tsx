@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import ShareEngineCard from "@/components/app/ShareEngineCard";
 import EngineRoomLeaderboard from "@/components/app/EngineRoomLeaderboard";
+import EngineRoomDirectory, {
+  type EngineRoomMember,
+} from "@/components/app/EngineRoomDirectory";
 
 type RoomPost = {
   id: string;
@@ -13,6 +16,7 @@ type RoomPost = {
   image_url: string | null;
   milestone_payload: { title?: string; detail?: string } | null;
   created_at: string;
+  visibility?: "followers" | "public" | string;
   author: { display_name: string | null; username: string | null };
   reactions: { user_id: string; kind: string }[];
   comments: {
@@ -31,9 +35,13 @@ const secondaryBtn =
 
 export default function EngineRoomClient() {
   const [posts, setPosts] = useState<RoomPost[]>([]);
+  const [members, setMembers] = useState<EngineRoomMember[]>([]);
   const [username, setUsername] = useState<string | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState("");
   const [meId, setMeId] = useState<string | null>(null);
   const [leaderboardOn, setLeaderboardOn] = useState(true);
+  const [publicOptIn, setPublicOptIn] = useState(false);
+  const [postPublic, setPostPublic] = useState(false);
   const [tab, setTab] = useState<"feed" | "leaderboard">("feed");
   const [accepted, setAccepted] = useState(false);
   const [body, setBody] = useState("");
@@ -49,7 +57,13 @@ export default function EngineRoomClient() {
     const json = (await res.json()) as {
       ok?: boolean;
       posts?: RoomPost[];
-      me?: { id?: string; username?: string | null; leaderboard_opt_in?: boolean };
+      members?: EngineRoomMember[];
+      me?: {
+        id?: string;
+        username?: string | null;
+        leaderboard_opt_in?: boolean;
+        engine_room_public_opt_in?: boolean;
+      };
       error?: string;
     };
     if (!res.ok || !json.ok) {
@@ -57,9 +71,11 @@ export default function EngineRoomClient() {
       return;
     }
     setPosts(json.posts ?? []);
+    setMembers(json.members ?? []);
     setUsername(json.me?.username ?? null);
     setMeId(json.me?.id ?? null);
     setLeaderboardOn(json.me?.leaderboard_opt_in !== false);
+    setPublicOptIn(Boolean(json.me?.engine_room_public_opt_in));
   }, []);
 
   useEffect(() => {
@@ -89,6 +105,7 @@ export default function EngineRoomClient() {
       form.set("body", body);
       if (photo) form.set("photo", photo);
       if (photoConfirm) form.set("photo_confirm", "1");
+      if (postPublic) form.set("visibility", "public");
       const res = await fetch("/api/app/engine-room", {
         method: "POST",
         body: form,
@@ -126,14 +143,61 @@ export default function EngineRoomClient() {
     await load();
   }
 
-  async function follow() {
+  async function saveUsername() {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/app/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameDraft }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Could not save username.");
+        return;
+      }
+      setUsernameDraft("");
+      await load();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function togglePublicOptIn(next: boolean) {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/app/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ engine_room_public_opt_in: next }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Could not update public sharing.");
+        return;
+      }
+      setPublicOptIn(next);
+      if (!next) setPostPublic(false);
+      await load();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function followMember(input: { username?: string; userId?: string }) {
     setPending(true);
     setError(null);
     try {
       const res = await fetch("/api/app/follows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: followName }),
+        body: JSON.stringify(
+          input.userId
+            ? { user_id: input.userId }
+            : { username: input.username },
+        ),
       });
       const json = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
@@ -145,6 +209,29 @@ export default function EngineRoomClient() {
     } finally {
       setPending(false);
     }
+  }
+
+  async function unfollowMember(userId: string) {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/app/follows?following_id=${encodeURIComponent(userId)}`,
+        { method: "DELETE" },
+      );
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Could not unfollow.");
+        return;
+      }
+      await load();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function follow() {
+    await followMember({ username: followName });
   }
 
   async function report(postId: string) {
@@ -172,7 +259,7 @@ export default function EngineRoomClient() {
           The Engine Room
         </h2>
         <ul className="mt-3 list-disc space-y-1 pl-5 font-sans text-sm text-brand-ink">
-          <li>Followers only. Not a public feed.</li>
+          <li>Followers-only is the default. Public sharing is opt-in.</li>
           <li>No harassment. Report or block if you need to.</li>
           <li>No minors in photos. Confirm 18+ before posting a selfie.</li>
           <li>Celebrate the work. Keep medical claims out of it.</li>
@@ -198,23 +285,75 @@ export default function EngineRoomClient() {
   return (
     <div className="space-y-6">
       <section className="border border-brand-ink/10 bg-surface-elevated p-5">
-        <p className="font-sans text-sm text-brand-muted">
-          Follow a teammate to see their posts. Find them at the rack, scan Train
-          together, or add @username here.
-        </p>
         {!username ? (
-          <p className="mt-2 font-sans text-sm text-brand-ink">
-            Set a username in{" "}
-            <Link href="/app/settings" className="font-semibold text-brand-orange">
-              Settings
-            </Link>{" "}
-            before you post.
-          </p>
+          <div className="border border-brand-orange bg-brand-orange/5 p-4">
+            <p className="font-sans text-xs font-bold uppercase tracking-[0.12em] text-brand-orange">
+              One step before you post
+            </p>
+            <h2 className="mt-1 font-display text-2xl text-brand-ink">
+              Choose a username
+            </h2>
+            <p className="mt-2 font-sans text-sm text-brand-muted">
+              This is how other members find and follow you. Save it here, then
+              you stay in The Engine Room.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                value={usernameDraft}
+                onChange={(e) => setUsernameDraft(e.target.value)}
+                placeholder="hunter"
+                className="min-h-11 flex-1 border border-brand-ink/15 px-3 py-2 font-sans text-sm"
+              />
+              <button
+                type="button"
+                className={primaryBtn}
+                disabled={pending || !usernameDraft.trim()}
+                onClick={() => void saveUsername()}
+              >
+                {pending ? "Saving…" : "Save and enter"}
+              </button>
+            </div>
+            <p className="mt-2 font-sans text-xs text-brand-muted">
+              3-32 letters, numbers, or underscores.
+            </p>
+          </div>
         ) : (
-          <p className="mt-2 font-sans text-sm text-brand-ink">
+          <p className="font-sans text-sm text-brand-ink">
             You are @{username}
           </p>
         )}
+
+        <label className="mt-4 flex items-start gap-2 font-sans text-sm text-brand-ink">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={publicOptIn}
+            disabled={pending}
+            onChange={(e) => void togglePublicOptIn(e.target.checked)}
+          />
+          <span>
+            Join the public Engine Room. You will see public posts from other
+            members who opted in, and you can make your own posts public.
+          </span>
+        </label>
+
+        <h3 className="mt-5 font-display text-lg text-brand-ink">
+          Find people to follow
+        </h3>
+        <p className="mt-1 font-sans text-sm text-brand-muted">
+          Pick someone from the list, or type a username if you already know it.
+        </p>
+        <EngineRoomDirectory
+          members={members}
+          pending={pending}
+          onFollow={(member) =>
+            void followMember({
+              userId: member.id,
+              username: member.username ?? undefined,
+            })
+          }
+          onUnfollow={(member) => void unfollowMember(member.id)}
+        />
         <div className="mt-3 flex flex-wrap gap-2">
           <input
             value={followName}
@@ -260,12 +399,18 @@ export default function EngineRoomClient() {
         <>
       <section className="border border-brand-ink/10 bg-surface-elevated p-5">
         <h2 className="font-display text-xl text-brand-ink">Post</h2>
+        {!username ? (
+          <p className="mt-2 font-sans text-sm text-brand-muted">
+            Save a username above, then you can post without leaving this page.
+          </p>
+        ) : null}
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={3}
           placeholder="Encouragement, a win, or a gym-floor note."
-          className="mt-3 w-full border border-brand-ink/15 px-3 py-2 font-sans text-sm"
+          disabled={!username}
+          className="mt-3 w-full border border-brand-ink/15 px-3 py-2 font-sans text-sm disabled:opacity-60"
         />
         <input
           type="file"
@@ -284,11 +429,27 @@ export default function EngineRoomClient() {
             I am 18+ and no minors are in this photo.
           </label>
         ) : null}
+        {publicOptIn ? (
+          <label className="mt-3 flex items-start gap-2 font-sans text-sm text-brand-ink">
+            <input
+              type="checkbox"
+              checked={postPublic}
+              onChange={(e) => setPostPublic(e.target.checked)}
+            />
+            Make this post public. Other members who opted into public sharing
+            can see it. Leave unchecked for followers only.
+          </label>
+        ) : (
+          <p className="mt-3 font-sans text-xs text-brand-muted">
+            This post stays with your followers unless you join the public
+            Engine Room above.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             className={primaryBtn}
-            disabled={pending}
+            disabled={pending || !username}
             onClick={() => void publish(photo ? "photo" : "text")}
           >
             {pending ? "Posting…" : "Post"}
@@ -311,7 +472,8 @@ export default function EngineRoomClient() {
 
       {posts.length === 0 ? (
         <p className="font-sans text-sm text-brand-muted">
-          No posts yet. Follow a teammate, then their posts land here.
+          No posts yet. Follow someone from the list, or join the public Engine
+          Room to see shared wins.
         </p>
       ) : (
         <ul className="space-y-4">
@@ -335,6 +497,7 @@ export default function EngineRoomClient() {
                   </Link>
                   <p className="font-sans text-xs text-brand-muted">
                     {new Date(post.created_at).toLocaleString()}
+                    {post.visibility === "public" ? " · Public" : ""}
                   </p>
                 </div>
                 {post.author_id !== meId ? (

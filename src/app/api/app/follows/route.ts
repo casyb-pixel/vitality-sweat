@@ -39,14 +39,16 @@ export async function POST(request: Request) {
   }
   const username =
     typeof body.username === "string" ? body.username.trim().replace(/^@/, "") : "";
-  if (!username) {
+  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+  if (!username && !userId) {
     return NextResponse.json({ ok: false, error: "Send a username." }, { status: 400 });
   }
-  const { data: target } = await supabase
-    .from("profiles")
-    .select("id, username")
-    .ilike("username", username)
-    .maybeSingle();
+  const targetQuery = supabase
+    .from("engine_room_members")
+    .select("id, username");
+  const { data: target } = userId
+    ? await targetQuery.eq("id", userId).maybeSingle()
+    : await targetQuery.ilike("username", username).maybeSingle();
   if (!target?.id || target.id === user.id) {
     return NextResponse.json(
       { ok: false, error: "No member with that username." },
@@ -58,6 +60,9 @@ export async function POST(request: Request) {
     following_id: target.id,
   });
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json({ ok: true });
+    }
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

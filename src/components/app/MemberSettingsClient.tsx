@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAddToHomeScreen } from "@/components/app/AddToHomeScreen";
 import type { FitnessProfile, UnitSystem } from "@/lib/fitness/types";
 
@@ -8,12 +9,14 @@ type SettingsClientProps = {
   profile: FitnessProfile;
   username?: string | null;
   enginePlus?: boolean;
+  engineRoomPublic?: boolean;
 };
 
 export default function MemberSettingsClient({
   profile,
   username: initialUsername = "",
   enginePlus: initialPlus = false,
+  engineRoomPublic: initialPublic = false,
 }: SettingsClientProps) {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(
     profile.unit_system ?? "imperial",
@@ -37,6 +40,7 @@ export default function MemberSettingsClient({
   const [username, setUsername] = useState(initialUsername ?? "");
   const [followUser, setFollowUser] = useState("");
   const [enginePlus, setEnginePlus] = useState(initialPlus);
+  const [engineRoomPublic, setEngineRoomPublic] = useState(initialPublic);
   const a2hs = useAddToHomeScreen();
 
   async function save() {
@@ -61,7 +65,23 @@ export default function MemberSettingsClient({
         setError(json.error ?? "Could not save settings.");
         return;
       }
-      setMessage("Settings saved.");
+      const accountRes = await fetch("/api/app/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          engine_room_public_opt_in: engineRoomPublic,
+        }),
+      });
+      const accountJson = (await accountRes.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!accountRes.ok || !accountJson.ok) {
+        setError(accountJson.error ?? "Could not save username.");
+        return;
+      }
+      setMessage("Settings saved. You can head back to the Engine Room.");
       if (notify && typeof Notification !== "undefined") {
         if (Notification.permission === "default") {
           await Notification.requestPermission();
@@ -175,20 +195,53 @@ export default function MemberSettingsClient({
           placeholder="hunter"
         />
       </label>
-      <button
-        type="button"
-        onClick={async () => {
-          await fetch("/api/app/account", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
-          });
-          setMessage("Username saved. Logging stays free.");
-        }}
-        className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange"
-      >
-        Save username
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={async () => {
+            setError(null);
+            const res = await fetch("/api/app/account", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username }),
+            });
+            const json = (await res.json()) as { ok?: boolean; error?: string };
+            if (!res.ok || !json.ok) {
+              setError(json.error ?? "Could not save username.");
+              return;
+            }
+            setMessage("Username saved.");
+          }}
+          className="inline-flex min-h-10 items-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white"
+        >
+          Save username
+        </button>
+        <Link
+          href="/app/engine-room"
+          className="inline-flex min-h-10 items-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange"
+        >
+          Enter the Engine Room
+        </Link>
+      </div>
+
+      <label className="flex items-start gap-2 font-sans text-sm text-brand-ink">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={engineRoomPublic}
+          onChange={async (e) => {
+            const next = e.target.checked;
+            setEngineRoomPublic(next);
+            await fetch("/api/app/account", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ engine_room_public_opt_in: next }),
+            });
+          }}
+        />
+        Join the public Engine Room (see and share posts with other members who
+        opted in)
+      </label>
 
       <label className="block font-sans text-sm font-semibold text-brand-ink">
         Follow a teammate
@@ -237,6 +290,14 @@ export default function MemberSettingsClient({
       ) : null}
       {message ? (
         <p className="font-sans text-sm text-brand-ink">{message}</p>
+      ) : null}
+      {message ? (
+        <Link
+          href="/app/engine-room"
+          className="inline-flex min-h-11 items-center bg-brand-orange px-5 py-2.5 font-sans text-sm font-bold uppercase tracking-[0.08em] text-white"
+        >
+          Enter the Engine Room
+        </Link>
       ) : null}
 
       <button

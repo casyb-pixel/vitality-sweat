@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   }
 
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("engine_room_members")
     .select("id, display_name, username")
     .ilike("username", username)
     .maybeSingle();

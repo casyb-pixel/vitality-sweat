@@ -8,6 +8,7 @@ import { suggestProgression } from "@/lib/fitness/progression";
 export type LastPrescription = {
   weight_lb: number | null;
   reps: number | null;
+  sets?: number | null;
   set_style: WorkoutSetStyle | string;
   message: string;
   source: "progression" | "baseline" | "plan" | "cache" | "hold_stale";
@@ -17,6 +18,7 @@ export type LastPrescription = {
 export type ExercisePrescription = {
   targetWeightLb: number | null;
   targetReps: number | null;
+  targetSets: number | null;
   source: "progression" | "baseline" | "plan" | "cache" | "hold_stale";
   message: string;
   suggestion: ProgressionSuggestion | null;
@@ -31,6 +33,13 @@ type PastSet = {
 
 function formatWeight(lb: number): string {
   return Number.isInteger(lb) ? `${lb} lb` : `${lb.toFixed(1)} lb`;
+}
+
+function formatSetsReps(sets: number | null, reps: number | null): string {
+  if (sets != null && reps != null) return `${sets}×${reps}`;
+  if (reps != null) return `${reps} reps`;
+  if (sets != null) return `${sets} sets`;
+  return "the prescribed work";
 }
 
 function styleSchemeLabel(setStyle: WorkoutSetStyle | string): string {
@@ -71,6 +80,9 @@ export function buildExercisePrescription(input: {
   /** ISO timestamp of last session that logged this exercise. */
   lastSessionAt?: string | null;
   now?: Date;
+  /** Bodyweight / reps-only moves skip load and coach from sets and reps. */
+  repsBased?: boolean;
+  plannedSets?: number | null;
 }): ExercisePrescription {
   const suggestion = suggestProgression(input.exerciseId, input.recentSets, {
     lastSessionAt: input.lastSessionAt,
@@ -78,30 +90,40 @@ export function buildExercisePrescription(input: {
   });
   const scheme = styleSchemeLabel(input.setStyle);
   const name = input.exerciseName.trim() || "This lift";
+  const repsBased = Boolean(input.repsBased);
+  const plannedSets = input.plannedSets ?? null;
 
   if (suggestion) {
-    const weight =
-      suggestion.suggestedWeightLb ??
-      suggestion.lastWeightLb ??
-      input.baselineWeightLb;
+    const weight = repsBased
+      ? null
+      : (suggestion.suggestedWeightLb ??
+        suggestion.lastWeightLb ??
+        input.baselineWeightLb);
     const reps =
       suggestion.suggestedReps ??
       suggestion.lastReps ??
       input.baselineReps ??
       midRepTarget(input.repMin, input.repMax);
+    const sets =
+      suggestion.suggestedSets ?? suggestion.lastSets ?? plannedSets;
 
     if (suggestion.heldForMissedWeek) {
       return {
         targetWeightLb: weight,
         targetReps: reps,
+        targetSets: sets,
         source: "hold_stale",
-        message: `${suggestion.message} Keep the ${scheme} scheme.`,
+        message: repsBased
+          ? `${suggestion.message} Keep the ${scheme} scheme.`
+          : `${suggestion.message} Keep the ${scheme} scheme.`,
         suggestion,
       };
     }
 
     let message: string;
-    if (
+    if (repsBased) {
+      message = `Last ${name.toLowerCase()} ${difficultyPhrase(suggestion.lastAvgDifficulty)} at ${formatSetsReps(suggestion.lastSets, suggestion.lastReps)} - today use ${formatSetsReps(sets, reps)} on the ${scheme} scheme.`;
+    } else if (
       suggestion.lastWeightLb != null &&
       suggestion.lastReps != null &&
       suggestion.suggestedWeightLb != null
@@ -116,6 +138,7 @@ export function buildExercisePrescription(input: {
     return {
       targetWeightLb: weight,
       targetReps: reps,
+      targetSets: sets,
       source: "progression",
       message,
       suggestion,
@@ -125,9 +148,11 @@ export function buildExercisePrescription(input: {
   if (input.baselineWeightLb != null || input.baselineReps != null) {
     const reps =
       input.baselineReps ?? midRepTarget(input.repMin, input.repMax);
-    const weight = input.baselineWeightLb;
-    const message =
-      weight != null && reps != null
+    const weight = repsBased ? null : input.baselineWeightLb;
+    const sets = plannedSets;
+    const message = repsBased
+      ? `No recent sets yet. Start from your baseline: ${formatSetsReps(sets, reps)} on the ${scheme} scheme.`
+      : weight != null && reps != null
         ? `No recent sets yet. Start from your baseline: ${formatWeight(weight)} × ${reps} on the ${scheme} scheme.`
         : weight != null
           ? `No recent sets yet. Start from your baseline: ${formatWeight(weight)} on the ${scheme} scheme.`
@@ -136,6 +161,7 @@ export function buildExercisePrescription(input: {
     return {
       targetWeightLb: weight,
       targetReps: reps,
+      targetSets: sets,
       source: "baseline",
       message,
       suggestion: null,
@@ -144,8 +170,9 @@ export function buildExercisePrescription(input: {
 
   if (input.lastPrescription) {
     return {
-      targetWeightLb: input.lastPrescription.weight_lb,
+      targetWeightLb: repsBased ? null : input.lastPrescription.weight_lb,
       targetReps: input.lastPrescription.reps,
+      targetSets: input.lastPrescription.sets ?? plannedSets,
       source: "cache",
       message:
         input.lastPrescription.message ||
@@ -158,12 +185,15 @@ export function buildExercisePrescription(input: {
   return {
     targetWeightLb: null,
     targetReps: planReps,
+    targetSets: plannedSets,
     source: "plan",
-    message:
-      planReps != null
+    message: repsBased
+      ? planReps != null
+        ? `No history yet. Hit about ${formatSetsReps(plannedSets, planReps)} on the ${scheme} scheme and log how it felt.`
+        : `No history yet. Follow the ${scheme} scheme and log how the reps felt.`
+      : planReps != null
         ? `No history yet. Hit about ${planReps} reps on the ${scheme} scheme and log how it felt.`
         : `No history yet. Follow the ${scheme} scheme and log how it felt.`,
-    suggestion: null,
   };
 }
 
@@ -174,6 +204,7 @@ export function prescriptionToSnapshot(
   return {
     weight_lb: prescription.targetWeightLb,
     reps: prescription.targetReps,
+    sets: prescription.targetSets,
     set_style: setStyle,
     message: prescription.message,
     source: prescription.source,

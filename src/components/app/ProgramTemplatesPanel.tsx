@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
 
-export default function ProgramTemplatesPanel() {
+export default function ProgramTemplatesPanel({
+  hasActiveProgram = false,
+}: {
+  hasActiveProgram?: boolean;
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 
@@ -28,13 +32,8 @@ export default function ProgramTemplatesPanel() {
     }
   }
 
-  return (
-    <section className="border border-brand-ink/10 bg-surface-elevated p-4">
-      <h2 className="font-display text-xl text-brand-ink">Start from a proven plan</h2>
-      <p className="mt-1 font-sans text-sm text-brand-muted">
-            AI generation stays available. You can also build your own split
-            above.
-      </p>
+  const body = (
+    <>
       <ul className="mt-4 grid gap-2 sm:grid-cols-2">
         {NAMED_PROGRAMS.map((program) => (
           <li key={program.slug} className="border border-brand-ink/10 p-3">
@@ -56,6 +55,32 @@ export default function ProgramTemplatesPanel() {
       {message ? (
         <p className="mt-3 font-sans text-sm text-brand-muted">{message}</p>
       ) : null}
+    </>
+  );
+
+  if (hasActiveProgram) {
+    return (
+      <details className="border border-brand-ink/10 bg-surface-elevated p-4">
+        <summary className="cursor-pointer font-display text-lg text-brand-ink">
+          Switch to a proven plan
+        </summary>
+        <p className="mt-2 font-sans text-sm text-brand-muted">
+          Your split stays at the top. These templates replace it if you want a
+          named starting point.
+        </p>
+        {body}
+      </details>
+    );
+  }
+
+  return (
+    <section className="border border-brand-ink/10 bg-surface-elevated p-4">
+      <h2 className="font-display text-xl text-brand-ink">Start from a proven plan</h2>
+      <p className="mt-1 font-sans text-sm text-brand-muted">
+        Prefer a named template? Pick one here. Building your own split stays
+        above.
+      </p>
+      {body}
     </section>
   );
 }
