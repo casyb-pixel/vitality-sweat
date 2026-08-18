@@ -20,6 +20,7 @@ import {
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import WorkoutSafetyNote from "@/components/legal/WorkoutSafetyNote";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
+import PostSessionRanks from "@/components/app/PostSessionRanks";
 import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
 import TrainTogetherSheet from "@/components/app/TrainTogetherSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
@@ -165,6 +166,7 @@ export default function WorkoutRunner({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
+  const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [restTrigger, setRestTrigger] = useState(0);
   const [milestone, setMilestone] = useState<WorkoutMilestone | null>(null);
@@ -642,9 +644,9 @@ export default function WorkoutRunner({
         setError(result.error);
         return;
       }
+      setFinishedSessionId(session.id);
       setSession(null);
       onSessionChange(null);
-      setShowInvitePrompt(true);
       setMessage(
         primaryGoal === "muscle_gain" || primaryGoal === "strength"
           ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
@@ -666,6 +668,23 @@ export default function WorkoutRunner({
       <p className="font-sans text-sm text-brand-muted">
         Starting {day.label}…
       </p>
+    );
+  }
+
+  if (finishedSessionId && !session) {
+    return (
+      <div className="space-y-4">
+        {message ? (
+          <p className="font-sans text-sm text-brand-muted">{message}</p>
+        ) : null}
+        <PostSessionRanks
+          sessionId={finishedSessionId}
+          onDone={() => {
+            setFinishedSessionId(null);
+            setShowInvitePrompt(true);
+          }}
+        />
+      </div>
     );
   }
 

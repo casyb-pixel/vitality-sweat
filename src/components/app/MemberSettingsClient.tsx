@@ -169,7 +169,7 @@ export default function MemberSettingsClient({
           checked={sessionCoachOn}
           onChange={(e) => setSessionCoachOn(e.target.checked)}
         />
-        Workout start coach (challenges and comments when a session begins)
+        Workout start coach and Engine Room coach (off hides both)
       </label>
 
       {a2hs.isStandalone ? (

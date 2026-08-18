@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { bankSessionToEngineRoom } from "@/lib/engine-room/bank-session";
+import { loadGameSnapshot } from "@/lib/engine-room/snapshot";
 import { createClient } from "@/utils/supabase/server";
 import { stripEmDashes } from "@/lib/text/humanize-copy";
 
@@ -115,9 +117,11 @@ export async function GET() {
 
   const { data: fitness } = await supabase
     .from("fitness_profiles")
-    .select("leaderboard_opt_in")
+    .select("leaderboard_opt_in, session_coach_opt_in")
     .eq("id", user.id)
     .maybeSingle();
+
+  const game = await loadGameSnapshot(supabase, user.id);
 
   const [{ data: follows }, { data: blocks }, { data: directory }] =
     await Promise.all([
@@ -166,8 +170,12 @@ export async function GET() {
       username: me?.username ?? null,
       display_name: me?.display_name ?? null,
       leaderboard_opt_in: fitness?.leaderboard_opt_in !== false,
+      session_coach_opt_in: fitness?.session_coach_opt_in !== false,
       engine_room_public_opt_in: Boolean(me?.engine_room_public_opt_in),
     },
+    streak: game.streak,
+    quests: game.quests,
+    rankHighlights: game.rankHighlights,
   });
 }
 
@@ -196,7 +204,10 @@ export async function POST(request: Request) {
 
   const kindRaw = String(form.get("kind") ?? "text");
   const kind =
-    kindRaw === "photo" || kindRaw === "win" || kindRaw === "promo"
+    kindRaw === "photo" ||
+    kindRaw === "win" ||
+    kindRaw === "promo" ||
+    kindRaw === "session"
       ? kindRaw
       : "text";
   const visibilityRaw = String(form.get("visibility") ?? "followers");
@@ -213,6 +224,35 @@ export async function POST(request: Request) {
       );
     }
   }
+  if (kind === "session") {
+    const sessionId = String(form.get("session_id") ?? "").trim();
+    if (!sessionId) {
+      return NextResponse.json(
+        { ok: false, error: "Send session_id to lock ranks." },
+        { status: 400 },
+      );
+    }
+    const banked = await bankSessionToEngineRoom({
+      supabase,
+      userId: user.id,
+      sessionId,
+      visibility,
+    });
+    if (!banked.ok) {
+      return NextResponse.json(
+        { ok: false, error: banked.error },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      id: banked.data.postId,
+      alreadyPosted: banked.data.alreadyPosted,
+      ranks: banked.data.ranks,
+      streakCount: banked.data.streakCount,
+    });
+  }
+
   const body = stripEmDashes(String(form.get("body") ?? "").trim());
   const photoConfirm = String(form.get("photo_confirm") ?? "") === "1";
   const milestoneRaw = String(form.get("milestone") ?? "");

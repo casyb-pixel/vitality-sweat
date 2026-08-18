@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:fitness": "npx tsx --test src/lib/fitness/prescription.test.ts src/lib/fitness/milestones.test.ts src/lib/fitness/one-rep-max.test.ts src/lib/fitness/encyclopedia.test.ts"
+    "test:fitness": "npx tsx --test src/lib/fitness/prescription.test.ts src/lib/fitness/milestones.test.ts src/lib/fitness/one-rep-max.test.ts src/lib/fitness/encyclopedia.test.ts src/lib/engine-room/ranks.test.ts src/lib/engine-room/coach.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.12.0",

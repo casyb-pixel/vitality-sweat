@@ -1,8 +1,8 @@
 import type { PolicyBlock, PolicyPage } from "@/lib/legal/policy-types";
 
 /** Bump this when the Terms change. Existing members must re-accept. */
-export const CURRENT_TERMS_VERSION = "2026-08-14";
-export const TERMS_LAST_UPDATED = "August 14, 2026";
+export const CURRENT_TERMS_VERSION = "2026-08-18";
+export const TERMS_LAST_UPDATED = "August 18, 2026";
 
 export const TERMS_ACCEPT_LABEL =
   "I am 18 or older, or I am a parent or guardian accepting for a minor I supervise. I have read and agree to the Terms of Use and Release of Liability.";
@@ -73,7 +73,7 @@ export const TERMS_PAGE: PolicyPage = {
     { type: "h2", text: "2. Who we are and what this is not" },
     {
       type: "p",
-      text: "Vitality Sweat is a Southwest Louisiana training, coaching, nutrition-education, and youth baseball brand. The Vitality Engine is a free member app that can suggest workouts and meals, including with automated or AI-generated content.",
+      text: "Vitality Sweat is a Southwest Louisiana training, coaching, nutrition-education, and youth baseball brand. The Vitality Engine is a free member app that can suggest workouts and meals, including with automated or AI-generated content. The Engine Room coach is the same kind of automated coaching, not a licensed clinician and not a direct message between members.",
     },
     {
       type: "p",
@@ -159,7 +159,7 @@ export const TERMS_PAGE: PolicyPage = {
     },
     {
       type: "p",
-      text: "Photo posts require you to confirm you are 18 or older and that no minors appear in the photo. Report and block tools exist. There are no direct messages in The Engine Room at this time.",
+      text: "Photo posts require you to confirm you are 18 or older and that no minors appear in the photo. Report and block tools exist. There are no direct messages between members in The Engine Room. The Engine coach is an automated coaching thread for you, not a clinician, and not a conversation with other members. Personal ranks are training estimates from bodyweight and estimated one-rep max, not competition judging.",
     },
     { type: "h2", text: "11. Community Guidelines" },
     {
@@ -210,7 +210,7 @@ export const COMMUNITY_GUIDELINES_PAGE: PolicyPage = {
     { type: "h2", text: "Purpose" },
     {
       type: "p",
-      text: "The Engine Room is a member space for celebrating training, posting encouragement, and sharing wins. Posts default to followers only. You can opt into a public square with other members who also opt in. It is not an open internet social network and not a place for medical advice.",
+      text: "The Engine Room is a member space for celebrating training, posting encouragement, sharing wins, and locking personal lift ranks when you post a finished session. Posts default to followers only. You can opt into a public square with other members who also opt in. It is not an open internet social network and not a place for medical advice.",
     },
     { type: "h2", text: "Required conduct" },
     {
@@ -220,6 +220,7 @@ export const COMMUNITY_GUIDELINES_PAGE: PolicyPage = {
         "Do not post sexual content involving minors, child sexual abuse material, or photos of minors.",
         "Photo posts: confirm you are 18 or older and that no minors are in the photo.",
         "Do not give clinical or dietitian advice to other members as if you were their provider.",
+        "Treat Engine ranks as training estimates, not meet results. The Engine coach is AI, not a clinician.",
         "Do not post illegal content, spam, scams, or impersonation.",
         "Do not share another person's private information.",
       ],
@@ -232,7 +233,7 @@ export const COMMUNITY_GUIDELINES_PAGE: PolicyPage = {
     { type: "h2", text: "Moderation" },
     {
       type: "p",
-      text: "We do not pre-screen posts. We may remove content or suspend accounts. Report and block tools are available. There are no direct messages in The Engine Room in this version of the app.",
+      text: "We do not pre-screen posts. We may remove content or suspend accounts. Report and block tools are available. There are no direct messages between members in The Engine Room in this version of the app. The Engine coach is AI, not a clinician, and not a DM with other members.",
     },
     { type: "h2", text: "Your liability" },
     {
