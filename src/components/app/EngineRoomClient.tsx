@@ -7,6 +7,15 @@ import EngineRoomLeaderboard from "@/components/app/EngineRoomLeaderboard";
 import EngineRoomDirectory, {
   type EngineRoomMember,
 } from "@/components/app/EngineRoomDirectory";
+import EngineRoomHud from "@/components/app/EngineRoomHud";
+import EngineRoomCoach from "@/components/app/EngineRoomCoach";
+import {
+  RANK_BAND_LABEL,
+  type PersonalLiftRank,
+  type RankBand,
+} from "@/lib/engine-room/ranks";
+import type { WeeklyQuest } from "@/lib/engine-room/quests";
+import type { EngineRoomStreak, RankHighlight } from "@/lib/engine-room/snapshot";
 
 type RoomPost = {
   id: string;
@@ -14,7 +23,12 @@ type RoomPost = {
   kind: string;
   body: string;
   image_url: string | null;
-  milestone_payload: { title?: string; detail?: string } | null;
+  milestone_payload: {
+    title?: string;
+    detail?: string;
+    streakCount?: number;
+    ranks?: PersonalLiftRank[];
+  } | null;
   created_at: string;
   visibility?: "followers" | "public" | string;
   author: { display_name: string | null; username: string | null };
@@ -26,7 +40,7 @@ type RoomPost = {
   }[];
 };
 
-const RULES_KEY = "vs_engine_room_rules_v1";
+const RULES_KEY = "vs_engine_room_rules_v2";
 
 const primaryBtn =
   "inline-flex min-h-10 items-center justify-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep disabled:opacity-60";
@@ -42,7 +56,7 @@ export default function EngineRoomClient() {
   const [leaderboardOn, setLeaderboardOn] = useState(true);
   const [publicOptIn, setPublicOptIn] = useState(false);
   const [postPublic, setPostPublic] = useState(false);
-  const [tab, setTab] = useState<"feed" | "leaderboard">("feed");
+  const [tab, setTab] = useState<"feed" | "leaderboard" | "coach">("feed");
   const [accepted, setAccepted] = useState(false);
   const [body, setBody] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -51,6 +65,13 @@ export default function EngineRoomClient() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showPromo, setShowPromo] = useState(false);
+  const [coachOn, setCoachOn] = useState(true);
+  const [streak, setStreak] = useState<EngineRoomStreak>({
+    currentCount: 0,
+    lastPostedOn: null,
+  });
+  const [quests, setQuests] = useState<WeeklyQuest[]>([]);
+  const [rankHighlights, setRankHighlights] = useState<RankHighlight[]>([]);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/app/engine-room");
@@ -62,8 +83,12 @@ export default function EngineRoomClient() {
         id?: string;
         username?: string | null;
         leaderboard_opt_in?: boolean;
+        session_coach_opt_in?: boolean;
         engine_room_public_opt_in?: boolean;
       };
+      streak?: EngineRoomStreak;
+      quests?: WeeklyQuest[];
+      rankHighlights?: RankHighlight[];
       error?: string;
     };
     if (!res.ok || !json.ok) {
@@ -75,7 +100,11 @@ export default function EngineRoomClient() {
     setUsername(json.me?.username ?? null);
     setMeId(json.me?.id ?? null);
     setLeaderboardOn(json.me?.leaderboard_opt_in !== false);
+    setCoachOn(json.me?.session_coach_opt_in !== false);
     setPublicOptIn(Boolean(json.me?.engine_room_public_opt_in));
+    setStreak(json.streak ?? { currentCount: 0, lastPostedOn: null });
+    setQuests(json.quests ?? []);
+    setRankHighlights(json.rankHighlights ?? []);
   }, []);
 
   useEffect(() => {
@@ -263,6 +292,11 @@ export default function EngineRoomClient() {
           <li>No harassment. Report or block if you need to.</li>
           <li>No minors in photos. Confirm 18+ before posting a selfie.</li>
           <li>Celebrate the work. Keep medical claims out of it.</li>
+          <li>
+            Ranks are training estimates from bodyweight and estimated 1RM, not
+            meet judging.
+          </li>
+          <li>The Engine coach is AI. There are no DMs between members.</li>
         </ul>
         <p className="mt-3 font-sans text-sm leading-relaxed text-brand-muted">
           These rules are part of the Terms you accepted. Read the{" "}
@@ -323,6 +357,16 @@ export default function EngineRoomClient() {
           </p>
         )}
 
+        {username ? (
+          <div className="mt-4">
+            <EngineRoomHud
+              streak={streak}
+              quests={quests}
+              rankHighlights={rankHighlights}
+            />
+          </div>
+        ) : null}
+
         <label className="mt-4 flex items-start gap-2 font-sans text-sm text-brand-ink">
           <input
             type="checkbox"
@@ -372,7 +416,6 @@ export default function EngineRoomClient() {
         </div>
       </section>
 
-      {leaderboardOn ? (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -381,21 +424,33 @@ export default function EngineRoomClient() {
           >
             Feed
           </button>
-          <button
-            type="button"
-            className={tab === "leaderboard" ? primaryBtn : secondaryBtn}
-            onClick={() => setTab("leaderboard")}
-          >
-            Leaderboard
-          </button>
+          {leaderboardOn ? (
+            <button
+              type="button"
+              className={tab === "leaderboard" ? primaryBtn : secondaryBtn}
+              onClick={() => setTab("leaderboard")}
+            >
+              Leaderboard
+            </button>
+          ) : null}
+          {coachOn ? (
+            <button
+              type="button"
+              className={tab === "coach" ? primaryBtn : secondaryBtn}
+              onClick={() => setTab("coach")}
+            >
+              Coach
+            </button>
+          ) : null}
         </div>
-      ) : null}
 
       {tab === "leaderboard" && leaderboardOn ? (
         <EngineRoomLeaderboard />
       ) : null}
 
-      {tab === "feed" || !leaderboardOn ? (
+      {tab === "coach" && coachOn ? <EngineRoomCoach /> : null}
+
+      {tab === "feed" ? (
         <>
       <section className="border border-brand-ink/10 bg-surface-elevated p-5">
         <h2 className="font-display text-xl text-brand-ink">Post</h2>
@@ -527,7 +582,28 @@ export default function EngineRoomClient() {
               {post.milestone_payload?.title ? (
                 <p className="mt-2 font-sans text-sm font-semibold text-brand-orange">
                   {post.milestone_payload.title}
+                  {post.kind === "session" && post.milestone_payload.streakCount
+                    ? ` · ${post.milestone_payload.streakCount}-day streak`
+                    : ""}
                 </p>
+              ) : null}
+              {post.kind === "session" && post.milestone_payload?.ranks?.length ? (
+                <ul className="mt-2 space-y-1">
+                  {post.milestone_payload.ranks.map((rank) => (
+                    <li
+                      key={`${post.id}-${rank.exerciseId}`}
+                      className="font-sans text-sm text-brand-ink"
+                    >
+                      <span className="font-semibold text-brand-orange">
+                        {rank.band
+                          ? RANK_BAND_LABEL[rank.band as RankBand]
+                          : "Unranked"}
+                      </span>
+                      {" · "}
+                      {rank.exerciseName}: {rank.detail}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
               {post.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element

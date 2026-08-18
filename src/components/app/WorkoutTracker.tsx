@@ -22,6 +22,7 @@ import {
 } from "@/lib/fitness/workout-logging";
 import InviteFriendsPrompt from "@/components/auth/InviteFriendsPrompt";
 import MilestoneCelebrate from "@/components/app/MilestoneCelebrate";
+import PostSessionRanks from "@/components/app/PostSessionRanks";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
 import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
@@ -59,6 +60,7 @@ export default function WorkoutTracker({
     initialSession,
   );
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
+  const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<ExerciseEquipment | "">("");
   const [category, setCategory] = useState<ExerciseCategory | "">("");
   const [search, setSearch] = useState("");
@@ -230,6 +232,7 @@ export default function WorkoutTracker({
         setError(result.error);
         return;
       }
+      setFinishedSessionId(session.id);
       setSession(null);
       setLoggedSets([]);
       setSetNumber(1);
@@ -238,7 +241,6 @@ export default function WorkoutTracker({
           ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
           : "Workout completed. Nice work.",
       );
-      setShowInvitePrompt(true);
       void loadHistory(exerciseId);
     });
   }
@@ -452,7 +454,15 @@ export default function WorkoutTracker({
         }}
       />
 
-      {showInvitePrompt ? (
+      {finishedSessionId ? (
+        <PostSessionRanks
+          sessionId={finishedSessionId}
+          onDone={() => {
+            setFinishedSessionId(null);
+            setShowInvitePrompt(true);
+          }}
+        />
+      ) : showInvitePrompt ? (
         <InviteFriendsPrompt
           variant="post_workout"
           visible
