@@ -7,7 +7,11 @@ import {
 import { getCreatorRole } from "@/lib/auth/creator";
 import { createClient } from "@/utils/supabase/server";
 
-export const runtime = "nodejs";
+/**
+ * Edge Runtime (same as blog-assist / video-assist): avoids Vercel Hobby Node
+ * cold-start / gateway HTML 502 pages that Video Studio can't parse as JSON.
+ */
+export const runtime = "edge";
 
 type IdeaSetRow = {
   id: string;
@@ -30,7 +34,9 @@ type SaveBody = {
 };
 
 function normalizeIdeas(value: unknown): ShortFormVideoIdea[] {
-  return normalizeVideoIdeas(value, 5).map(serializeVideoIdea);
+  return normalizeVideoIdeas(value, 5)
+    .filter((idea) => idea.kind !== "custom")
+    .map(serializeVideoIdea);
 }
 
 /**

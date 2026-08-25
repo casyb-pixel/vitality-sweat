@@ -166,7 +166,10 @@ export default function BlogWizard({
         summary?: string;
         options?: BlogIdeaOption[];
         researchWarning?: string | null;
-      }>(res);
+      }>(res, {
+        timeoutHint:
+          "The AI service timed out or crashed before sending a response. Tap Find Trending Angles again. Usually works on retry.",
+      });
 
       if (!parsed.ok) {
         setTrendsError(parsed.error);

@@ -21,8 +21,8 @@ export type CreatorPublishedPost = {
   bodyMarkdown: string;
 };
 
-/** Blog-tied short, or a strength-exercise how-to Short. */
-export type ShortFormVideoIdeaKind = "blog" | "exercise_howto";
+/** Blog-tied short, strength-exercise how-to, or Hunter's own concept. */
+export type ShortFormVideoIdeaKind = "blog" | "exercise_howto" | "custom";
 
 /**
  * One short-form concept from `generate_video_ideas`.

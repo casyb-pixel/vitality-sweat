@@ -5,9 +5,13 @@
  */
 export async function readApiJson<T = unknown>(
   res: Response,
+  options?: { timeoutHint?: string },
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   const raw = await res.text();
   const trimmed = raw.trim();
+  const timeoutHint =
+    options?.timeoutHint?.trim() ||
+    "The AI service timed out or crashed before sending a response. Try again in a moment.";
 
   if (!trimmed) {
     return {
@@ -30,8 +34,7 @@ export async function readApiJson<T = unknown>(
       }
       return {
         ok: false,
-        error:
-          "The AI service timed out or crashed before sending a response. Tap Find Trending Angles again — usually works on retry.",
+        error: timeoutHint,
       };
     }
     return {

@@ -18,6 +18,7 @@ import {
 } from "@/lib/video/pick-exercises-for-howto";
 import { createClient } from "@/utils/supabase/server";
 import { GYM_BRO_SCRIPT_RULES, NO_EM_DASH_RULE, stripEmDashes } from "@/lib/text/humanize-copy";
+import { absoluteUrl } from "@/lib/seo/site";
 
 export const runtime = "edge";
 export const maxDuration = 60;
@@ -174,14 +175,18 @@ export async function POST(request: Request) {
       return jsonError("Provide the blog `title` / `blogTitle`.", 400);
     }
 
+    const rawKind = body.concept?.kind ?? body.idea?.kind;
     const conceptKind =
-      body.concept?.kind === "exercise_howto" ||
-      body.idea?.kind === "exercise_howto"
+      rawKind === "exercise_howto"
         ? "exercise_howto"
-        : "blog";
+        : rawKind === "custom"
+          ? "custom"
+          : "blog";
+    const postSlug = (body.post?.slug ?? "").trim() || null;
     return handleGenerateSocialPackage({
       apiKey,
       blogTitle,
+      postSlug,
       concept: {
         title: conceptTitle,
         videoHook: (
@@ -621,11 +626,12 @@ async function regenerateExerciseHowTo(input: {
 async function handleGenerateSocialPackage(input: {
   apiKey: string;
   blogTitle: string;
+  postSlug: string | null;
   concept: {
     title: string;
     videoHook: string;
     shootingConcept: string;
-    kind: "blog" | "exercise_howto";
+    kind: "blog" | "exercise_howto" | "custom";
     exerciseName: string | null;
     formTips: string[] | null;
     voiceoverScript: string | null;
@@ -635,9 +641,12 @@ async function handleGenerateSocialPackage(input: {
   hasVoiceOver: boolean;
 }) {
   const model = getGeminiModel();
+  const chronicleUrl = input.postSlug
+    ? absoluteUrl(`/blog/${input.postSlug}`)
+    : null;
   const assetLine = input.assetsReady
-    ? `Assets confirmed â€” video clip: ${input.hasVideo ? "yes" : "no"}, voice-over: ${input.hasVoiceOver ? "yes" : "no"}.`
-    : "Assets pending â€” still write the full package as if he will post with gym footage + VO.";
+    ? `Assets confirmed - video clip: ${input.hasVideo ? "yes" : "no"}, voice-over: ${input.hasVoiceOver ? "yes" : "no"}.`
+    : "Assets pending - still write the full package as if he will post with gym footage + VO.";
 
   const howToLine =
     input.concept.kind === "exercise_howto"
@@ -652,7 +661,13 @@ async function handleGenerateSocialPackage(input: {
         ]
           .filter(Boolean)
           .join("\n")
-      : "This is a blog-related short promoting Sweatlife Chronicles + free Vitality Engine signup.";
+      : input.concept.kind === "custom"
+        ? [
+            "This is HUNTER'S OWN IDEA. Do not invent a new concept or overwrite what he said.",
+            "Keep his wording and intent. Write captions that match HIS video idea.",
+            "He filmed this as a talking-head / creative clip for Vitality Sweat social accounts.",
+          ].join("\n")
+        : "This is a blog-related short promoting Sweatlife Chronicles + free Vitality Engine signup.";
 
   const prompt = [
     "You are an expert social media growth manager for Vitality Sweat / Sweatlife Chronicles.",
@@ -669,6 +684,9 @@ async function handleGenerateSocialPackage(input: {
     "- thumbnailTitle: short text overlay suggestion (max 6 words) for the first frame / thumbnail",
     "- seoMetadata: platform keyword tags plus a 1-2 sentence SEO description that mentions free signup",
     "- For YouTube: description should include the exercise name (how-tos) and invite viewers to the free Vitality Engine app",
+    chronicleUrl
+      ? `- YouTube / SEO description MUST include this Chronicle URL on its own line: ${chronicleUrl}`
+      : null,
     "",
     "Return ONLY valid JSON (no markdown fences) with this exact shape:",
     JSON.stringify({
@@ -684,6 +702,7 @@ async function handleGenerateSocialPackage(input: {
     }),
     "",
     `BLOG TITLE:\n${input.blogTitle}`,
+    chronicleUrl ? `CHRONICLE URL:\n${chronicleUrl}` : null,
     `SELECTED VIDEO CONCEPT:\n${input.concept.title}`,
     input.concept.videoHook
       ? `VIDEO HOOK:\n${input.concept.videoHook}`

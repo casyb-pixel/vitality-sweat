@@ -23,7 +23,9 @@ function coerceScriptBeats(
 }
 
 function coerceKind(value: unknown): ShortFormVideoIdeaKind {
-  return value === "exercise_howto" ? "exercise_howto" : "blog";
+  if (value === "exercise_howto") return "exercise_howto";
+  if (value === "custom") return "custom";
+  return "blog";
 }
 
 /**
@@ -85,7 +87,14 @@ export function normalizeVideoIdea(item: unknown): ShortFormVideoIdea | null {
       typeof row.durationSec === "number" && Number.isFinite(row.durationSec)
         ? Math.round(row.durationSec)
         : null,
-    filmMode: row.filmMode === "talking_head" ? "talking_head" : "silent_vo",
+    filmMode:
+      kind === "custom"
+        ? row.filmMode === "silent_vo"
+          ? "silent_vo"
+          : "talking_head"
+        : row.filmMode === "talking_head"
+          ? "talking_head"
+          : "silent_vo",
     shotList: asStringArray(row.shotList).slice(0, 8),
     coachNote:
       typeof row.coachNote === "string" && row.coachNote.trim()
@@ -111,7 +120,12 @@ export function normalizeVideoIdeas(
 
 /** Serialize for jsonb persistence (drop empties that confuse older readers). */
 export function serializeVideoIdea(idea: ShortFormVideoIdea): ShortFormVideoIdea {
-  const kind = idea.kind === "exercise_howto" ? "exercise_howto" : "blog";
+  const kind: ShortFormVideoIdeaKind =
+    idea.kind === "exercise_howto"
+      ? "exercise_howto"
+      : idea.kind === "custom"
+        ? "custom"
+        : "blog";
   return {
     title: idea.title.trim(),
     videoHook: (idea.videoHook ?? "").trim(),
@@ -127,7 +141,14 @@ export function serializeVideoIdea(idea: ShortFormVideoIdea): ShortFormVideoIdea
     scriptBeats: idea.scriptBeats ?? null,
     spokenLines: idea.spokenLines?.map((l) => l.trim()).filter(Boolean).slice(0, 12) ?? null,
     durationSec: idea.durationSec ?? null,
-    filmMode: idea.filmMode === "talking_head" ? "talking_head" : "silent_vo",
+    filmMode:
+      kind === "custom"
+        ? idea.filmMode === "silent_vo"
+          ? "silent_vo"
+          : "talking_head"
+        : idea.filmMode === "talking_head"
+          ? "talking_head"
+          : "silent_vo",
     shotList: idea.shotList?.map((s) => s.trim()).filter(Boolean).slice(0, 8) ?? null,
     coachNote: (idea.coachNote ?? "").trim() || null,
   };

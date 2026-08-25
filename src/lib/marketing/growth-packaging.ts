@@ -114,6 +114,7 @@ export function buildVideoGrowthPromoPack(input: {
   baseCaption?: string;
   baseDescription?: string;
   market?: MetroId | null;
+  blogSlug?: string | null;
 }): VideoGrowthPromoPack {
   const copy = marketSignupCopy(input.market);
   const signupUrl = freeSignupAbsoluteUrl(input.market);
@@ -122,6 +123,8 @@ export function buildVideoGrowthPromoPack(input: {
     input.conceptTitle;
   const blogBit = input.blogTitle.trim();
   const place = copy.shortLabel;
+  const slug = input.blogSlug?.trim() || "";
+  const chronicleUrl = slug ? absoluteUrl(`/blog/${slug}`) : "";
 
   return {
     captionVariants: {
@@ -136,11 +139,14 @@ export function buildVideoGrowthPromoPack(input: {
       ].join("\n"),
       facebook: [
         `${blogBit ? `From the Sweatlife Chronicles: ${blogBit}` : "New from Vitality Sweat."}`,
+        chronicleUrl ? `Read the post: ${chronicleUrl}` : null,
         "",
         `${copy.trainWithUs}. Hunter's coaching is free to start in the Vitality Engine - log sessions, plan meals, share the grocery list.`,
         "",
         `Create your free account: ${signupUrl}`,
-      ].join("\n"),
+      ]
+        .filter((line): line is string => line != null)
+        .join("\n"),
       youtubeShorts: [
         `${hook} #VitalitySweat #Shorts`,
         "",
@@ -151,10 +157,13 @@ export function buildVideoGrowthPromoPack(input: {
     descriptionWithAppLink: [
       input.baseDescription?.trim() ||
         `${input.conceptTitle} - Vitality Sweat / Sweatlife Chronicles.`,
+      chronicleUrl ? `Read more: ${chronicleUrl}` : null,
       "",
       `${copy.trainWithUs}. Create a free Vitality Engine account: ${signupUrl}`,
       `Train. Fuel. Compete. - ${place}.`,
-    ].join("\n"),
+    ]
+      .filter((line): line is string => line != null)
+      .join("\n"),
     companionPostTitle: blogBit
       ? `${blogBit}: what to do next in the free app (${place})`
       : `After this clip: your free Vitality Engine next step in ${place}`,

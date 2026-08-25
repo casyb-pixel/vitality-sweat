@@ -13,6 +13,7 @@ import { extractSectionOptionsFromPostBody } from "@/lib/blog/heading-anchor";
 import VideoTeleprompter, {
   scriptFromIdea,
 } from "@/components/creator/VideoTeleprompter";
+import { readApiJson } from "@/lib/http/read-api-json";
 import type {
   CreatorPublishedPost,
   ShortFormVideoIdea,
@@ -24,6 +25,12 @@ import type {
   VideoSocialPackage,
   VideoStudioPhase,
 } from "@/lib/video/video-studio";
+import { buildCustomVideoIdea } from "@/lib/video/custom-idea";
+import {
+  getSpeechRecognitionCtor,
+  isSpeechDictationAvailable,
+  transcriptFromSpeechEvent,
+} from "@/lib/video/speech-dictation";
 import {
   canLikelyCompressInBrowser,
   COMPRESS_OFFER_BYTES,
@@ -41,7 +48,7 @@ import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/cl
 import type { VideoScriptPreset } from "@/lib/marketing/campaign-templates";
 import { APP_INVITE_SCRIPT_GUIDANCE } from "@/lib/marketing/campaign-templates";
 import { METROS, type MetroId } from "@/lib/markets/metros";
-import { SOCIAL_LINKS } from "@/lib/seo/site";
+import { SOCIAL_LINKS, absoluteUrl } from "@/lib/seo/site";
 
 const PHASE_ORDER: VideoStudioPhase[] = [
   "SELECT_BLOG_CONTEXT",
@@ -64,6 +71,9 @@ const bigButtonClass =
 
 const secondaryButtonClass =
   "inline-flex min-h-12 w-full items-center justify-center border-2 border-brand-ink/20 bg-surface-elevated px-4 py-3 font-sans text-sm font-bold uppercase tracking-[0.08em] text-brand-ink transition-colors hover:border-brand-orange hover:text-brand-orange disabled:opacity-60";
+
+const IDEAS_TIMEOUT_HINT =
+  "The AI service timed out or crashed before sending a response. Tap Try again. Your idea card still works if you want to film your own concept.";
 
 function Spinner({ dark = false }: { dark?: boolean }) {
   return (
@@ -148,6 +158,12 @@ export default function VideoWizard({
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(
     null,
   );
+  const [customCaptureOpen, setCustomCaptureOpen] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customNotes, setCustomNotes] = useState("");
+  const [dictating, setDictating] = useState(false);
+  const [dictateError, setDictateError] = useState<string | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<ShortFormVideoIdea | null>(
     null,
   );
@@ -319,6 +335,7 @@ export default function VideoWizard({
       if (mergedUrl) URL.revokeObjectURL(mergedUrl);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      recognitionRef.current?.stop();
     };
   }, [videoUrl, audioUrl, mergedUrl]);
 
@@ -327,12 +344,12 @@ export default function VideoWizard({
     setSelectedIdea(null);
     setIdeas([]);
     setIdeasError(null);
+    setCustomCaptureOpen(false);
     setPack(null);
     setGrowthPack(null);
     setPackError(null);
     setMergeError(null);
     setPhase("VIDEO_IDEAS_DISPLAY");
-    // Keep loading ideas for this blog (existing effect / call below).
     await loadIdeasForPost(post);
   }
 
@@ -479,34 +496,39 @@ export default function VideoWizard({
     setPhase("VIDEO_IDEAS_DISPLAY");
 
     try {
-      // Prefer locked ideas so gym trips / re-entry don't reshuffle the set.
       const lockedRes = await fetch(
         `/api/creator/video-ideas?postId=${encodeURIComponent(post.id)}`,
       );
-      const lockedJson = (await lockedRes.json()) as {
+      const lockedParsed = await readApiJson<{
         ok?: boolean;
         locked?: boolean;
         ideas?: ShortFormVideoIdea[];
         lockedAt?: string;
         error?: string;
-      };
-      if (
-        lockedRes.ok &&
-        lockedJson.ok &&
-        lockedJson.locked &&
-        lockedJson.ideas &&
-        lockedJson.ideas.length > 0
-      ) {
-        const howtoCount = lockedJson.ideas.filter(
-          (idea) => idea.kind === "exercise_howto",
-        ).length;
-        if (howtoCount >= 2) {
-          setIdeas(lockedJson.ideas);
-          setIdeasLocked(true);
-          setIdeasLockedAt(lockedJson.lockedAt ?? null);
-          return;
+      }>(lockedRes, { timeoutHint: IDEAS_TIMEOUT_HINT });
+
+      if (lockedParsed.ok) {
+        const lockedJson = lockedParsed.data;
+        if (
+          lockedRes.ok &&
+          lockedJson.ok &&
+          lockedJson.locked &&
+          lockedJson.ideas &&
+          lockedJson.ideas.length > 0
+        ) {
+          const aiIdeas = lockedJson.ideas.filter(
+            (idea) => idea.kind !== "custom",
+          );
+          const howtoCount = aiIdeas.filter(
+            (idea) => idea.kind === "exercise_howto",
+          ).length;
+          if (howtoCount >= 2) {
+            setIdeas(aiIdeas);
+            setIdeasLocked(true);
+            setIdeasLockedAt(lockedJson.lockedAt ?? null);
+            return;
+          }
         }
-        // Legacy 5-blog locks: fall through and mint a fresh 3+2 batch.
       }
 
       const res = await fetch("/api/creator/video-assist", {
@@ -521,16 +543,20 @@ export default function VideoWizard({
             title: post.title,
             excerpt: post.excerpt,
             keywords: post.keywords,
-            bodyMarkdown: post.bodyMarkdown || post.bodyPreview,
             slug: post.slug,
           },
         }),
       });
-      const data = (await res.json()) as {
+      const parsed = await readApiJson<{
         ok: boolean;
         error?: string;
         ideas?: ShortFormVideoIdea[];
-      };
+      }>(res, { timeoutHint: IDEAS_TIMEOUT_HINT });
+      if (!parsed.ok) {
+        setIdeasError(parsed.error);
+        return;
+      }
+      const data = parsed.data;
       if (!res.ok || !data.ok || !data.ideas?.length) {
         setIdeasError(data.error ?? "Couldn't generate video ideas.");
         return;
@@ -547,14 +573,22 @@ export default function VideoWizard({
           ideas: data.ideas,
         }),
       });
-      const saveJson = (await saveRes.json()) as {
+      const saveParsed = await readApiJson<{
         ok?: boolean;
         ideas?: ShortFormVideoIdea[];
         lockedAt?: string;
         error?: string;
-      };
+      }>(saveRes, { timeoutHint: IDEAS_TIMEOUT_HINT });
+      if (!saveParsed.ok) {
+        setIdeas(data.ideas);
+        setIdeasError(
+          saveParsed.error ||
+            "Ideas generated but couldn't lock them. They may reshuffle if you leave.",
+        );
+        return;
+      }
+      const saveJson = saveParsed.data;
       if (!saveRes.ok || !saveJson.ok) {
-        // Still show generated ideas even if lock failed — warn creator.
         setIdeas(data.ideas);
         setIdeasError(
           saveJson.error ??
@@ -563,7 +597,9 @@ export default function VideoWizard({
         return;
       }
 
-      setIdeas(saveJson.ideas ?? data.ideas);
+      setIdeas(
+        (saveJson.ideas ?? data.ideas).filter((idea) => idea.kind !== "custom"),
+      );
       setIdeasLocked(true);
       setIdeasLockedAt(saveJson.lockedAt ?? null);
     } catch (error) {
@@ -577,6 +613,8 @@ export default function VideoWizard({
 
   async function regenerateIdea(index: number) {
     if (!selectedPost || regeneratingIndex != null) return;
+    const current = ideas[index];
+    if (!current || current.kind === "custom") return;
     setRegeneratingIndex(index);
     setIdeasError(null);
     try {
@@ -592,17 +630,20 @@ export default function VideoWizard({
           scriptPreset,
           post: {
             title: selectedPost.title,
-            bodyMarkdown:
-              selectedPost.bodyMarkdown || selectedPost.bodyPreview,
             slug: selectedPost.slug,
           },
         }),
       });
-      const data = (await res.json()) as {
+      const parsed = await readApiJson<{
         ok?: boolean;
         idea?: ShortFormVideoIdea;
         error?: string;
-      };
+      }>(res, { timeoutHint: IDEAS_TIMEOUT_HINT });
+      if (!parsed.ok) {
+        setIdeasError(parsed.error);
+        return;
+      }
+      const data = parsed.data;
       if (!res.ok || !data.ok || !data.idea) {
         setIdeasError(data.error ?? "Couldn't regenerate that idea.");
         return;
@@ -618,29 +659,30 @@ export default function VideoWizard({
           idea: data.idea,
         }),
       });
-      const saveJson = (await saveRes.json()) as {
+      const saveParsed = await readApiJson<{
         ok?: boolean;
         ideas?: ShortFormVideoIdea[];
         lockedAt?: string;
         error?: string;
-      };
-      if (!saveRes.ok || !saveJson.ok || !saveJson.ideas) {
-        // Apply locally even if persistence failed.
+      }>(saveRes, { timeoutHint: IDEAS_TIMEOUT_HINT });
+      if (!saveParsed.ok || !saveRes.ok || !saveParsed.data.ok || !saveParsed.data.ideas) {
         setIdeas((prev) => {
           const next = [...prev];
           next[index] = data.idea!;
           return next;
         });
         setIdeasError(
-          saveJson.error ??
+          (!saveParsed.ok ? saveParsed.error : saveParsed.data.error) ??
             "Replaced locally, but couldn't save the locked set.",
         );
         return;
       }
 
-      setIdeas(saveJson.ideas);
+      setIdeas(
+        saveParsed.data.ideas.filter((idea) => idea.kind !== "custom"),
+      );
       setIdeasLocked(true);
-      setIdeasLockedAt(saveJson.lockedAt ?? null);
+      setIdeasLockedAt(saveParsed.data.lockedAt ?? null);
     } catch (error) {
       setIdeasError(
         error instanceof Error
@@ -673,11 +715,16 @@ export default function VideoWizard({
           concept: idea,
         }),
       });
-      const data = (await res.json()) as {
+      const parsed = await readApiJson<{
         ok: boolean;
         error?: string;
         project?: VideoProjectState;
-      };
+      }>(res, { timeoutHint: IDEAS_TIMEOUT_HINT });
+      if (!parsed.ok) {
+        setIdeasError(parsed.error);
+        return;
+      }
+      const data = parsed.data;
       if (!res.ok || !data.ok || !data.project) {
         setIdeasError(data.error ?? "Couldn't start the video project.");
         return;
@@ -691,6 +738,79 @@ export default function VideoWizard({
           : "Network error starting the video project.",
       );
     }
+  }
+
+  function stopDictation() {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setDictating(false);
+  }
+
+  function openCustomCapture() {
+    stopDictation();
+    setCustomTitle("");
+    setCustomNotes("");
+    setDictateError(null);
+    setCustomCaptureOpen(true);
+  }
+
+  function toggleDictation() {
+    if (dictating) {
+      stopDictation();
+      return;
+    }
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      setDictateError("This browser cannot dictate. Type the idea in the box.");
+      return;
+    }
+    setDictateError(null);
+    const recognition = new Ctor();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      const { finalChunk } = transcriptFromSpeechEvent(event);
+      if (!finalChunk) return;
+      setCustomNotes((prev) =>
+        [prev.trim(), finalChunk].filter(Boolean).join(" "),
+      );
+    };
+    recognition.onerror = (event) => {
+      const code = event.error ?? "";
+      if (code === "aborted" || code === "no-speech") return;
+      setDictateError(
+        code === "not-allowed"
+          ? "Microphone was blocked. Allow mic access or type the idea."
+          : "Could not hear that. Try again or type it.",
+      );
+      stopDictation();
+    };
+    recognition.onend = () => {
+      setDictating(false);
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setDictating(true);
+    } catch {
+      setDictateError("Could not start the mic. Type the idea instead.");
+      recognitionRef.current = null;
+    }
+  }
+
+  async function submitCustomIdea() {
+    const notes = customNotes.trim();
+    if (!notes) {
+      setDictateError("Say or type what you want to film.");
+      return;
+    }
+    stopDictation();
+    setCustomCaptureOpen(false);
+    await chooseIdea(
+      buildCustomVideoIdea({ notes, title: customTitle }),
+    );
   }
 
   async function uploadAsset(
@@ -963,6 +1083,7 @@ export default function VideoWizard({
             formTips: selectedIdea.formTips ?? null,
             voiceoverScript: selectedIdea.voiceoverScript ?? null,
           },
+          post: { slug: selectedPost.slug, title: selectedPost.title },
           assetsReady: Boolean(videoAsset || voiceoverAsset || mergedAsset),
           hasVideo: Boolean(videoAsset || mergedAsset),
           hasVoiceOver: Boolean(voiceoverAsset),
@@ -1132,13 +1253,15 @@ export default function VideoWizard({
     if (!selectedPost || !selectedIdea || !pack) return;
 
     const isHowTo = selectedIdea.kind === "exercise_howto";
+    const isCustom = selectedIdea.kind === "custom";
+    const chronicleUrl = absoluteUrl(`/blog/${selectedPost.slug}`);
     const lines = [
       `# Vitality Sweat Production Pack`,
       ``,
       `Blog: ${selectedPost.title}`,
-      `URL: /blog/${selectedPost.slug}`,
+      `URL: ${chronicleUrl}`,
       `Video idea: ${selectedIdea.title}`,
-      `Kind: ${isHowTo ? "Exercise how-to" : "Blog short"}`,
+      `Kind: ${isHowTo ? "Exercise how-to" : isCustom ? "Hunter's idea" : "Blog short"}`,
       isHowTo && selectedIdea.exerciseName
         ? `Exercise: ${selectedIdea.exerciseName}`
         : null,
@@ -1168,6 +1291,9 @@ export default function VideoWizard({
       `TikTok: ${pack.seoMetadata.tiktok.join(", ") || "-"}`,
       `YouTube Shorts: ${pack.seoMetadata.youtubeShorts.join(", ") || "-"}`,
       `Instagram Reels: ${pack.seoMetadata.instagramReels.join(", ") || "-"}`,
+      growthPack?.descriptionWithAppLink
+        ? `## Description with Chronicle + app link\n${growthPack.descriptionWithAppLink}`
+        : null,
       ``,
       `## Assets`,
       `Project ID: ${project?.id ?? "not synced"}`,
@@ -1209,6 +1335,16 @@ export default function VideoWizard({
     }
     if (videoFile) {
       downloadBlob(videoFile, videoFile.name);
+      return;
+    }
+    if (videoAsset?.signedUrl) {
+      void fetch(videoAsset.signedUrl)
+        .then((r) => r.blob())
+        .then((blob) =>
+          downloadBlob(blob, videoAsset.fileName || `clip-${slug}.mp4`),
+        )
+        .catch(() => undefined);
+      return;
     }
     if (audioBlob) {
       const ext = audioBlob.type.includes("mp4") ? "m4a" : "webm";
@@ -1265,6 +1401,11 @@ export default function VideoWizard({
     setIdeas([]);
     setSelectedIdea(null);
     setIdeasError(null);
+    setCustomCaptureOpen(false);
+    setCustomTitle("");
+    setCustomNotes("");
+    setDictateError(null);
+    stopDictation();
     setPack(null);
     setGrowthPack(null);
     setPackError(null);
@@ -1305,10 +1446,9 @@ export default function VideoWizard({
             Pick a Chronicle to film
           </h2>
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
-            Pulls your latest published posts. Tap one and we&apos;ll spin up 3
-            blog Shorts plus 2 strength exercise how-tos (exercises that still
-            need a video).
-            short-form video angles.
+            Pick the Chronicle that fits the clip so we can drop a link in the
+            description when you post. You get AI Shorts plus a blank Your idea
+            card if you already know what you want to film.
           </p>
 
           <div className="space-y-3 border-2 border-brand-ink/10 bg-surface-elevated p-4">
@@ -1476,7 +1616,7 @@ export default function VideoWizard({
       {phase === "VIDEO_IDEAS_DISPLAY" ? (
         <section className="space-y-4" aria-label="Step 2: Video ideas">
           <h2 className="font-display text-[clamp(1.5rem,5.5vw,2rem)] leading-tight text-brand-ink">
-            Short-form angles
+            {customCaptureOpen ? "Your idea" : "Short-form angles"}
           </h2>
           {selectedPost ? (
             <p className="border-l-4 border-brand-orange bg-brand-orange/5 px-3 py-2 font-sans text-sm leading-snug text-brand-ink">
@@ -1484,13 +1624,107 @@ export default function VideoWizard({
             </p>
           ) : null}
 
+          {customCaptureOpen ? (
+            <div className="space-y-4">
+              <p className="font-sans text-sm leading-relaxed text-brand-muted">
+                Say or type what you want to film. No script. We&apos;ll brand
+                the clip and add a link to this Chronicle when you post.
+              </p>
+              <label className="block space-y-1.5">
+                <span className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  Title (optional)
+                </span>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="Leave blank to use your first sentence"
+                  className="min-h-12 w-full border-2 border-brand-ink/15 bg-surface-elevated px-3 py-2 font-sans text-sm text-brand-ink placeholder:text-brand-muted"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                  The idea
+                </span>
+                <textarea
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  rows={6}
+                  placeholder="What should this video be about?"
+                  className="w-full border-2 border-brand-ink/15 bg-surface-elevated px-3 py-2 font-sans text-sm leading-relaxed text-brand-ink placeholder:text-brand-muted"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={toggleDictation}
+                className={`flex min-h-16 w-full flex-col items-center justify-center gap-1 border-2 px-4 py-3 text-center ${
+                  dictating
+                    ? "border-red-600 bg-red-50"
+                    : "border-dashed border-brand-ink/25 bg-surface hover:border-brand-orange"
+                }`}
+              >
+                <span
+                  className={`font-sans text-xs font-bold uppercase tracking-[0.14em] ${
+                    dictating ? "text-red-700" : "text-brand-orange"
+                  }`}
+                >
+                  {dictating
+                    ? "Listening... tap to stop"
+                    : isSpeechDictationAvailable()
+                      ? "Speak the idea"
+                      : "Dictation unavailable on this browser"}
+                </span>
+                <span className="font-sans text-xs text-brand-muted">
+                  {isSpeechDictationAvailable()
+                    ? "Uses your phone mic. You can also type."
+                    : "Type the idea in the box above."}
+                </span>
+              </button>
+              {dictateError ? (
+                <p
+                  className="font-sans text-sm font-semibold text-red-700"
+                  role="alert"
+                >
+                  {dictateError}
+                </p>
+              ) : null}
+              {ideasError ? (
+                <p
+                  className="font-sans text-sm font-semibold text-red-700"
+                  role="alert"
+                >
+                  {ideasError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void submitCustomIdea()}
+                disabled={!customNotes.trim()}
+                className={bigButtonClass}
+              >
+                Record this idea
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  stopDictation();
+                  setCustomCaptureOpen(false);
+                  setDictateError(null);
+                }}
+                className={secondaryButtonClass}
+              >
+                Back to angles
+              </button>
+            </div>
+          ) : (
+            <>
           {ideasLocked && !ideasLoading ? (
             <p className="border border-brand-ink/10 bg-surface-elevated px-3 py-2 font-sans text-sm text-brand-muted">
               Locked in
               {ideasLockedAt
                 ? ` · ${formatDate(ideasLockedAt)}`
-                : ""}. Three blog angles + two exercise how-tos stay put when
-              you leave. Reject one slot to swap just that idea.
+                : ""}. AI angles stay put when you leave. Your idea is always
+              open if you want to film something else.
             </p>
           ) : null}
 
@@ -1508,7 +1742,7 @@ export default function VideoWizard({
               >
                 {ideasError}
               </p>
-              {selectedPost && !ideas.length ? (
+              {selectedPost ? (
                 <button
                   type="button"
                   onClick={() => void selectBlog(selectedPost)}
@@ -1521,6 +1755,25 @@ export default function VideoWizard({
           ) : null}
 
           <div className="space-y-3">
+            <article className="border-2 border-brand-orange/50 bg-brand-orange/5 p-4">
+              <p className="font-sans text-[0.65rem] font-bold uppercase tracking-[0.12em] text-brand-orange">
+                Your idea
+              </p>
+              <p className="mt-1 font-display text-lg leading-snug text-brand-ink">
+                Blank. You call this one.
+              </p>
+              <p className="mt-2 font-sans text-sm leading-relaxed text-brand-muted">
+                Speak the concept, record the clip, and we&apos;ll package it
+                with Vitality Sweat captions plus a link to this Chronicle.
+              </p>
+              <button
+                type="button"
+                onClick={openCustomCapture}
+                className="mt-4 inline-flex min-h-12 w-full items-center justify-center bg-brand-orange px-4 py-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+              >
+                Film your idea
+              </button>
+            </article>
             {ideas.map((idea, index) => {
               const isHowTo = idea.kind === "exercise_howto";
               return (
@@ -1628,6 +1881,8 @@ export default function VideoWizard({
           >
             ← Pick a different blog
           </button>
+            </>
+          )}
         </section>
       ) : null}
 
@@ -1639,6 +1894,11 @@ export default function VideoWizard({
           <p className="border-l-4 border-brand-orange bg-brand-orange/5 px-3 py-2 font-display text-base leading-snug text-brand-ink">
             {selectedIdea.title}
           </p>
+          {selectedIdea.kind === "custom" && selectedIdea.shootingConcept ? (
+            <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-brand-ink">
+              {selectedIdea.shootingConcept}
+            </p>
+          ) : null}
           {selectedIdea.kind === "exercise_howto" &&
           selectedIdea.formTips?.length ? (
             <div className="border border-brand-ink/10 bg-surface-elevated px-3 py-3">
@@ -1675,18 +1935,20 @@ export default function VideoWizard({
             </div>
           ) : null}
           <p className="font-sans text-sm leading-relaxed text-brand-muted">
-            Upload a gym clip and drop a quick voice-over. Then we&apos;ll sync,
-            trim, and build the YouTube posting pack.
+            {selectedIdea.kind === "custom"
+              ? "Record the video. Voice-over is optional. Then we'll build the branding pack with a Chronicle link for Vitality Sweat socials."
+              : "Upload a gym clip and drop a quick voice-over. Then we'll sync, trim, and build the YouTube posting pack."}
           </p>
 
           <div className="space-y-3">
             <div className="flex min-h-36 flex-col items-center justify-center gap-3 border-2 border-dashed border-brand-ink/25 bg-surface px-4 py-6 text-center">
               <span className="font-sans text-xs font-bold uppercase tracking-[0.14em] text-brand-orange">
-                Gym video clip
+                {selectedIdea.kind === "custom" ? "Your video" : "Gym video clip"}
               </span>
               <span className="font-sans text-sm text-brand-muted">
-                Pick a video from Photos (under ~45s / 720p stays under the
-                upload limit). Large clips get a compress option first.
+                {selectedIdea.kind === "custom"
+                  ? "Talking head or gym clip from Photos. Keep it around 45s."
+                  : "Pick a video from Photos (under ~45s / 720p stays under the upload limit). Large clips get a compress option first."}
               </span>
               <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
                 <label
@@ -1844,12 +2106,16 @@ export default function VideoWizard({
                   recording ? "text-red-700" : "text-brand-orange"
                 }`}
               >
-                {recording
-                  ? `Recording… ${recordSeconds}s — tap to stop`
-                  : "Record Voice Over narration"}
+                  {recording
+                    ? `Recording… ${recordSeconds}s. Tap to stop`
+                    : selectedIdea.kind === "custom"
+                      ? "Optional voice over"
+                      : "Record Voice Over narration"}
               </span>
               <span className="font-sans text-sm text-brand-muted">
-                Uses your phone mic · keep it under 45s
+                {selectedIdea.kind === "custom"
+                  ? "Skip this if you already talked on camera."
+                  : "Uses your phone mic · keep it under 45s"}
               </span>
               {audioBlob && !recording ? (
                 <span className="font-sans text-xs font-semibold text-brand-ink">
@@ -1896,7 +2162,9 @@ export default function VideoWizard({
             disabled={
               packLoading ||
               assetUploadKind !== null ||
-              (!videoAsset && !voiceoverAsset)
+              (selectedIdea.kind === "custom"
+                ? !videoAsset
+                : !videoAsset && !voiceoverAsset)
             }
             className={bigButtonClass}
           >
@@ -1907,6 +2175,8 @@ export default function VideoWizard({
               </>
             ) : videoAsset && voiceoverAsset ? (
               "Sync clip + voiceover →"
+            ) : selectedIdea.kind === "custom" ? (
+              "Build branding pack"
             ) : (
               "Build Production Pack"
             )}
@@ -1914,7 +2184,9 @@ export default function VideoWizard({
           <p className="text-center font-sans text-xs text-brand-muted">
             {videoAsset && voiceoverAsset
               ? "Next: mute gym audio and lay your voiceover under the picture."
-              : "Need at least one completed secure upload to continue."}
+              : selectedIdea.kind === "custom"
+                ? "Need the video uploaded to continue. Voice-over is optional."
+                : "Need at least one completed secure upload to continue."}
             {project ? ` Project ${project.id.slice(0, 8)} is saved.` : ""}
           </p>
           <button
@@ -2131,6 +2403,10 @@ export default function VideoWizard({
                 {selectedPost.title}
               </li>
               <li>
+                <span className="font-bold">Chronicle URL: </span>
+                {absoluteUrl(`/blog/${selectedPost.slug}`)}
+              </li>
+              <li>
                 <span className="font-bold">Idea: </span>
                 {selectedIdea.title}
               </li>
@@ -2190,7 +2466,7 @@ export default function VideoWizard({
               </p>
               <ul className="mt-2 space-y-1 font-sans text-sm text-brand-ink">
                 <li>✓ Caption variants (IG / FB / YouTube Shorts) with free signup CTA</li>
-                <li>✓ Pinned comment + description with app link</li>
+                <li>✓ Pinned comment + description with Chronicle and app link</li>
                 <li>✓ Companion Chronicles draft title/prompt</li>
               </ul>
 
@@ -2206,7 +2482,7 @@ export default function VideoWizard({
                   ["pin", "Pinned comment", growthPack.pinnedComment],
                   [
                     "desc",
-                    "Description + app link",
+                    "Description + Chronicle link",
                     growthPack.descriptionWithAppLink,
                   ],
                   [
@@ -2355,7 +2631,12 @@ export default function VideoWizard({
           <button
             type="button"
             onClick={downloadSyncedVideoForPhone}
-            disabled={!mergedBlob && !mergedAsset?.signedUrl && !videoFile}
+            disabled={
+              !mergedBlob &&
+              !mergedAsset?.signedUrl &&
+              !videoFile &&
+              !videoAsset?.signedUrl
+            }
             className={secondaryButtonClass}
           >
             Download synced video to phone

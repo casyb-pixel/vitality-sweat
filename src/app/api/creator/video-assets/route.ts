@@ -428,6 +428,7 @@ async function saveSocialPackage(
     baseCaption: body.socialPackage.caption,
     baseDescription: body.socialPackage.seoMetadata?.description,
     market: normalizeMarketParam(body.market),
+    blogSlug: project.post_slug,
   });
 
   const { data, error } = await supabase
@@ -710,12 +711,19 @@ function normalizeConcept(
       title: value?.title?.trim() ?? "",
       videoHook: value?.videoHook?.trim() ?? "",
       shootingConcept: value?.shootingConcept?.trim() ?? "",
-      kind: value?.kind === "exercise_howto" ? "exercise_howto" : "blog",
+      kind:
+        value?.kind === "exercise_howto"
+          ? "exercise_howto"
+          : value?.kind === "custom"
+            ? "custom"
+            : "blog",
       exerciseId: value?.exerciseId ?? null,
       exerciseName: value?.exerciseName ?? null,
       formTips: value?.formTips ?? null,
       voiceoverScript: value?.voiceoverScript ?? null,
       scriptBeats: value?.scriptBeats ?? null,
+      filmMode: value?.filmMode ?? null,
+      coachNote: value?.coachNote ?? null,
     })
   );
 }
