@@ -9,7 +9,7 @@ import {
   isValidUsZip,
   normalizeUsZip,
 } from "@/lib/auth/member-profile";
-import { trackSignupComplete, trackSignupStart } from "@/lib/analytics/ga";
+import { trackGaEvent, trackSignupComplete, trackSignupStart } from "@/lib/analytics/ga";
 import { buildAuthCallbackUrl } from "@/lib/auth/redirect";
 import { resolveAccessDecision } from "@/lib/auth/authorize";
 import { sanitizeNextPath } from "@/lib/auth/safe-next";
@@ -287,6 +287,7 @@ export default function LoginModal({
           }
 
           setView("confirm-sent");
+          trackGaEvent("signup_pending_confirm", { method: "password" });
           return;
         }
 
@@ -341,6 +342,9 @@ export default function LoginModal({
           return;
         }
         setView("magic-sent");
+        if (isSignup) {
+          trackGaEvent("signup_pending_confirm", { method: "magic_link" });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Magic link failed.");
       }
@@ -463,16 +467,24 @@ export default function LoginModal({
                   <>
                     We sent a confirmation link to{" "}
                     <span className="font-semibold text-brand-ink">{email}</span>.
-                    Open it on this device to finish creating your free account.
+                    Open that email on this phone or computer, tap the link, and
+                    you will land in the free Vitality Engine. Check spam if it
+                    is not in your inbox within a minute. The link expires, so
+                    finish it before you close this tab.
                   </>
                 ) : (
                   <>
                     We sent a magic link to{" "}
                     <span className="font-semibold text-brand-ink">{email}</span>.
                     Open it on this device to finish{" "}
-                    {isSignup ? "creating your account" : "signing in"}.
+                    {isSignup ? "creating your account" : "signing in"}. Check
+                    spam if you do not see it within a minute.
                   </>
                 )}
+              </p>
+              <p className="font-sans text-xs leading-relaxed text-brand-muted">
+                Tip: keep this tab open. After you confirm, you will set up your
+                profile once, then you can log workouts and meals.
               </p>
               <button
                 type="button"

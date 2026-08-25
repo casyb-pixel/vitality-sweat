@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackGenerateLead } from "@/lib/analytics/ga";
 import { RATE_CARD_PACKAGES } from "@/lib/markets/audience-brief";
 import { METROS } from "@/lib/markets/metros";
 
@@ -14,6 +15,8 @@ export default function AdvertiseInquiryForm() {
     setPending(true);
     setError(null);
     const form = new FormData(e.currentTarget);
+    const packageId = String(form.get("package_id") || "");
+    const market = String(form.get("market") || "");
     try {
       const res = await fetch("/api/advertise/inquiry", {
         method: "POST",
@@ -22,8 +25,8 @@ export default function AdvertiseInquiryForm() {
           name: form.get("name"),
           email: form.get("email"),
           business: form.get("business"),
-          package_id: form.get("package_id"),
-          market: form.get("market"),
+          package_id: packageId,
+          market,
           message: form.get("message"),
         }),
       });
@@ -32,6 +35,7 @@ export default function AdvertiseInquiryForm() {
         setError(json.error ?? "Could not send. Email hello@vitalitysweat.com.");
         return;
       }
+      trackGenerateLead({ package_id: packageId, market });
       setOk(true);
     } catch {
       setError("Could not send. Email hello@vitalitysweat.com.");

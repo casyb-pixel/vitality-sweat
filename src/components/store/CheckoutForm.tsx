@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/store/CartProvider";
+import { trackBeginCheckout } from "@/lib/analytics/ga";
 import { formatMoney } from "@/lib/store/cart";
 
 type FieldErrors = Record<string, string>;
@@ -95,6 +96,18 @@ export default function CheckoutForm() {
         );
         return;
       }
+
+      trackBeginCheckout({
+        currency,
+        value: subtotalCents / 100,
+        items: items.map((item) => ({
+          item_id: item.productId,
+          item_name: item.name,
+          price: Number.parseFloat(item.unitPrice) || 0,
+          quantity: item.quantity,
+          item_variant: [item.size, item.color].filter(Boolean).join(" / ") || undefined,
+        })),
+      });
 
       window.location.href = data.checkoutUrl;
     } catch {

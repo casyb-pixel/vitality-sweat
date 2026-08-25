@@ -188,6 +188,8 @@ export async function loadOrderForFulfillment(sessionId: string): Promise<
       alreadyFulfilled: boolean;
       printfulOrderId: string | null;
       currency: string;
+      totalCents: number;
+      subtotalCents: number;
     }
   | { ok: false; error: string }
 > {
@@ -199,7 +201,7 @@ export async function loadOrderForFulfillment(sessionId: string): Promise<
   const { data: order, error } = await admin
     .from("orders")
     .select(
-      "id, currency, shipping_address, external_fulfillment_id, fulfillment_status",
+      "id, currency, shipping_address, external_fulfillment_id, fulfillment_status, total_cents, subtotal_cents",
     )
     .eq("external_payment_id", sessionId)
     .maybeSingle();
@@ -257,6 +259,8 @@ export async function loadOrderForFulfillment(sessionId: string): Promise<
       ? String(order.external_fulfillment_id)
       : null,
     currency,
+    totalCents: Number(order.total_cents) || 0,
+    subtotalCents: Number(order.subtotal_cents) || 0,
   };
 }
 

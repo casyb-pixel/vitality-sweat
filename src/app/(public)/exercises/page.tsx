@@ -7,9 +7,9 @@ import { featuredEncyclopediaPages } from "@/lib/fitness/encyclopedia";
 import { buildCanonical } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: "How to do the lifts",
+  title: "Exercise Form Guides: Cues, Setup, Common Mistakes",
   description:
-    "Simple cues for first-gym and everyday lifts. Log every set in the free Vitality Engine.",
+    "How-to pages for seated cable row, dumbbell row, incline push-up, and more. Own the reps, then log them in the free Vitality Engine.",
   alternates: { canonical: buildCanonical("/exercises") },
 };
 

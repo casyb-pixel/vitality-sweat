@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { LibrarySearchSignal } from "@/lib/library/signals";
+import {
+  GA4_ACCOUNT_ID,
+  GA4_CUSTOM_DIMENSIONS,
+  GA4_KEY_EVENTS,
+  GA4_PROPERTY_ID,
+} from "@/lib/analytics/ga";
+import { GSC_REINDEX_QUEUE } from "@/lib/seo/gsc-reindex-queue";
 
 type CreatorContentGapsProps = {
   onWriteAbout?: (topic: string) => void;
@@ -49,6 +56,43 @@ export default function CreatorContentGaps({
     };
   }, []);
 
+  const measurementBlock = (
+    <div className="border border-brand-ink/10 bg-surface-elevated p-3">
+      <p className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange">
+        Measurement checklist
+      </p>
+      <p className="mt-1 font-sans text-xs text-brand-muted">
+        GA4 account {GA4_ACCOUNT_ID} · property {GA4_PROPERTY_ID}. In Admin,
+        mark these as key events: {GA4_KEY_EVENTS.join(", ")}. Register custom
+        dimensions for{" "}
+        {GA4_CUSTOM_DIMENSIONS.map((d) => d.param).join(", ")}. Link Google Ads
+        552-125-8444 to this property.
+      </p>
+      <p className="mt-3 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange">
+        GSC request indexing
+      </p>
+      <p className="mt-1 font-sans text-xs text-brand-muted">
+        After deploy, open Search Console URL Inspection for each URL and click
+        Request indexing (API cannot do this with full-user access).
+      </p>
+      <ul className="mt-2 list-disc pl-5 font-sans text-sm text-brand-ink">
+        {GSC_REINDEX_QUEUE.map((item) => (
+          <li key={item.url}>
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-brand-orange hover:underline"
+            >
+              {item.url.replace("https://vitalitysweat.com", "")}
+            </a>
+            <span className="text-brand-muted"> · {item.why}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   if (loading) {
     return (
       <section className="border border-brand-ink/10 bg-surface-elevated px-4 py-4">
@@ -61,15 +105,16 @@ export default function CreatorContentGaps({
 
   if (error) {
     return (
-      <section className="border border-brand-ink/10 bg-surface-elevated px-4 py-4">
+      <section className="space-y-3 border border-brand-ink/10 bg-surface-elevated px-4 py-4">
         <p className="font-sans text-sm text-brand-muted">{error}</p>
+        {measurementBlock}
       </section>
     );
   }
 
   if (!signals.length) {
     return (
-      <section className="border border-brand-ink/10 bg-surface-elevated px-4 py-4">
+      <section className="space-y-3 border border-brand-ink/10 bg-surface-elevated px-4 py-4">
         <h2 className="font-display text-xl text-brand-ink">
           Member topic requests
         </h2>
@@ -84,6 +129,7 @@ export default function CreatorContentGaps({
             ))}
           </ul>
         ) : null}
+        {measurementBlock}
       </section>
     );
   }
@@ -134,11 +180,11 @@ export default function CreatorContentGaps({
       {gscQueries.length ? (
         <div className="border border-brand-ink/10 bg-surface-elevated p-3">
           <p className="font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-orange">
-            Search Console starter queries
+            Search Console priority queries
           </p>
           <p className="mt-1 font-sans text-xs text-brand-muted">
-            Pipe live GSC for sc-domain:vitalitysweat.com when that property is
-            connected. Until then, write these 17-25 queries first.
+            Seeded from live GSC themes (exercise form, BMI, creatine). Write
+            these before inventing new topics.
           </p>
           <ul className="mt-2 list-disc pl-5 font-sans text-sm text-brand-ink">
             {gscQueries.map((q) => (
@@ -147,6 +193,7 @@ export default function CreatorContentGaps({
           </ul>
         </div>
       ) : null}
+      {measurementBlock}
     </section>
   );
 }

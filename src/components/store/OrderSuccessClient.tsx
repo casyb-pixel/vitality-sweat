@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/store/CartProvider";
+import { trackPurchase, type GaEcommerceItem } from "@/lib/analytics/ga";
 
 type CompleteState =
   | { status: "loading" }
@@ -15,6 +16,7 @@ export default function OrderSuccessClient() {
   const sessionId = searchParams.get("session_id");
   const { clearCart } = useCart();
   const [state, setState] = useState<CompleteState>({ status: "loading" });
+  const purchaseTracked = useRef(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -36,6 +38,9 @@ export default function OrderSuccessClient() {
           ok?: boolean;
           message?: string;
           printfulOrderId?: string | null;
+          currency?: string;
+          value?: number;
+          items?: GaEcommerceItem[];
         };
         if (cancelled) return;
         if (!res.ok || !data.ok) {
@@ -46,6 +51,15 @@ export default function OrderSuccessClient() {
               "Payment may have succeeded, but fulfillment needs a moment. We will retry automatically.",
           });
           return;
+        }
+        if (!purchaseTracked.current) {
+          purchaseTracked.current = true;
+          trackPurchase({
+            transaction_id: sessionId!,
+            currency: data.currency || "USD",
+            value: data.value ?? 0,
+            items: data.items ?? [],
+          });
         }
         clearCart();
         setState({

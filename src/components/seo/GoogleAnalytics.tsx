@@ -38,8 +38,8 @@ function GaPageViews() {
 
 /**
  * Loads GA4 and reports App Router navigations as page_view events.
- * Growth events (signup_start, signup_complete, cta_click, grocery_share_view)
- * are fired via `trackGaEvent` in `@/lib/analytics/ga`.
+ * Growth + commerce events fire via `trackGaEvent` in `@/lib/analytics/ga`.
+ * Admin checklist: mark GA4_KEY_EVENTS as key events; link Ads to property 448390395.
  */
 export default function GoogleAnalytics() {
   if (!GA_MEASUREMENT_ID) return null;

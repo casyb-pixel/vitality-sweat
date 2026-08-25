@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import HealthFitnessDisclaimer from "@/components/legal/HealthFitnessDisclaimer";
+import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
+import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import PublicPage from "@/components/public/PublicPage";
 import JsonLd from "@/components/seo/JsonLd";
 import {
@@ -37,11 +39,15 @@ export async function generateMetadata({
   const ex = await getPublicExercise(slug);
   if (!ex && !page) return { title: "Exercise" };
   const titleName = page?.name ?? ex?.name ?? "Exercise";
+  const muscle = page?.primaryMuscle ?? ex?.primary_muscle;
+  const equipment = page?.equipment ?? ex?.equipment;
   const description =
     page?.description ??
-    `Coaching cues for ${titleName}. Log it in the free Vitality Engine.`;
+    `${titleName} form cues${muscle ? ` for ${muscle}` : ""}${
+      equipment ? ` (${equipment})` : ""
+    }. Common mistakes, setup, and how to log it in the free Vitality Engine.`;
   return {
-    title: `How to ${titleName}`,
+    title: `${titleName}: Form, Cues, and Common Mistakes`,
     description,
     alternates: { canonical: buildCanonical(`/exercises/${slug}`) },
   };
@@ -65,6 +71,48 @@ export default async function ExercisePage({
     "Plant, brace, own the range. Log the set in Engine when you finish.";
   const cues = (page?.cues ?? ex?.cues ?? []).filter(Boolean);
   const logName = name;
+  const canonical = buildCanonical(`/exercises/${slug}`);
+  const description = page?.description ?? lede;
+
+  const jsonLd: Record<string, unknown>[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "ExercisePlan",
+      name,
+      url: canonical,
+      exerciseType: page?.primaryMuscle ?? ex?.primary_muscle,
+      description,
+    },
+  ];
+
+  if (page && cues.length) {
+    jsonLd.push({
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: `How to do the ${name}`,
+      description,
+      step: cues.map((cue, index) => ({
+        "@type": "HowToStep",
+        position: index + 1,
+        text: cue,
+      })),
+    });
+  }
+
+  if (page?.faqs.length) {
+    jsonLd.push({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: page.faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faq.a,
+        },
+      })),
+    });
+  }
 
   return (
     <PublicPage eyebrow={eyebrow} title={name} lede={lede}>
@@ -138,14 +186,22 @@ export default async function ExercisePage({
         {page?.engineCta ??
           "Log this in the free Vitality Engine when you finish the set."}
       </p>
-      <p className="mt-4">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <SignupCtaLink
+          location="exercise_end"
+          label={`Create free account · ${name}`}
+          nextPath={`/app/workout?exercise=${encodeURIComponent(logName)}`}
+          className="inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+        >
+          Create free account
+        </SignupCtaLink>
         <Link
           href={`/app/workout?exercise=${encodeURIComponent(logName)}`}
-          className="inline-flex min-h-11 items-center bg-brand-orange px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white"
+          className="inline-flex min-h-11 items-center justify-center border border-brand-ink/15 px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange"
         >
           Log this in Engine
         </Link>
-      </p>
+      </div>
 
       {page && (page.relatedSlugs.length || page.relatedTools.length) ? (
         <nav className="mt-10 max-w-2xl" aria-label="Related pages">
@@ -174,21 +230,28 @@ export default async function ExercisePage({
                 </Link>
               </li>
             ))}
+            {page.primaryMuscle ? (
+              <li>
+                <Link
+                  href={`/exercises/muscle/${encodeURIComponent(page.primaryMuscle)}`}
+                  className="border border-brand-ink/15 px-3 py-2 font-sans text-xs font-semibold uppercase tracking-[0.08em]"
+                >
+                  More {page.primaryMuscle}
+                </Link>
+              </li>
+            ) : null}
           </ul>
         </nav>
       ) : null}
 
+      <div className="mt-12">
+        <JoinEngineCTA location="exercise_join" variant="end" />
+      </div>
+
       <HealthFitnessDisclaimer compact />
-      <JsonLd
-        data={{
-          "@context": "https://schema.org",
-          "@type": "ExercisePlan",
-          name,
-          url: buildCanonical(`/exercises/${slug}`),
-          exerciseType: page?.primaryMuscle ?? ex?.primary_muscle,
-          description: page?.description ?? lede,
-        }}
-      />
+      {jsonLd.map((data, index) => (
+        <JsonLd key={index} data={data} />
+      ))}
     </PublicPage>
   );
 }

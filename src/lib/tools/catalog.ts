@@ -275,11 +275,18 @@ export const TOOLS: ToolDef[] = [
   },
   {
     slug: "bmi",
-    title: "BMI Calculator",
+    title: "Athletic BMI Calculator",
     eyebrow: "Context",
     description:
-      "Body mass index from height and weight. A rough screen, not a grade, especially if you lift or you are still growing.",
-    keywords: ["BMI calculator", "body mass index teens", "height weight"],
+      "BMI calculator for athletes and gym-goers. A rough screen with muscle context, not a verdict. Free Vitality Sweat tool.",
+    keywords: [
+      "BMI calculator",
+      "athletic BMI calculator",
+      "BMI calculator for athletes",
+      "BMI for gym goers",
+      "body mass index teens",
+      "height weight",
+    ],
     hunterNote:
       "I am a high-school athlete. BMI calls a lot of lifters heavy because muscle is dense. I use this as context. I do not use it as a report card.",
     engineCta:
@@ -301,6 +308,10 @@ export const TOOLS: ToolDef[] = [
         h2: "What to do instead",
         p: "Log training. Eat enough to recover. Repeat next week. If you want a calorie starting point, use the TDEE tool, then cook from Engine. That loop has a next action. BMI does not.",
       },
+      {
+        h2: "Athletes read BMI differently",
+        p: "Dense muscle raises the number without meaning you are out of shape. Use strength, sleep, food, and how you feel in sport as the real report card. Engine can track the habits. BMI is just a snapshot.",
+      },
     ],
     faqs: [
       {
@@ -315,6 +326,10 @@ export const TOOLS: ToolDef[] = [
         q: "Why include this tool at all?",
         a: "People search it. Better they land on a careful page than a shame chart. Use Engine for the work that actually moves.",
       },
+      {
+        q: "Is BMI useful for bodybuilders or lifters?",
+        a: "Only as context. Muscle is dense. Pair the number with waist, performance, and how clothes fit before you invent a crisis.",
+      },
     ],
   },
   {
@@ -322,8 +337,15 @@ export const TOOLS: ToolDef[] = [
     title: "Creatine Dose Calculator",
     eyebrow: "Fuel",
     description:
-      "A simple daily creatine monohydrate estimate from body weight. Coaching math, not medical advice.",
-    keywords: ["creatine dosage", "creatine monohydrate", "3-5 grams", "creatine loading"],
+      "Creatine monohydrate daily dose calculator for athletes. Simple 3-5g guidance, optional loading notes. Not medical advice.",
+    keywords: [
+      "creatine dosage",
+      "creatine monohydrate",
+      "how much creatine should I take",
+      "3-5 grams creatine",
+      "creatine loading",
+      "calculadora de creatina",
+    ],
     hunterNote:
       "I take about 5 grams with a meal most days. I do not load. I drink water like a person who trains. That is the whole routine.",
     engineCta:

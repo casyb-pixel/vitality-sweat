@@ -37,6 +37,15 @@ async function fulfillFromSession(sessionId: string) {
       orderId: loaded.orderId,
       printfulOrderId: loaded.printfulOrderId,
       message: "Order already sent to Printful.",
+      currency: loaded.currency,
+      value: (loaded.totalCents || loaded.subtotalCents) / 100,
+      items: loaded.items.map((item) => ({
+        item_id: item.productId,
+        item_name: item.name,
+        price: item.unitPriceCents / 100,
+        quantity: item.quantity,
+        item_variant: [item.size, item.color].filter(Boolean).join(" / ") || undefined,
+      })),
     };
   }
 
@@ -73,6 +82,18 @@ async function fulfillFromSession(sessionId: string) {
     orderId: loaded.orderId,
     printfulOrderId: fulfillment.printfulOrderId,
     message: "Payment confirmed and Printful order created.",
+    currency: loaded.currency,
+    value:
+      (session.amount_total != null
+        ? session.amount_total
+        : loaded.totalCents || loaded.subtotalCents) / 100,
+    items: loaded.items.map((item) => ({
+      item_id: item.productId,
+      item_name: item.name,
+      price: item.unitPriceCents / 100,
+      quantity: item.quantity,
+      item_variant: [item.size, item.color].filter(Boolean).join(" / ") || undefined,
+    })),
   };
 }
 

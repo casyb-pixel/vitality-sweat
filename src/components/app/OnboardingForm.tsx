@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { trackOnboardingComplete } from "@/lib/analytics/ga";
 import { isValidUsZip, normalizeUsZip } from "@/lib/auth/member-profile";
 import {
   birthdateFromAge,
@@ -132,6 +133,7 @@ export default function OnboardingForm({
           return;
         }
 
+        trackOnboardingComplete();
         router.replace("/app?share=engine");
         router.refresh();
       } catch (err) {

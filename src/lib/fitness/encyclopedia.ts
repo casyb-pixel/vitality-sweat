@@ -249,7 +249,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     equipment: "bodyweight",
     trackingType: "reps_only",
     description:
-      "Incline push-up how-to: hands on a bench or desk, same plank line as a floor push-up. Log the height in Vitality Engine.",
+      "Incline push-up form guide: hands on a bench or desk, plank line, 45-degree elbows. Progress height week to week and log reps in the free Vitality Engine.",
     lede: "Hands up on a bench is not a lesser push-up. It is the version you can own today.",
     hunterNote:
       "I use a bench when my floor push-ups start cheating. The line matters more than the floor.",
@@ -273,17 +273,33 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
         h2: "First gym, first press",
         p: "If barbell bench feels like a crowd, start here. Then chest-press machine. Then dumbbells. You can still leave in 45 minutes looking like you had a plan.",
       },
+      {
+        h2: "Regressions and progressions",
+        p: "Too hard: wall or counter height. Working set: bench or box. Too easy: lower the hands, then floor push-ups, then a slow tempo (3 seconds down). Keep the same name in your log and put the surface in the notes so next month is comparable.",
+      },
+      {
+        h2: "Where it fits in a session",
+        p: "After a squat pattern. 3 sets of 8-12. Rest about 90 seconds. Pair with a row (dumbbell or cable) so your shoulders get a pull for every press.",
+      },
     ],
     faqs: [
       {
         q: "Is a wall push-up worth logging?",
         a: "Yes, if that is the height you can own. Call it what it is. Next week, try a counter.",
       },
+      {
+        q: "What is the best angle for incline push-ups?",
+        a: "There is no magic degree. Higher hands equals easier. Pick a height where the last 2 reps are honest, not a worm, and repeat that height for a week before you drop.",
+      },
+      {
+        q: "Can I do incline push-ups on a bed?",
+        a: "No. Soft surfaces slide and collapse. Use a bench, sturdy desk, stairs, or a box that does not move.",
+      },
     ],
     engineCta:
       "Log incline push-ups in the free Vitality Engine. Put the surface in the notes so next week is honest.",
-    relatedTools: [],
-    relatedSlugs: ["push-up", "chest-press-machine"],
+    relatedTools: ["bmi"],
+    relatedSlugs: ["push-up", "chest-press-machine", "dumbbell-row"],
   },
   {
     slug: "dumbbell-row",
@@ -294,7 +310,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     equipment: "free_weight",
     trackingType: "weight_reps",
     description:
-      "Dumbbell row cues: hand on a bench, pull to the hip, no twist. Log both sides in Vitality Engine.",
+      "Dumbbell row form cues: hand on a bench, pull to the hip, quiet torso, no twist. Log both sides in the free Vitality Engine so your pull matches your press.",
     lede: "Plant one hand. Pull the other to your hip. Your torso stays quiet. That is the whole lift.",
     hunterNote:
       "If you have to rotate your shoulders to finish the rep, the bell is too heavy. I have done that. It is not a back set.",
@@ -318,17 +334,37 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
         h2: "Sets that fit 45 minutes",
         p: "3 sets of 8-10 each side after your squat and press. Rest about 90 seconds. If you cannot remember the weight, that is why Engine exists.",
       },
+      {
+        h2: "When to graduate to chest support",
+        p: "If your torso keeps twisting even with a lighter bell, move to the chest-supported dumbbell row. The pad removes the cheat. Come back to one-arm rows when you can keep the table quiet.",
+      },
+      {
+        h2: "Common equipment swaps",
+        p: "No bench: hand on a rack. No dumbbell: a kettlebell still rows if you pull to the hip. Cable seated rows are a different page. Do not rename them as a dumbbell row in your log.",
+      },
     ],
     faqs: [
       {
         q: "Should I row both arms at once?",
         a: "Two-arm chest-supported is a different page. One-arm teaches you to keep the torso quiet. Start here.",
       },
+      {
+        q: "How heavy should the dumbbell be?",
+        a: "Heavy enough that the last 2 reps are honest, light enough that you do not twist. If the bell needs a body English finish, drop a size.",
+      },
+      {
+        q: "Do I need a bench for dumbbell rows?",
+        a: "A bench is ideal. A sturdy rack rail at hip height works. Soft couches and rolling chairs do not.",
+      },
     ],
     engineCta:
       "Log each side in the free Vitality Engine. Same weight both sides unless you wrote a reason.",
     relatedTools: [],
-    relatedSlugs: ["chest-supported-dumbbell-row", "lat-pulldown"],
+    relatedSlugs: [
+      "chest-supported-dumbbell-row",
+      "seated-cable-row",
+      "lat-pulldown",
+    ],
   },
   {
     slug: "dumbbell-romanian-deadlift",
@@ -564,7 +600,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     equipment: "free_weight",
     trackingType: "weight_reps",
     description:
-      "Chest-supported dumbbell row cues: 45-degree bench, pull to the hip, torso stays on the pad. Log it in Vitality Engine.",
+      "Chest-supported dumbbell row form: 30-45 degree incline, chest on the pad, pull to the hips, no torso swing. Log it as its own movement in the free Vitality Engine.",
     lede: "Lie on an incline bench. Row both bells. Your chest stays on the pad so you cannot turn it into a circus.",
     hunterNote:
       "This is the row I trust when I am tired. If the pad is there, I cannot swing. That is the point.",
@@ -588,17 +624,33 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
         h2: "Where it sits in a session",
         p: "After your hinge or squat. 3 sets of 8-10. Then a carry or a plank. Then you are done. If you want a how-to while you rest, this page is the rest.",
       },
+      {
+        h2: "Bench angle that actually works",
+        p: "Around 45 degrees is the default. Steeper starts to feel like an upright row. Flatter can feel like a seal row and crush your breath. Pick one angle and keep it for a training block so the weight in Engine means something.",
+      },
+      {
+        h2: "No bench, no problem",
+        p: "If every incline is taken, switch to a one-arm dumbbell row or a seated cable row for the day. Do not invent a standing swing and call it chest-supported. Name what you actually did.",
+      },
     ],
     faqs: [
       {
         q: "What angle?",
         a: "Around 45 degrees is a good default. Steeper makes it more like an upright row. Flatter can feel like a seal row. Pick one and repeat it.",
       },
+      {
+        q: "Pronated or neutral grip?",
+        a: "Neutral (palms in) is the friendliest start. Pronated (palms back) is fine if your elbows track clean. Keep the same grip for the block.",
+      },
+      {
+        q: "Can I do a chest-supported row without a bench?",
+        a: "Not really. Without a pad it is a different lift. Use a one-arm dumbbell row or cable row instead and log the real name.",
+      },
     ],
     engineCta:
       "Log chest-supported rows in the free Vitality Engine. Name the movement. Do not hide it inside a generic row.",
     relatedTools: [],
-    relatedSlugs: ["dumbbell-row", "lat-pulldown"],
+    relatedSlugs: ["dumbbell-row", "seated-cable-row", "lat-pulldown"],
   },
   {
     slug: "leg-press",
@@ -654,7 +706,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     equipment: "machine",
     trackingType: "weight_reps",
     description:
-      "Seated cable row cues: tall sit, pull to the ribs, no full-body rock. Log the stack in Vitality Engine.",
+      "Seated cable row form cues: tall sit, pull to the ribs, quiet torso, no full-body rock. Log the stack pin in the free Vitality Engine after every working set.",
     lede: "Sit tall. Pull the handle to your ribs. Your torso is a post, not a rocking chair.",
     hunterNote:
       "If I see you leaning back like you are starting a boat, the stack won. Drop a plate. Row.",
@@ -678,17 +730,37 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
         h2: "Rest, log, next set",
         p: "90 seconds. Write the pin. If the gym is loud and you will forget, Engine is the notebook. That is the whole reason the app is free to log.",
       },
+      {
+        h2: "Handle choices that stay honest",
+        p: "V-handle or close neutral is the cleanest start. A wide bar can become a rear-delt swing if you chase ego weight. Pick one handle for four weeks so the numbers in Engine compare.",
+      },
+      {
+        h2: "Cable row vs dumbbell row",
+        p: "Cables keep tension at the stretch and show the stack. Dumbbells teach each side to stay quiet. Use both across a week. Do not rename a cable set as a dumbbell row in your history.",
+      },
     ],
     faqs: [
       {
         q: "Can I use straps?",
         a: "If grip dies before your back does, straps are allowed. Log the same. Grip can get extra work on carries.",
       },
+      {
+        q: "Should I lean back on the seated cable row?",
+        a: "A tiny brace is fine. A full rock to finish the rep is not. If you need the rock, drop a plate.",
+      },
+      {
+        q: "V-handle or wide bar?",
+        a: "Start with a V-handle or close grip. Wide bars are optional later when your elbows track clean and the torso stays quiet.",
+      },
     ],
     engineCta:
       "Log seated cable rows in the free Vitality Engine. Pin number, every working set.",
-    relatedTools: [],
-    relatedSlugs: ["lat-pulldown", "dumbbell-row"],
+    relatedTools: ["plate-calculator"],
+    relatedSlugs: [
+      "lat-pulldown",
+      "dumbbell-row",
+      "chest-supported-dumbbell-row",
+    ],
   },
   ...ENCYCLOPEDIA_BATCH_2026_08_18,
 ];

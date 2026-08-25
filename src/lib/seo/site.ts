@@ -26,7 +26,7 @@ export const BRAND_DISAMBIGUATING_DESCRIPTION =
   "Vitality Sweat is a Southwest Louisiana fitness coaching and youth baseball brand founded by Hunter Broussard, with the Vitality Engine app and Sweatlife Chronicles under the same brand.";
 
 export const DEFAULT_DESCRIPTION =
-  "Vitality Sweat is Hunter Broussard's Southwest Louisiana brand for fitness training, peak-performance nutrition, and youth baseball. Open the Vitality Engine app and read Sweatlife Chronicles.";
+  "Vitality Sweat is Hunter Broussard's Southwest Louisiana training, nutrition, and youth baseball brand. Free Vitality Engine app for workouts and meals, plus Sweatlife Chronicles coaching notes.";
 
 /** What the organization knows about (schema knowsAbout). */
 export const BRAND_KNOWS_ABOUT = [

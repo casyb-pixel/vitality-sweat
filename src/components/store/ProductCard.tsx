@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useCart } from "@/components/store/CartProvider";
+import { trackAddToCart } from "@/lib/analytics/ga";
 import type { StoreProduct } from "@/lib/store/products";
 import { resolveVariant } from "@/lib/store/cart";
 import { productPath } from "@/lib/store/product-slug";
@@ -47,6 +48,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     product.source === "printful" && Boolean(selectedVariant?.id);
 
   const onAdd = () => {
+    const variantLabel = [size, color].filter(Boolean).join(" / ");
     addItem(
       {
         id: product.id,
@@ -60,6 +62,19 @@ export default function ProductCard({ product }: ProductCardProps) {
       color || "Default",
       1,
     );
+    trackAddToCart({
+      currency: product.currency,
+      value: displayPrice,
+      items: [
+        {
+          item_id: product.id,
+          item_name: product.name,
+          price: Number.parseFloat(String(displayPrice)) || 0,
+          quantity: 1,
+          item_variant: variantLabel || undefined,
+        },
+      ],
+    });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };

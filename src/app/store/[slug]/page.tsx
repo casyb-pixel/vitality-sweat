@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductCard from "@/components/store/ProductCard";
+import ViewItemTracker from "@/components/store/ViewItemTracker";
 import {
   absoluteUrl,
   buildCanonical,
@@ -87,6 +88,12 @@ export default async function StoreProductPage({
             {product.name}
           </p>
           <div className="mt-8 max-w-xl">
+            <ViewItemTracker
+              itemId={product.id}
+              itemName={product.name}
+              price={product.price}
+              currency={product.currency}
+            />
             <ProductCard product={product} />
           </div>
           <p className="mt-8 max-w-xl font-sans text-sm leading-relaxed text-brand-muted">

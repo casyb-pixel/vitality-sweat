@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
+import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
+import SignupCtaLink from "@/components/marketing/SignupCtaLink";
 import ToolCalculator from "@/components/tools/ToolCalculator";
 import { getTool, TOOLS } from "@/lib/tools/catalog";
 import { absoluteUrl, buildCanonical } from "@/lib/seo/site";
@@ -99,14 +101,25 @@ export default async function ToolPage({
             </p>
           ) : null}
 
-          <p className="mt-4">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <SignupCtaLink
+              location="tool_end"
+              label={`Create free account · ${tool.title}`}
+              className="inline-flex min-h-11 items-center justify-center bg-brand-orange px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-brand-orange-deep"
+            >
+              Create free account
+            </SignupCtaLink>
             <Link
               href="/app"
-              className="inline-flex min-h-11 items-center bg-brand-orange px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white"
+              className="inline-flex min-h-11 items-center justify-center border border-brand-ink/15 px-5 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange"
             >
               Open the free Vitality Engine
             </Link>
-          </p>
+          </div>
+
+          <div className="mt-12">
+            <JoinEngineCTA location="tool_join" variant="end" />
+          </div>
         </article>
       </main>
       <JsonLd

@@ -1,13 +1,18 @@
-/** Starter queries for Creator Content Gaps until GSC is fully wired. */
+/** Starter queries for Creator Content Gaps, seeded from live GSC themes. */
 export const STARTER_GSC_KEYWORDS = [
+  "seated cable row",
+  "chest supported dumbbell row",
+  "dumbbell row form",
+  "incline push up",
+  "athletic BMI calculator",
+  "BMI calculator for athletes",
+  "creatine dose calculator",
+  "how much creatine should I take",
   "first gym workout 45 minutes",
   "how to not look lost in the gym",
-  "dorm room bodyweight workout",
-  "tdee calculator athlete",
-  "how much creatine should I take",
+  "pre workout carbs",
   "bench press form cues",
   "protein on a budget rouses",
   "baseball in season lifting",
-  "feel 18 again workout",
   "hevy vs vitality engine",
 ] as const;
