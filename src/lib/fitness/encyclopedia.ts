@@ -2,9 +2,11 @@
  * Hunter-voice encyclopedia overlays for public /exercises/[slug] pages.
  * Review in git. Not Hunter's Daily Brief.
  *
- * Batch: week of Aug 17, 2026. Beginner first, then tools (see catalog.ts),
- * then lift cues.
+ * Aug 17 batch lives in this file. Later review batches are imported below.
+ * Cluster order: beginner, then tools (see catalog.ts), then lift cues.
  */
+
+import { ENCYCLOPEDIA_BATCH_2026_08_18 } from "./encyclopedia-batch-2026-08-18";
 
 export type EncyclopediaCluster = "beginner" | "train";
 
@@ -12,6 +14,8 @@ export type EncyclopediaPage = {
   slug: string;
   name: string;
   cluster: EncyclopediaCluster;
+  /** Review batch date. Hub "start here" stays on 2026-08-17. */
+  batch?: string;
   eyebrow: string;
   primaryMuscle: string;
   equipment: "free_weight" | "machine" | "bodyweight";
@@ -29,8 +33,11 @@ export type EncyclopediaPage = {
   relatedSlugs: string[];
 };
 
-/** This week's review batch. Tools live in src/lib/tools/catalog.ts. */
-export const ENCYCLOPEDIA_BATCH_LABEL = "Aug 17-23, 2026";
+/** First public batch. Hub "start here" uses this. */
+export const FEATURED_ENCYCLOPEDIA_BATCH = "2026-08-17";
+
+/** Parent review batch in the current PR. Tools live in src/lib/tools/catalog.ts. */
+export const ENCYCLOPEDIA_BATCH_LABEL = "Aug 18, 2026";
 
 export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
   {
@@ -683,6 +690,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     relatedTools: [],
     relatedSlugs: ["lat-pulldown", "dumbbell-row"],
   },
+  ...ENCYCLOPEDIA_BATCH_2026_08_18,
 ];
 
 const bySlug = new Map(
@@ -698,5 +706,9 @@ export function encyclopediaSlugs(): string[] {
 }
 
 export function featuredEncyclopediaPages(): EncyclopediaPage[] {
-  return ENCYCLOPEDIA_PAGES.filter((page) => page.cluster === "beginner");
+  return ENCYCLOPEDIA_PAGES.filter(
+    (page) =>
+      page.cluster === "beginner" &&
+      (page.batch ?? FEATURED_ENCYCLOPEDIA_BATCH) === FEATURED_ENCYCLOPEDIA_BATCH,
+  );
 }

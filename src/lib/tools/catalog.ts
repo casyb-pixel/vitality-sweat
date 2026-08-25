@@ -194,20 +194,42 @@ export const TOOLS: ToolDef[] = [
     title: "Heart Rate Zone Calculator",
     eyebrow: "Conditioning",
     description:
-      "Estimate easy, tempo, and interval heart rate zones from age. Useful for runs and sport conditioning.",
-    keywords: ["heart rate zones", "max heart rate", "zone 2"],
+      "Estimate easy, tempo, and interval heart rate zones from age. A coaching range for runs and sport work, not a clinic reading.",
+    keywords: ["heart rate zones", "max heart rate", "zone 2", "easy run"],
     hunterNote:
-      "Easy work should feel easy. If you cannot talk, you are not in the easy zone.",
+      "Easy work should feel easy. If you cannot talk in a sentence, you are not in the easy zone. I do not chase a number on a watch to prove the day counted.",
+    engineCta:
+      "Keep easy days easy, then log the lift in the free Vitality Engine. Conditioning is not a substitute for the working sets.",
     body: [
       {
         h2: "Age-based max is an estimate",
-        p: "We use 208 minus 0.7 times age. Wearables beat this. Use zones to keep easy days easy.",
+        p: "We use 208 minus 0.7 times age. That is a formula, not a lab test. A watch that measured you on a hard day will beat this page. Use the zones to keep easy days easy, not to grade your heart.",
+      },
+      {
+        h2: "What I actually do with it",
+        p: "Most of the week should live in the easy range. Talk in a sentence. Save the high zone for short repeats if a coach asked for them. If you lift the same day, do not turn the run into a second max-out. Tired legs make ugly squats.",
+      },
+      {
+        h2: "Sport days",
+        p: "Baseball and gym class already spike you. That is not a reason to add a long tempo because a chart had three colors. Log practice as practice. Use this tool when you pick a run on purpose.",
+      },
+      {
+        h2: "What this page will not do",
+        p: "We will not read a heart condition off a calculator. If something feels off, tell a parent, coach, or clinician. This is a pace-keeping tool for athletes who keep mixing easy and hard until both get worse.",
       },
     ],
     faqs: [
       {
-        q: "Is this for baseball conditioning?",
-        a: "Yes. Keep most running conversational. Save the high zone for short repeats.",
+        q: "Is this medical advice?",
+        a: "No. It is a coaching estimate from age. Talk to a clinician if you have a heart or health question.",
+      },
+      {
+        q: "Do I need a chest strap?",
+        a: "No. Wrist watches drift. Perceived effort still counts. If you can talk, you are probably easy. If you are gasping, you are not.",
+      },
+      {
+        q: "Can I use this for baseball conditioning?",
+        a: "Yes. Keep most running conversational. Save the high zone for short repeats a coach actually programmed.",
       },
     ],
   },
@@ -216,20 +238,38 @@ export const TOOLS: ToolDef[] = [
     title: "Running Pace Calculator",
     eyebrow: "Endurance",
     description:
-      "Turn a distance and time into minutes per mile so your easy runs stay easy.",
-    keywords: ["running pace", "min per mile", "split calculator"],
+      "Turn a distance and time into minutes per mile so your easy runs stay easy, especially in a lift week.",
+    keywords: ["running pace", "min per mile", "split calculator", "easy run"],
     hunterNote:
-      "If you are lifting the same week, most miles should feel boring on purpose.",
+      "If I am lifting the same week, most miles should feel boring on purpose. Fast for no reason is how I show up cooked for squats.",
+    engineCta:
+      "Plug the pace, then log the lift in the free Vitality Engine. Do not let a random run erase the working sets.",
     body: [
       {
         h2: "Pace is a tool, not a personality",
-        p: "Plug in what you actually ran. Then decide if that was easy, tempo, or too much.",
+        p: "Plug in the distance and time you actually ran. The page gives minutes per mile. Then you decide if that was easy, a workout, or too much for a lift week. Strava does not get a vote on your squat day.",
+      },
+      {
+        h2: "Lift weeks stay boring on purpose",
+        p: "If you goblet squat or press later today, keep the run conversational. You can still move. You do not need a personal record on the sidewalk. Log the run if you want. Log the lift either way.",
+      },
+      {
+        h2: "A worked example",
+        p: "You jog 2 miles in 20 minutes. That is 10:00 per mile. If you could talk the whole way, that was easy. If you had to stop and fold over, that was not easy, no matter what a color-coded chart said. Next time, slow down or shorten it.",
+      },
+      {
+        h2: "What this page will not do",
+        p: "We will not write a marathon plan. We will not tell you to suffer for a screenshot. If running hurts in a way that is not normal tired, stop and tell a parent or coach.",
       },
     ],
     faqs: [
       {
         q: "Kilometers?",
-        a: "Enter miles for now. Convert km to miles by dividing by 1.609.",
+        a: "Enter miles for now. Convert km to miles by dividing by 1.609, then plug that in.",
+      },
+      {
+        q: "Do I have to run if I lift?",
+        a: "No. This page is for when you already ran and want the pace. Walking still counts as moving.",
       },
     ],
   },
@@ -238,20 +278,42 @@ export const TOOLS: ToolDef[] = [
     title: "BMI Calculator",
     eyebrow: "Context",
     description:
-      "Body mass index is a rough screen, not a verdict. Especially if you lift.",
-    keywords: ["BMI calculator", "body mass index teens"],
+      "Body mass index from height and weight. A rough screen, not a grade, especially if you lift or you are still growing.",
+    keywords: ["BMI calculator", "body mass index teens", "height weight"],
     hunterNote:
-      "I am a high-school athlete. BMI calls a lot of us overweight because muscle is dense. Use it as context, not a grade.",
+      "I am a high-school athlete. BMI calls a lot of lifters heavy because muscle is dense. I use this as context. I do not use it as a report card.",
+    engineCta:
+      "If you came here worried about a number, log the lifts and the meals in the free Vitality Engine instead. Training and food you can repeat beat a BMI screenshot.",
     body: [
       {
         h2: "Why this page is careful",
-        p: "BMI does not know about muscle, sport, or puberty. If the number bothers you, talk to a parent, coach, or clinician. We will not shame you with it.",
+        p: "BMI is weight over height squared. It does not know about muscle, sport, bone, or puberty. Two people can share a number and live totally different weeks. We show the math because people search it. We will not shame you with it.",
+      },
+      {
+        h2: "If you lift, read this twice",
+        p: "Strength work adds muscle. Muscle is heavy for the space it takes. A chart built for office populations will often flag athletes as high. That is a limit of the chart, not a character review. Watch your lifts, your sleep, and how you feel in sport.",
+      },
+      {
+        h2: "Teens and growing athletes",
+        p: "If you are still growing, a single BMI snapshot is an even weaker story. Do not go hunting a smaller number because a website colored a box. Talk to a parent, a coach, or a clinician if the number is stuck in your head. This page will not put you on a crash plan.",
+      },
+      {
+        h2: "What to do instead",
+        p: "Log training. Eat enough to recover. Repeat next week. If you want a calorie starting point, use the TDEE tool, then cook from Engine. That loop has a next action. BMI does not.",
       },
     ],
     faqs: [
       {
         q: "Should teens obsess over BMI?",
-        a: "No. Strength, sleep, food, and how you feel in sport matter more.",
+        a: "No. Strength, sleep, food, and how you feel in sport matter more. This number is context, not a verdict.",
+      },
+      {
+        q: "Is this medical advice?",
+        a: "No. If a number worries you, talk to a parent, coach, or clinician. We will not grade your body here.",
+      },
+      {
+        q: "Why include this tool at all?",
+        a: "People search it. Better they land on a careful page than a shame chart. Use Engine for the work that actually moves.",
       },
     ],
   },
@@ -260,20 +322,42 @@ export const TOOLS: ToolDef[] = [
     title: "Creatine Dose Calculator",
     eyebrow: "Fuel",
     description:
-      "A simple daily creatine monohydrate estimate for athletes. Not medical advice.",
-    keywords: ["creatine dosage", "creatine monohydrate", "3-5 grams"],
+      "A simple daily creatine monohydrate estimate from body weight. Coaching math, not medical advice.",
+    keywords: ["creatine dosage", "creatine monohydrate", "3-5 grams", "creatine loading"],
     hunterNote:
-      "I take about 5 grams with a meal. Loading is optional. Water still matters.",
+      "I take about 5 grams with a meal most days. I do not load. I drink water like a person who trains. That is the whole routine.",
+    engineCta:
+      "Creatine is optional. The work still has to get logged in the free Vitality Engine. Powder does not replace the set.",
     body: [
       {
         h2: "Daily beats loading for most people",
-        p: "3 to 5 grams of creatine monohydrate most days is the simple plan. Loading is faster, not required. Skip this if a clinician told you not to.",
+        p: "3 to 5 grams of creatine monohydrate most days is the simple plan. The calculator scales a bit with body weight. Loading is faster, not required. Skip this page if a clinician told you not to use it.",
+      },
+      {
+        h2: "What I actually do",
+        p: "One scoop, about 5 grams, with a meal. I do not cycle it like a comic-book supplement. I do not mix it with five other tubs because a video stacked them. If I miss a day, I take it the next day. That is it.",
+      },
+      {
+        h2: "What this is not",
+        p: "Creatine is not a steroid. It is not a personality. It will not fix skipped sleep or skipped meals. It will not replace protein you already needed. If someone promised a new body from a tub, they were selling.",
+      },
+      {
+        h2: "Take it into Engine",
+        p: "If you use it, keep training logged. The scoop does not show up as a PR by itself. Working sets do. Grocery list still matters. Water still matters. Parents can see the same log if you share the week.",
       },
     ],
     faqs: [
       {
         q: "Is creatine a steroid?",
-        a: "No. It is a supplement a lot of athletes use. Still not medical advice.",
+        a: "No. It is a common supplement a lot of athletes use. Still not medical advice.",
+      },
+      {
+        q: "Do I have to load?",
+        a: "No. Daily use is enough for most people. Loading is optional and often just upsets a stomach.",
+      },
+      {
+        q: "Should high-school athletes take it?",
+        a: "That is a parent and clinician conversation, not a calculator's job. This page only does the gram math.",
       },
     ],
   },
