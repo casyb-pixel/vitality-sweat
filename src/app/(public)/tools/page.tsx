@@ -3,6 +3,15 @@ import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
 import JsonLd from "@/components/seo/JsonLd";
+import LiftFinder from "@/components/public/LiftFinder";
+import {
+  ENCYCLOPEDIA_PAGES,
+  featuredEncyclopediaPages,
+} from "@/lib/fitness/encyclopedia";
+import {
+  pagesToSearchIndex,
+  toEncyclopediaSearchHit,
+} from "@/lib/fitness/encyclopedia-search";
 import { TOOLS } from "@/lib/tools/catalog";
 import { buildCanonical } from "@/lib/seo/site";
 
@@ -26,6 +35,15 @@ export default function ToolsHubPage() {
             Calculators for training and fuel. Then log the work in the free
             Vitality Engine. These are estimates, not medical advice.
           </p>
+          <div className="mt-10">
+            <LiftFinder
+              variant="compact"
+              contained
+              headline="Need cues, not a number?"
+              index={pagesToSearchIndex(ENCYCLOPEDIA_PAGES)}
+              featured={featuredEncyclopediaPages().map(toEncyclopediaSearchHit)}
+            />
+          </div>
           <AdSlot slotId="tools-inline" label="Local partner" size="banner" />
           <ul className="mt-10 grid gap-4 sm:grid-cols-2">
             {TOOLS.map((tool) => (

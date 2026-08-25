@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PublicPage from "@/components/public/PublicPage";
+import LiftFinder from "@/components/public/LiftFinder";
 import JsonLd from "@/components/seo/JsonLd";
 import { getPublicExercises } from "@/lib/fitness/public-exercises";
-import { featuredEncyclopediaPages } from "@/lib/fitness/encyclopedia";
+import {
+  ENCYCLOPEDIA_PAGES,
+  featuredEncyclopediaPages,
+} from "@/lib/fitness/encyclopedia";
+import {
+  pagesToSearchIndex,
+  toEncyclopediaSearchHit,
+} from "@/lib/fitness/encyclopedia-search";
 import { buildCanonical } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -26,7 +34,13 @@ export default async function ExercisesHubPage() {
       title="Pick a lift. Own the reps."
       lede="How-to pages for the gym floor, not a challenge board. Read the cues, do the set, log it in Engine. Coaching notes, not medical advice."
     >
-      <section className="max-w-2xl">
+      <LiftFinder
+        variant="full"
+        contained
+        index={pagesToSearchIndex(ENCYCLOPEDIA_PAGES)}
+        featured={featuredEncyclopediaPages().map(toEncyclopediaSearchHit)}
+      />
+      <section className="mt-12 max-w-2xl">
         <h2 className="font-display text-2xl text-brand-ink">
           If the gym still feels huge, start here
         </h2>

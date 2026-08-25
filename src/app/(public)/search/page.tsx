@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PublicPage from "@/components/public/PublicPage";
 import { getAllBlogPostsAsync } from "@/lib/blog/posts";
+import { ENCYCLOPEDIA_PAGES } from "@/lib/fitness/encyclopedia";
+import {
+  pagesToSearchIndex,
+  searchEncyclopedia,
+} from "@/lib/fitness/encyclopedia-search";
 import { NAMED_PROGRAMS } from "@/lib/fitness/program-templates";
 import { getPublicExercises } from "@/lib/fitness/public-exercises";
 import { TOOLS } from "@/lib/tools/catalog";
@@ -26,6 +31,14 @@ export default async function SearchPage({
     getPublicExercises(),
   ]);
 
+  const encyclopediaHits = query
+    ? searchEncyclopedia(pagesToSearchIndex(ENCYCLOPEDIA_PAGES), q ?? "").slice(
+        0,
+        20,
+      )
+    : [];
+  const encyclopediaSlugs = new Set(encyclopediaHits.map((hit) => hit.slug));
+
   const results = query
     ? [
         ...TOOLS.filter((t) =>
@@ -38,9 +51,18 @@ export default async function SearchPage({
           title: p.title,
           kind: "Program",
         })),
+        ...encyclopediaHits.map((hit) => ({
+          href: `/exercises/${hit.slug}`,
+          title: hit.name,
+          kind: "Exercise",
+        })),
         ...exercises
-          .filter((e) => e.name.toLowerCase().includes(query))
-          .slice(0, 20)
+          .filter(
+            (e) =>
+              !encyclopediaSlugs.has(e.slug) &&
+              e.name.toLowerCase().includes(query),
+          )
+          .slice(0, 10)
           .map((e) => ({
             href: `/exercises/${e.slug}`,
             title: e.name,

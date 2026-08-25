@@ -5,7 +5,16 @@ import AdSlot from "@/components/AdSlot";
 import SiteFooter from "@/components/SiteFooter";
 import JoinEngineCTA from "@/components/marketing/JoinEngineCTA";
 import SignupCtaLink from "@/components/marketing/SignupCtaLink";
+import LiftFinder from "@/components/public/LiftFinder";
 import { getLatestBlogPostAsync } from "@/lib/blog/posts";
+import {
+  ENCYCLOPEDIA_PAGES,
+  featuredEncyclopediaPages,
+} from "@/lib/fitness/encyclopedia";
+import {
+  pagesToSearchIndex,
+  toEncyclopediaSearchHit,
+} from "@/lib/fitness/encyclopedia-search";
 import {
   getMetro,
   marketSignupCopy,
@@ -148,6 +157,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <div className="section-y site-shell">
         <AdSlot slotId="home-below-hero" size="leaderboard" />
       </div>
+
+      <LiftFinder
+        variant="full"
+        index={pagesToSearchIndex(ENCYCLOPEDIA_PAGES)}
+        featured={featuredEncyclopediaPages().map(toEncyclopediaSearchHit)}
+      />
 
       {/* INTRO — Hunter&apos;s journey */}
       <section className="section-y bg-surface-elevated">

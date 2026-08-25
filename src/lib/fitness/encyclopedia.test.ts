@@ -7,6 +7,10 @@ import {
   FEATURED_ENCYCLOPEDIA_BATCH,
   getEncyclopediaPage,
 } from "./encyclopedia";
+import {
+  pagesToSearchIndex,
+  searchEncyclopedia,
+} from "./encyclopedia-search";
 import { ENCYCLOPEDIA_BATCH_2026_08_18 } from "./encyclopedia-batch-2026-08-18";
 import { ENCYCLOPEDIA_BATCH_2026_08_25 } from "./encyclopedia-batch-2026-08-25";
 import { ENCYCLOPEDIA_BATCH_2026_08_25B } from "./encyclopedia-batch-2026-08-25b";
@@ -111,4 +115,40 @@ test("start-here hub stays on the first beginner batch", () => {
       `${page.slug} should not flood start here`,
     );
   }
+});
+
+test("encyclopedia search ranks goblet and row by name", () => {
+  const hits = pagesToSearchIndex(ENCYCLOPEDIA_PAGES);
+  const goblet = searchEncyclopedia(hits, "goblet");
+  assert.ok(goblet.length > 0);
+  assert.equal(goblet[0]?.slug, "goblet-squat");
+
+  const rows = searchEncyclopedia(hits, "row");
+  assert.ok(rows.length >= 3);
+  assert.ok(rows.every((hit) => hit.slug.includes("row") || hit.searchText.includes("row")));
+  const slugs = rows.map((hit) => hit.slug);
+  assert.equal(new Set(slugs).size, slugs.length);
+});
+
+test("encyclopedia search matches muscle and equipment filters", () => {
+  const hits = pagesToSearchIndex(ENCYCLOPEDIA_PAGES);
+  const quads = searchEncyclopedia(hits, "quads");
+  assert.ok(quads.length > 0);
+  assert.ok(quads.some((hit) => hit.primaryMuscle === "quads"));
+
+  const bodyweight = searchEncyclopedia(hits, "bodyweight");
+  assert.ok(bodyweight.length > 0);
+  assert.equal(bodyweight[0]?.equipment, "bodyweight");
+  const byEquipment = searchEncyclopedia(hits, "", { equipment: "bodyweight" });
+  assert.ok(byEquipment.length > 0);
+  assert.ok(byEquipment.every((hit) => hit.equipment === "bodyweight"));
+
+  const filtered = searchEncyclopedia(hits, "", { muscle: "quads" });
+  assert.ok(filtered.length > 0);
+  assert.ok(filtered.every((hit) => hit.primaryMuscle === "quads"));
+  const filterSlugs = filtered.map((hit) => hit.slug);
+  assert.equal(new Set(filterSlugs).size, filterSlugs.length);
+
+  const empty = searchEncyclopedia(hits, "");
+  assert.equal(empty.length, 0);
 });

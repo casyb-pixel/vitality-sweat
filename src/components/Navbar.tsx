@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/chronicles", label: "Chronicles", title: "The Sweatlife Chronicles" },
+  { href: "/exercises", label: "Exercises" },
   { href: "/tools", label: "Tools" },
   { href: "/store", label: "Store" },
 ] as const;
@@ -222,7 +223,7 @@ export default function Navbar() {
 
           <nav
             aria-label="Primary"
-            className="hidden items-center gap-6 md:flex"
+            className="hidden items-center gap-4 lg:gap-6 md:flex"
           >
             {NAV_LINKS.map((link) => (
               <Link
