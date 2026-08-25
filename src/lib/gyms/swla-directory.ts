@@ -65,6 +65,7 @@ export const SWLA_GYM_DIRECTORY: ReadonlyArray<{ name: string; metro: string }> 
   { name: "Genesis Fitness Center Westlake", metro: "Westlake" },
   { name: "Anytime Fitness Sulphur", metro: "Sulphur" },
   { name: "All Hours Fitness DeRidder", metro: "DeRidder" },
+  { name: "Reeves Community Gym", metro: "Reeves" },
 
   // Alexandria / Pineville
   { name: "Planet Fitness Alexandria", metro: "Alexandria" },

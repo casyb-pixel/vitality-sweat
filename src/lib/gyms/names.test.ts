@@ -21,6 +21,7 @@ test("SWLA gym seed keys are unique and cover the corridor", () => {
     "Alexandria",
     "Opelousas",
     "New Iberia",
+    "Reeves",
   ]) {
     assert.equal(metros.has(metro), true, `missing ${metro}`);
   }
