@@ -418,7 +418,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_18: EncyclopediaPage[] = [
     engineCta:
       "Log the bench press in the free Vitality Engine. Plates on the bar, every working set.",
     relatedTools: ["plate-calculator", "one-rep-max"],
-    relatedSlugs: ["chest-press-machine", "push-up"],
+    relatedSlugs: ["chest-press-machine", "dumbbell-bench-press"],
   },
   {
     slug: "overhead-press",
@@ -510,7 +510,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_18: EncyclopediaPage[] = [
     engineCta:
       "Log trap-bar deadlifts in the free Vitality Engine. Count the plates. Do not estimate from a photo.",
     relatedTools: ["plate-calculator"],
-    relatedSlugs: ["dumbbell-romanian-deadlift", "goblet-squat"],
+    relatedSlugs: ["dumbbell-romanian-deadlift", "deadlift"],
   },
   {
     slug: "barbell-hip-thrust",
