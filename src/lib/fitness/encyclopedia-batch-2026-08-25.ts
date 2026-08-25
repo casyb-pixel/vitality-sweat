@@ -108,7 +108,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_25: EncyclopediaPage[] = [
     engineCta:
       "Log dead-hang time in the free Vitality Engine. Duration counts. Guessing does not.",
     relatedTools: [],
-    relatedSlugs: ["doorframe-row", "lat-pulldown", "band-pull-apart"],
+    relatedSlugs: ["doorframe-row", "pull-up", "lat-pulldown"],
   },
   {
     slug: "reverse-lunge",
@@ -710,7 +710,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_25: EncyclopediaPage[] = [
     engineCta:
       "Log barbell rows in the free Vitality Engine. Plates, every working set.",
     relatedTools: ["plate-calculator"],
-    relatedSlugs: ["dumbbell-row", "chest-supported-dumbbell-row", "deadlift"],
+    relatedSlugs: ["pendlay-row", "chest-supported-dumbbell-row", "deadlift"],
   },
   {
     slug: "incline-dumbbell-bench-press",

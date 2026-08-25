@@ -3,11 +3,12 @@
  * Review in git. Not Hunter's Daily Brief.
  *
  * Aug 17 batch lives in this file. Later review batches are imported below.
- * Cluster order: beginner leftovers (dorm), then named-program lift cues.
+ * Cluster order: beginner leftovers (dorm), then named-program lift cues, then remaining program plus gym staples.
  */
 
 import { ENCYCLOPEDIA_BATCH_2026_08_18 } from "./encyclopedia-batch-2026-08-18";
 import { ENCYCLOPEDIA_BATCH_2026_08_25 } from "./encyclopedia-batch-2026-08-25";
+import { ENCYCLOPEDIA_BATCH_2026_08_25B } from "./encyclopedia-batch-2026-08-25b";
 
 export type EncyclopediaCluster = "beginner" | "train";
 
@@ -500,7 +501,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
     engineCta:
       "Log the lat pulldown stack in the free Vitality Engine. The number on the pin is the set.",
     relatedTools: [],
-    relatedSlugs: ["dumbbell-row", "chest-supported-dumbbell-row"],
+    relatedSlugs: ["lat-pulldown-wide", "lat-pulldown-neutral"],
   },
   {
     slug: "chest-press-machine",
@@ -765,6 +766,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
   },
   ...ENCYCLOPEDIA_BATCH_2026_08_18,
   ...ENCYCLOPEDIA_BATCH_2026_08_25,
+  ...ENCYCLOPEDIA_BATCH_2026_08_25B,
 ];
 
 const bySlug = new Map(

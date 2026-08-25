@@ -9,6 +9,7 @@ import {
 } from "./encyclopedia";
 import { ENCYCLOPEDIA_BATCH_2026_08_18 } from "./encyclopedia-batch-2026-08-18";
 import { ENCYCLOPEDIA_BATCH_2026_08_25 } from "./encyclopedia-batch-2026-08-25";
+import { ENCYCLOPEDIA_BATCH_2026_08_25B } from "./encyclopedia-batch-2026-08-25b";
 import { TOOLS } from "../tools/catalog";
 
 const THIS_WEEK_TOOL_SLUGS = ["tdee"] as const;
@@ -30,7 +31,7 @@ function pageText(value: unknown): string {
 }
 
 test("this week ships 10-20 encyclopedia pages (exercises plus tools)", () => {
-  const total = ENCYCLOPEDIA_BATCH_2026_08_25.length;
+  const total = ENCYCLOPEDIA_BATCH_2026_08_25B.length;
   assert.ok(total >= 10 && total <= 20, `got ${total} pages`);
 });
 
@@ -70,7 +71,7 @@ test("this week's tool pages have Engine CTAs and no typographic dashes", () => 
 });
 
 test("copy stays coaching, not medical theater", () => {
-  const blob = `${pageText(ENCYCLOPEDIA_BATCH_2026_08_25)} ${pageText(
+  const blob = `${pageText(ENCYCLOPEDIA_BATCH_2026_08_25B)} ${pageText(
     TOOLS.filter((tool) =>
       (THIS_WEEK_TOOL_SLUGS as readonly string[]).includes(tool.slug),
     ),
@@ -81,9 +82,9 @@ test("copy stays coaching, not medical theater", () => {
 });
 
 test("this week's exercise batch is 20 pages with a review date", () => {
-  assert.equal(ENCYCLOPEDIA_BATCH_2026_08_25.length, 20);
-  for (const page of ENCYCLOPEDIA_BATCH_2026_08_25) {
-    assert.equal(page.batch, "2026-08-25", page.slug);
+  assert.equal(ENCYCLOPEDIA_BATCH_2026_08_25B.length, 20);
+  for (const page of ENCYCLOPEDIA_BATCH_2026_08_25B) {
+    assert.equal(page.batch, "2026-08-25b", page.slug);
   }
 });
 
@@ -102,6 +103,7 @@ test("start-here hub stays on the first beginner batch", () => {
   for (const page of [
     ...ENCYCLOPEDIA_BATCH_2026_08_18,
     ...ENCYCLOPEDIA_BATCH_2026_08_25,
+    ...ENCYCLOPEDIA_BATCH_2026_08_25B,
   ]) {
     assert.equal(
       featured.some((row) => row.slug === page.slug),

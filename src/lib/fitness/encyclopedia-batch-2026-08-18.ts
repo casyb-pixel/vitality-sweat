@@ -276,7 +276,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_18: EncyclopediaPage[] = [
     engineCta:
       "Log bench dips in the free Vitality Engine. Same bench height next time.",
     relatedTools: [],
-    relatedSlugs: ["push-up", "incline-push-up"],
+    relatedSlugs: ["dip", "push-up"],
   },
   {
     slug: "walking-lunge-bodyweight",
@@ -322,7 +322,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_18: EncyclopediaPage[] = [
     engineCta:
       "Log walking lunges in the free Vitality Engine. Count each leg. Name the version.",
     relatedTools: [],
-    relatedSlugs: ["goblet-squat", "farmer-carry"],
+    relatedSlugs: ["walking-lunge", "goblet-squat"],
   },
   {
     slug: "band-pull-apart",
@@ -464,7 +464,7 @@ export const ENCYCLOPEDIA_BATCH_2026_08_18: EncyclopediaPage[] = [
     engineCta:
       "Log the overhead press in the free Vitality Engine. Bar or dumbbells, named honestly.",
     relatedTools: ["plate-calculator"],
-    relatedSlugs: ["pike-push-up", "barbell-bench-press"],
+    relatedSlugs: ["dumbbell-overhead-press", "pike-push-up"],
   },
   {
     slug: "trap-bar-deadlift",
