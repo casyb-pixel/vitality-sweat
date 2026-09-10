@@ -43,11 +43,21 @@ import {
 } from "@/lib/fitness/types";
 import PlateCalculator from "@/components/app/PlateCalculator";
 
+type ScheduledDayOption = {
+  id: string;
+  label: string;
+};
+
 type WorkoutTrackerProps = {
   exercises: Exercise[];
   initialSession: WorkoutSession | null;
   primaryGoal?: PrimaryGoal | null;
   onSessionChange?: (session: WorkoutSession | null) => void;
+  /** Attach this session to a split day so Engine can save the exercise list. */
+  programDayId?: string | null;
+  scheduledDays?: ScheduledDayOption[];
+  onProgramDayIdChange?: (id: string | null) => void;
+  onFinished?: (sessionId: string) => void;
 };
 
 export default function WorkoutTracker({
@@ -55,10 +65,17 @@ export default function WorkoutTracker({
   initialSession,
   primaryGoal = null,
   onSessionChange,
+  programDayId = null,
+  scheduledDays = [],
+  onProgramDayIdChange,
+  onFinished,
 }: WorkoutTrackerProps) {
   const [catalog, setCatalog] = useState<Exercise[]>(initialExercises);
   const [session, setSessionState] = useState<WorkoutSession | null>(
     initialSession,
+  );
+  const [dayId, setDayId] = useState<string | null>(
+    programDayId ?? initialSession?.program_day_id ?? null,
   );
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
@@ -112,6 +129,10 @@ export default function WorkoutTracker({
   useEffect(() => {
     setSessionState(initialSession);
   }, [initialSession]);
+
+  useEffect(() => {
+    if (programDayId) setDayId(programDayId);
+  }, [programDayId]);
 
   const selected = useMemo(
     () => catalog.find((e) => e.id === exerciseId) ?? null,
@@ -186,11 +207,28 @@ export default function WorkoutTracker({
     if (note) setMessage(note);
   }
 
+  function selectDay(id: string) {
+    setDayId(id);
+    onProgramDayIdChange?.(id);
+    if (!session) return;
+    startTransition(async () => {
+      const result = await startWorkoutSession(id, {
+        gymName: gymName.trim() || null,
+        gymOptionId,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setSession(result.data.session);
+    });
+  }
+
   function startSession() {
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await startWorkoutSession(null, {
+      const result = await startWorkoutSession(dayId, {
         gymName: gymName.trim() || null,
         gymOptionId,
       });
@@ -241,7 +279,8 @@ export default function WorkoutTracker({
         setError(result.error);
         return;
       }
-      setFinishedSessionId(session.id);
+      const finishedId = session.id;
+      setFinishedSessionId(finishedId);
       setSession(null);
       setLoggedSets([]);
       setSetNumber(1);
@@ -250,6 +289,7 @@ export default function WorkoutTracker({
           ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
           : "Workout completed. Nice work.",
       );
+      onFinished?.(finishedId);
       void loadHistory(exerciseId);
     });
   }
@@ -397,6 +437,34 @@ export default function WorkoutTracker({
 
   return (
     <div className="space-y-6">
+      {scheduledDays.length > 0 ? (
+        <fieldset className="space-y-2">
+          <legend className="font-sans text-sm font-semibold text-brand-ink">
+            Which split day is this?
+          </legend>
+          <p className="font-sans text-xs text-brand-muted">
+            Engine saves what you log to that day so you can run the same
+            workout next time.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {scheduledDays.map((day) => (
+              <button
+                key={day.id}
+                type="button"
+                onClick={() => selectDay(day.id)}
+                className={`min-h-10 rounded-md border px-3 py-2 font-sans text-xs font-bold uppercase tracking-[0.06em] ${
+                  dayId === day.id
+                    ? "border-brand-orange bg-brand-orange text-white"
+                    : "border-brand-ink/15 text-brand-ink hover:border-brand-orange"
+                }`}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         {!session ? (
           <button

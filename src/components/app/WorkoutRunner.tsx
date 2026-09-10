@@ -27,6 +27,7 @@ import RunnerExerciseEditSheet from "@/components/app/RunnerExerciseEditSheet";
 import TrainTogetherSheet from "@/components/app/TrainTogetherSheet";
 import WorkoutRestCoach from "@/components/app/WorkoutRestCoach";
 import ExerciseHowToSheet from "@/components/app/ExerciseHowToSheet";
+import WorkoutTracker from "@/components/app/WorkoutTracker";
 import { postWinToEngineRoom } from "@/lib/engine-room/post-win";
 import { nextSupersetIndex } from "@/lib/fitness/supersets";
 import type { WorkoutMilestone } from "@/lib/fitness/milestones";
@@ -52,6 +53,7 @@ type WorkoutRunnerProps = {
   primaryGoal?: PrimaryGoal | null;
   onDayChange?: (day: NestedProgramDay) => void;
   paired?: boolean;
+  onSessionFinished?: () => void;
   onBaselinesSaved?: (
     programExerciseId: string,
     baseline: { baseline_weight_lb: number | null; baseline_reps: number },
@@ -137,6 +139,7 @@ export default function WorkoutRunner({
   onDayChange,
   onBaselinesSaved,
   paired = false,
+  onSessionFinished,
 }: WorkoutRunnerProps) {
   const exercises = useMemo(
     () =>
@@ -659,6 +662,7 @@ export default function WorkoutRunner({
       setFinishedSessionId(session.id);
       setSession(null);
       onSessionChange(null);
+      onSessionFinished?.();
       setMessage(
         primaryGoal === "muscle_gain" || primaryGoal === "strength"
           ? "Workout completed. Nice work. Log tape measurements on Progress when you can."
@@ -724,9 +728,34 @@ export default function WorkoutRunner({
   if (!current) {
     return (
       <div className="space-y-4">
-        <p className="font-sans text-sm text-brand-muted">
-          No exercises on this day.
-        </p>
+        {error ? (
+          <p className="font-sans text-sm text-red-700">{error}</p>
+        ) : null}
+        <header className="space-y-2">
+          <p className="eyebrow text-brand-orange">{day.label}</p>
+          <h2 className="font-display text-xl text-brand-ink">Log this day</h2>
+          <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted">
+            This day has no exercises yet. Log your lifts here. Engine will
+            save them so you can run the same workout next time.
+          </p>
+        </header>
+        <WorkoutTracker
+          exercises={catalog}
+          initialSession={session}
+          primaryGoal={primaryGoal}
+          programDayId={day.id.startsWith("paired-") ? null : day.id}
+          onSessionChange={(next) => {
+            setSession(next);
+            onSessionChange(next);
+          }}
+          onFinished={(sessionId) => {
+            setFinishedSessionId(sessionId);
+            setSession(null);
+            onSessionChange(null);
+            setMessage("Workout completed. Nice work. This day is saved for next time.");
+            onSessionFinished?.();
+          }}
+        />
         <button type="button" onClick={onExit} className={secondaryBtn}>
           Back to plan
         </button>

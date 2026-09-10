@@ -17,8 +17,17 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function WorkoutPage() {
+export default async function WorkoutPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ startDay?: string }>;
+}) {
   const { user } = await requireMemberAccess("/app/workout");
+  const params = searchParams ? await searchParams : {};
+  const startDayId =
+    typeof params.startDay === "string" && params.startDay.trim()
+      ? params.startDay.trim()
+      : null;
   const supabase = await createClient();
   const profile = await getFitnessProfile(supabase, user.id);
   const completion = await getMemberCompletionRedirect(supabase, user.id, {
@@ -90,6 +99,7 @@ export default async function WorkoutPage() {
         exercises={(exercises as Exercise[] | null) ?? []}
         initialSession={(activeSession as WorkoutSession | null) ?? null}
         profileGoal={profile?.primary_goal ?? null}
+        initialStartDayId={startDayId}
       />
     </div>
   );

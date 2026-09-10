@@ -26,6 +26,7 @@ export default function WorkoutHistoryClient() {
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [repeating, setRepeating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,6 +99,34 @@ export default function WorkoutHistoryClient() {
     if (openId) await openSession(openId);
   }
 
+  async function repeatSession(sessionId: string) {
+    setRepeating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/app/workout/session/repeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        program_day_id?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.ok || !json.program_day_id) {
+        setError(json.error ?? "Could not repeat that workout.");
+        return;
+      }
+      window.location.assign(
+        `/app/workout?startDay=${encodeURIComponent(json.program_day_id)}`,
+      );
+    } catch {
+      setError("Could not repeat that workout.");
+    } finally {
+      setRepeating(false);
+    }
+  }
+
   const exerciseName = (id: string) =>
     detail?.exercises?.find((e) => e.id === id)?.name ?? "Exercise";
 
@@ -109,8 +138,8 @@ export default function WorkoutHistoryClient() {
           What you already lifted
         </h1>
         <p className="max-w-xl font-sans text-sm text-brand-muted">
-          Every completed session lives here. Open one to edit notes or delete a
-          bad set.
+          Every completed session lives here. Open one to edit notes, delete a
+          bad set, or do that workout again.
         </p>
       </header>
 
@@ -216,14 +245,26 @@ export default function WorkoutHistoryClient() {
                 className="mt-1.5 w-full border border-brand-ink/15 px-3 py-2 font-sans text-sm"
               />
             </label>
-            <button
-              type="button"
-              onClick={() => void saveNotes()}
-              disabled={saving}
-              className="mt-3 inline-flex min-h-10 items-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Save notes"}
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void saveNotes()}
+                disabled={saving || repeating}
+                className="inline-flex min-h-10 items-center bg-brand-orange px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-white disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save notes"}
+              </button>
+              {(detail.sets ?? []).length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void repeatSession(detail.session.id)}
+                  disabled={repeating || saving}
+                  className="inline-flex min-h-10 items-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
+                >
+                  {repeating ? "Opening…" : "Do this workout again"}
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : (
           <p className="font-sans text-sm text-brand-muted">

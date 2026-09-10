@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import WorkoutAgent, {
   type NestedProgramDay,
   type NestedWorkoutProgram,
@@ -10,6 +10,7 @@ import WorkoutTracker from "@/components/app/WorkoutTracker";
 import ProgramTemplatesPanel from "@/components/app/ProgramTemplatesPanel";
 import WorkoutSafetyNote from "@/components/legal/WorkoutSafetyNote";
 import { syntheticDayFromSnapshot, type PairedDaySnapshot } from "@/lib/fitness/workout-pairing";
+import { suggestedScheduledDay } from "@/lib/fitness/save-session-to-day";
 import type {
   Exercise,
   PrimaryGoal,
@@ -24,6 +25,8 @@ type WorkoutWorkspaceProps = {
   initialSession: WorkoutSession | null;
   /** From fitness_profiles; used when program goal is missing (freeform). */
   profileGoal?: PrimaryGoal | null;
+  /** History "Do this workout again" lands here with the day already seeded. */
+  initialStartDayId?: string | null;
 };
 
 function findDayById(
@@ -67,6 +70,7 @@ export default function WorkoutWorkspace({
   exercises,
   initialSession,
   profileGoal = null,
+  initialStartDayId = null,
 }: WorkoutWorkspaceProps) {
   const [program, setProgram] = useState(initialProgram);
   const [session, setSession] = useState(initialSession);
@@ -85,6 +89,35 @@ export default function WorkoutWorkspace({
     const map = new Map(exercises.map((ex) => [ex.id, ex]));
     return map;
   }, [exercises]);
+
+  const scheduledDays = useMemo(
+    () =>
+      (program?.days ?? []).filter(
+        (day) => (day.day_kind ?? "scheduled") === "scheduled",
+      ),
+    [program],
+  );
+  const todayDay = useMemo(
+    () => suggestedScheduledDay(scheduledDays),
+    [scheduledDays],
+  );
+  const [freeformDayId, setFreeformDayId] = useState<string | null>(
+    () =>
+      initialSession?.program_day_id ??
+      suggestedScheduledDay(
+        (initialProgram?.days ?? []).filter(
+          (day) => (day.day_kind ?? "scheduled") === "scheduled",
+        ),
+      )?.id ??
+      null,
+  );
+
+  useEffect(() => {
+    if (freeformDayId && scheduledDays.some((day) => day.id === freeformDayId)) {
+      return;
+    }
+    setFreeformDayId(todayDay?.id ?? null);
+  }, [freeformDayId, scheduledDays, todayDay?.id]);
 
   useEffect(() => {
     const inviteId = session?.paired_invite_id;
@@ -120,6 +153,30 @@ export default function WorkoutWorkspace({
       cancelled = true;
     };
   }, [session?.paired_invite_id, catalogById, runningDay?.id]);
+
+  const startedFromQuery = useRef(false);
+  useEffect(() => {
+    if (startedFromQuery.current || !initialStartDayId) return;
+    const day = findDayById(program, initialStartDayId);
+    if (!day) return;
+    startedFromQuery.current = true;
+    setRunningDay(enrichDay(day, catalogById));
+  }, [initialStartDayId, program, catalogById]);
+
+  async function refreshProgram() {
+    try {
+      const res = await fetch("/api/app/workout/plan");
+      const json = (await res.json()) as {
+        ok?: boolean;
+        program?: NestedWorkoutProgram | null;
+      };
+      if (res.ok && json.ok && json.program) {
+        setProgram(json.program);
+      }
+    } catch {
+      // Plan refresh is best-effort after a saved session.
+    }
+  }
 
   function handleStartDay(day: NestedProgramDay) {
     setRunningDay(enrichDay(day, catalogById));
@@ -229,6 +286,9 @@ export default function WorkoutWorkspace({
             onSessionChange={setSession}
             onBaselinesSaved={handleBaselinesSaved}
             onDayChange={handleRunningDayChange}
+            onSessionFinished={() => {
+              void refreshProgram();
+            }}
             primaryGoal={effectiveGoal}
             paired={paired || runningDay.id.startsWith("paired-")}
             onExit={() => {
@@ -248,8 +308,9 @@ export default function WorkoutWorkspace({
                 Log today’s workout
               </h2>
               <p className="max-w-2xl font-sans text-sm leading-relaxed text-brand-muted">
-                Pick a program day above to run the guided session, or log
-                freeform sets here.
+                Pick a program day above for the guided session, or log
+                freeform sets here. Choose a split day so Engine can save this
+                workout for next time.
               </p>
             </header>
             <WorkoutTracker
@@ -257,6 +318,15 @@ export default function WorkoutWorkspace({
               initialSession={session}
               primaryGoal={effectiveGoal}
               onSessionChange={setSession}
+              programDayId={freeformDayId}
+              scheduledDays={scheduledDays.map((day) => ({
+                id: day.id,
+                label: day.label,
+              }))}
+              onProgramDayIdChange={setFreeformDayId}
+              onFinished={() => {
+                void refreshProgram();
+              }}
             />
           </>
         )}

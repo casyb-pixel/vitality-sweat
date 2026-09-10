@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { latestBodyWeightLb } from "@/lib/fitness/body-logs";
+import { saveSessionToDay } from "@/lib/fitness/save-session-to-day";
 import { resolveGymCheckIn } from "@/lib/gyms/resolve";
 import { createClient } from "@/utils/supabase/server";
 
@@ -315,6 +316,18 @@ export async function PATCH(request: Request) {
         { ok: false, error: error.message },
         { status: 500 },
       );
+    }
+
+    if (body.status === "completed" && data?.program_day_id) {
+      try {
+        await saveSessionToDay(supabase, {
+          sessionId: data.id,
+          programDayId: data.program_day_id,
+          userId: user.id,
+        });
+      } catch {
+        // Completing the session still succeeds if the split write-back fails.
+      }
     }
 
     return NextResponse.json({ ok: true, session: data });
