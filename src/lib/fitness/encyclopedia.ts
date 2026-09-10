@@ -3,12 +3,13 @@
  * Review in git. Not Hunter's Daily Brief.
  *
  * Aug 17 batch lives in this file. Later review batches are imported below.
- * Cluster order: beginner leftovers (dorm), then named-program lift cues, then remaining program plus gym staples.
+ * Cluster order: beginner leftovers (dorm), then named-program lift cues, then remaining program plus gym staples, then catalog overlays.
  */
 
 import { ENCYCLOPEDIA_BATCH_2026_08_18 } from "./encyclopedia-batch-2026-08-18";
 import { ENCYCLOPEDIA_BATCH_2026_08_25 } from "./encyclopedia-batch-2026-08-25";
 import { ENCYCLOPEDIA_BATCH_2026_08_25B } from "./encyclopedia-batch-2026-08-25b";
+import { ENCYCLOPEDIA_BATCH_2026_09_10 } from "./encyclopedia-batch-2026-09-10";
 
 export type EncyclopediaCluster = "beginner" | "train";
 
@@ -39,7 +40,7 @@ export type EncyclopediaPage = {
 export const FEATURED_ENCYCLOPEDIA_BATCH = "2026-08-17";
 
 /** Parent review batch in the current PR. Tools live in src/lib/tools/catalog.ts. */
-export const ENCYCLOPEDIA_BATCH_LABEL = "Aug 25, 2026";
+export const ENCYCLOPEDIA_BATCH_LABEL = "Sep 10, 2026";
 
 export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
   {
@@ -767,6 +768,7 @@ export const ENCYCLOPEDIA_PAGES: EncyclopediaPage[] = [
   ...ENCYCLOPEDIA_BATCH_2026_08_18,
   ...ENCYCLOPEDIA_BATCH_2026_08_25,
   ...ENCYCLOPEDIA_BATCH_2026_08_25B,
+  ...ENCYCLOPEDIA_BATCH_2026_09_10,
 ];
 
 const bySlug = new Map(
