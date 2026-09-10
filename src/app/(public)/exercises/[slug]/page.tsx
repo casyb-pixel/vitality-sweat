@@ -180,7 +180,7 @@ export default async function ExercisePage({
         </p>
       )}
 
-      <AdSlot slotId="exercise-sidebar" label="Local partner" size="banner" />
+      <AdSlot slotId="exercise-sidebar" size="banner" />
 
       <p className="mt-6 max-w-2xl font-sans text-sm font-semibold text-brand-ink">
         {page?.engineCta ??

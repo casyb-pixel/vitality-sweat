@@ -9,7 +9,7 @@ import { buildCanonical } from "@/lib/seo/site";
 export const metadata: Metadata = {
   title: "Programs",
   description:
-    "Named plans you can start in the free Vitality Engine: first gym, dorm, PPL, 5x5, baseball, feel-18 rebuild.",
+    "Named plans you can start in the free Vitality Engine: first gym, job-site, post-shift, dorm, PPL, 5x5, baseball, feel-18 rebuild.",
   alternates: { canonical: buildCanonical("/programs") },
 };
 
@@ -41,7 +41,7 @@ export default function ProgramsHubPage() {
           </li>
         ))}
       </ul>
-      <AdSlot slotId="program-end" label="Local partner" size="banner" />
+      <AdSlot slotId="program-end" size="banner" />
       <JsonLd
         data={{
           "@context": "https://schema.org",

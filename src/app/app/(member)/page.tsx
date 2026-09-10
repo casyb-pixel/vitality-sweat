@@ -127,7 +127,7 @@ export default async function MemberDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <AdSlot slotId="app-home" label="Local partner" size="banner" />
+      <AdSlot slotId="app-home" size="banner" />
       <header className="space-y-3">
         <p className="eyebrow text-brand-orange">Vitality Engine</p>
         <h1 className="font-display text-[clamp(1.85rem,5vw,2.75rem)] leading-[1.05] text-brand-ink">

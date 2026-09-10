@@ -66,7 +66,7 @@ export default async function ProgramDetailPage({
           </article>
         ))}
       </div>
-      <AdSlot slotId="program-end" label="Local partner" size="banner" />
+      <AdSlot slotId="program-end" size="banner" />
       <p className="mt-6">
         <Link
           href={`/app/workout?startProgram=${program.slug}`}

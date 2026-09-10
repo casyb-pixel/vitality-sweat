@@ -147,11 +147,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
               fallbackThumbnail={coverSrc}
             />
             <div className="my-8">
-              <AdSlot
-                slotId={midSlotId}
-                label="Local partner placement"
-                size="banner"
-              />
+              <AdSlot slotId={midSlotId} size="banner" />
             </div>
             {showGrowthCta ? (
               <JoinEngineCTA location="blog_mid" variant="mid" />
@@ -189,11 +185,7 @@ export default async function BlogArticlePage({ params }: BlogPageProps) {
       </article>
 
       <div className="site-shell space-y-8 pb-[var(--section-y)]">
-        <AdSlot
-          slotId="blog-end"
-          label="Local partner placement"
-          size="banner"
-        />
+        <AdSlot slotId="blog-end" size="banner" />
         {showGrowthCta ? (
           <JoinEngineCTA location="blog_end" variant="end" />
         ) : null}

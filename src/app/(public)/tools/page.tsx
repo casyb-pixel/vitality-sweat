@@ -44,7 +44,7 @@ export default function ToolsHubPage() {
               featured={featuredEncyclopediaPages().map(toEncyclopediaSearchHit)}
             />
           </div>
-          <AdSlot slotId="tools-inline" label="Local partner" size="banner" />
+          <AdSlot slotId="tools-inline" size="banner" />
           <ul className="mt-10 grid gap-4 sm:grid-cols-2">
             {TOOLS.map((tool) => (
               <li key={tool.slug}>

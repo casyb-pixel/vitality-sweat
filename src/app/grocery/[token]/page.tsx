@@ -104,11 +104,7 @@ export default async function SharedGroceryPage({ params }: PageProps) {
         </div>
 
         <div className="mt-8 print:hidden">
-          <AdSlot
-            slotId="grocery-footer"
-            label="Local partner"
-            size="banner"
-          />
+          <AdSlot slotId="grocery-footer" size="banner" />
         </div>
       </div>
     </main>

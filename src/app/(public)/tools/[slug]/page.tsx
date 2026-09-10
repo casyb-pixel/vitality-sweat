@@ -72,7 +72,7 @@ export default async function ToolPage({
             <ToolCalculator slug={tool.slug} />
           </div>
 
-          <AdSlot slotId="tools-inline" label="Local partner" size="banner" />
+          <AdSlot slotId="tools-inline" size="banner" />
 
           {tool.body.map((block) => (
             <section key={block.h2} className="mt-10 max-w-2xl">

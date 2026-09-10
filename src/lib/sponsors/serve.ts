@@ -42,6 +42,7 @@ type CreativeJoinRow = {
     sponsors: {
       id: string;
       name: string;
+      slug?: string | null;
       is_active: boolean;
     } | null;
   } | null;
@@ -61,6 +62,16 @@ function isFlightLive(campaign: {
     return false;
   }
   return true;
+}
+
+/** Seeded pitch-deck flights should not render on the public site. */
+export function isDemoSponsor(input: {
+  slug?: string | null;
+  name?: string | null;
+}): boolean {
+  const slug = (input.slug ?? "").toLowerCase();
+  const name = (input.name ?? "").toLowerCase();
+  return slug.includes("demo") || name.includes("(demo)");
 }
 
 function zipMatch(
@@ -111,6 +122,7 @@ export async function serveCreativeForSlot(
         sponsors!inner (
           id,
           name,
+          slug,
           is_active
         )
       )
@@ -129,6 +141,7 @@ export async function serveCreativeForSlot(
     const campaign = row.sponsor_campaigns;
     const sponsor = campaign?.sponsors;
     if (!campaign || !sponsor?.is_active) return false;
+    if (isDemoSponsor(sponsor)) return false;
     if (!isFlightLive(campaign)) return false;
     if (!zipMatch(campaign.target_zips, input.visitorZip)) return false;
     return true;
