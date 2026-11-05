@@ -257,7 +257,10 @@ export default function WorkoutHistoryClient() {
               {(detail.sets ?? []).length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => void repeatSession(detail.session.id)}
+                  onClick={() => {
+                    const sessionId = detail?.session?.id;
+                    if (sessionId) void repeatSession(sessionId);
+                  }}
                   disabled={repeating || saving}
                   className="inline-flex min-h-10 items-center border border-brand-ink/15 px-4 py-2 font-sans text-xs font-bold uppercase tracking-[0.08em] text-brand-ink hover:border-brand-orange hover:text-brand-orange disabled:opacity-60"
                 >
