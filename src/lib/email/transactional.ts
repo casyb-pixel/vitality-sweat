@@ -16,7 +16,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { absoluteUrl } from "@/lib/seo/site";
 
-export type EmailTemplate = "welcome" | "weekly_tip";
+export type EmailTemplate = "welcome" | "weekly_tip" | "scholarship_deadline";
 
 export type EmailSendResult =
   | { status: "sent"; outboxId: string; providerMessageId: string }

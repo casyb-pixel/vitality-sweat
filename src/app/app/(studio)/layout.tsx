@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
+import { scholarshipNavVisible } from "@/lib/auth/scholarship";
 
-export default function CreatorAppLayout({
+export default async function CreatorAppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const showScholarships = await scholarshipNavVisible();
   return (
     <div className="min-h-full bg-surface">
       <header className="sticky top-0 z-40 border-b border-brand-ink/10 bg-surface-elevated/95 backdrop-blur-md">
@@ -43,6 +45,14 @@ export default function CreatorAppLayout({
             >
               Gyms
             </Link>
+            {showScholarships ? (
+              <Link
+                href="/app/scholarships"
+                className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
+              >
+                Scholarships
+              </Link>
+            ) : null}
             <Link
               href="/chronicles"
               className="font-sans text-xs font-semibold text-brand-muted hover:text-brand-orange sm:text-sm"
